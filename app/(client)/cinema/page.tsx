@@ -1,32 +1,22 @@
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, MapPin, Loader2, Clock, Ticket, ChevronRight, Star } from 'lucide-react';
-import BookingModal from './components/BookingModal';
-// Fix 1: Import thêm getImageUrl
+import { Search, Loader2, Clock, ChevronRight, Star } from 'lucide-react';
+// 1. Import useRouter để điều hướng
+import { useRouter } from 'next/navigation';
 import { apiRequest, getImageUrl } from '@/app/lib/api';
 
-// Fix 2: Component hiển thị ảnh sử dụng getImageUrl
 const MovieShowtimeItem = ({ movie, onSelect }: any) => (
   <div className="group flex gap-4 p-4 rounded-[2rem] bg-zinc-900/30 border border-white/5 hover:border-red-600/30 hover:bg-zinc-900/60 transition-all duration-300">
-    {/* Poster Nhỏ Gọn */}
     <div className="relative shrink-0">
       <div className="w-24 h-36 rounded-2xl overflow-hidden shadow-xl">
         <img 
-          src={getImageUrl(movie.image)} // <-- SỬA TẠI ĐÂY
+          src={getImageUrl(movie.image)} 
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
           alt={movie.title} 
-          onError={(e) => {
-            // Dự phòng nếu ảnh lỗi
-            e.currentTarget.src = "https://placehold.co/400x600?text=Poster+Error";
-          }}
         />
-      </div>
-      <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-lg bg-red-600 text-[8px] font-black text-white italic">
-        {movie.tag}
       </div>
     </div>
 
-    {/* Nội dung tinh gọn */}
     <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
       <div>
         <h4 className="text-base font-black uppercase italic tracking-tighter text-white truncate group-hover:text-red-500 transition-colors">
@@ -46,7 +36,8 @@ const MovieShowtimeItem = ({ movie, onSelect }: any) => (
               {f.times.map((st: any) => (
                 <button 
                   key={st.id} 
-                  onClick={() => onSelect(movie, st, f.type)} 
+                  // 2. Gọi hàm onSelect khi nhấn vào giờ
+                  onClick={() => onSelect(st.id)} 
                   className="px-4 py-2 rounded-xl bg-zinc-800 border border-white/5 text-[10px] font-black text-zinc-300 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-90"
                 >
                   {st.time}
@@ -61,6 +52,8 @@ const MovieShowtimeItem = ({ movie, onSelect }: any) => (
 );
 
 export default function Cinema() {
+  // 3. Khởi tạo router
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [cinemas, setCinemas] = useState<any[]>([]);
   const [movies, setMovies] = useState<any[]>([]);
@@ -69,17 +62,23 @@ export default function Cinema() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [fetchingShowtimes, setFetchingShowtimes] = useState(false);
-  const [booking, setBooking] = useState<any>(null);
 
   useEffect(() => { 
     setIsMounted(true); 
     setSelectedDate(new Date().toISOString().split('T')[0]);
   }, []);
 
+  // 4. Hàm xử lý nhảy trang
+  const handleBooking = (showtimeId: number) => {
+    // Chuyển hướng sang trang booking kèm ID suất chiếu
+    // Đường dẫn này tùy thuộc vào cấu trúc folder của bạn (ví dụ: app/booking/[id]/page.tsx)
+    router.push(`/booking/${showtimeId}`);
+  };
+
   useEffect(() => {
     const fetchCinemas = async () => {
       try {
-        const res = await apiRequest('/api/v1/cinemas');
+        const res = await apiRequest('/api/v1/cinema-items');
         const result = await res.json();
         const list = result.data || [];
         setCinemas(list);
@@ -101,23 +100,24 @@ export default function Cinema() {
           const grouped = filtered.reduce((acc: any, curr: any) => {
             const m = curr.movie;
             if (!m) return acc;
-            
-            // Fix 3: Xử lý ảnh khi nhóm dữ liệu (Mặc dù src đã gọi getImageUrl, nhưng đảm bảo dữ liệu truyền vào sạch)
             if (!acc[m.id]) {
               acc[m.id] = { 
                 id: m.id, 
                 title: m.title, 
-                image: m.posterUrl, // Giữ nguyên tên trường là image để khớp với MovieShowtimeItem props
+                image: m.posterUrl, 
                 duration: m.duration, 
                 genre: m.genre?.name, 
                 tag: m.rating >= 18 ? "T18" : "T13", 
                 formats: {} 
               };
             }
-            
             const type = curr.room?.name?.includes("IMAX") ? "IMAX 3D" : "2D DIGITAL";
             if (!acc[m.id].formats[type]) acc[m.id].formats[type] = [];
-            acc[m.id].formats[type].push({ id: curr.id, time: new Date(curr.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }), roomId: curr.room?.id });
+            acc[m.id].formats[type].push({ 
+                id: curr.id, 
+                time: new Date(curr.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }), 
+                roomId: curr.room?.id 
+            });
             return acc;
           }, {});
           setMovies(Object.values(grouped).map((m: any) => ({ ...m, formats: Object.entries(m.formats).map(([type, times]) => ({ type, times })) })));
@@ -141,10 +141,10 @@ export default function Cinema() {
     <div className="bg-[#050505] min-h-screen pt-20 pb-10 px-4 text-zinc-400">
       <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Sidebar Rạp - Gọn gàng */}
+        {/* Sidebar Rạp */}
         <div className="lg:col-span-4 space-y-6">
           <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-600 transition-colors" size={14} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-600" size={14} />
             <input 
               onChange={e => setSearchTerm(e.target.value)} 
               placeholder="Tìm nhanh rạp..." 
@@ -161,7 +161,7 @@ export default function Cinema() {
                   selectedId === c.id ? 'bg-red-600 border-red-600 text-white shadow-lg' : 'bg-zinc-900/20 border-white/5 hover:border-white/10'
                 }`}
               >
-                <div className="min-w-0">
+                <div className="min-w-0 text-left">
                   <h3 className="text-[11px] font-[1000] uppercase italic truncate">{c.name}</h3>
                   <p className={`text-[8px] font-bold mt-0.5 truncate opacity-50`}>{c.address}</p>
                 </div>
@@ -171,9 +171,8 @@ export default function Cinema() {
           </div>
         </div>
 
-        {/* Main Content - Suất chiếu */}
+        {/* Main Content */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Lịch ngày ngang tinh giản */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {dateTabs.map(d => (
               <button 
@@ -189,14 +188,18 @@ export default function Cinema() {
             ))}
           </div>
 
-          {/* Danh sách phim - Lưới 1 cột gọn gàng */}
           <div className="bg-zinc-900/10 rounded-[2.5rem] border border-white/5 p-2 min-h-[400px]">
             {fetchingShowtimes ? (
               <div className="h-[400px] flex items-center justify-center"><Loader2 className="animate-spin text-red-600" /></div>
             ) : movies.length > 0 ? (
               <div className="grid grid-cols-1 gap-2">
                 {movies.map((m) => (
-                  <MovieShowtimeItem key={m.id} movie={m} onSelect={(movieData: any, st: any, format: any) => setBooking({ ...movieData, id: st.id, time: st.time, format, roomId: st.roomId })} />
+                  <MovieShowtimeItem 
+                    key={m.id} 
+                    movie={m} 
+                    // 5. Truyền hàm xử lý nhảy trang vào item
+                    onSelect={handleBooking} 
+                  />
                 ))}
               </div>
             ) : (
@@ -205,8 +208,6 @@ export default function Cinema() {
           </div>
         </div>
       </div>
-
-      {booking && <BookingModal info={booking} onClose={() => setBooking(null)} />}
       
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }

@@ -73,9 +73,9 @@ export default function TopMenu() {
             <span>Tin mới</span>
           </Link>
 
-          <Link href="/my-tickets" className="flex items-center gap-2 text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest group transition-all">
+          <Link href="/discounts" className="flex items-center gap-2 text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest group transition-all">
             <Ticket size={14} className="text-red-600 group-hover:scale-110 transition-transform" />
-            <span>Vé của tôi</span>
+            <span>Mã giảm giá</span>
           </Link>
         </div>
 
