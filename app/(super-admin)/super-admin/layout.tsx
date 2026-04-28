@@ -55,7 +55,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     { label: "Voucher", icon: <Zap size={20} />, href: "/super-admin/voucher" },
     { label: "Quản lý đơn hàng", icon: <MessageSquare size={20} />, href: "/super-admin/order" },
     { label: "Người dùng", icon: <Users size={20} />, href: "/super-admin/user" },
-    { label: "Giá vé & Ghế", icon: <Ticket size={20} />, href: "/super-admin/ticket" },
+    { label: "Giá vé & Ghế", icon: <Ticket size={20} />, href: "/super-admin/seat-price" },
     { label: "Thống kê", icon: <BarChart3 size={20} />, href: "/super-admin/analytic" },
   ];
 

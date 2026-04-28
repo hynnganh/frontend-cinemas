@@ -100,7 +100,7 @@ export default function CinemaDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12 font-sans selection:bg-red-600 overflow-hidden relative">
+    <div className="min-h-screen bg-[#050505] text-white p-3 md:p-6 font-sans selection:bg-red-600 overflow-hidden relative">
       <Toaster position="top-right" />
       
       {/* Background Glow */}

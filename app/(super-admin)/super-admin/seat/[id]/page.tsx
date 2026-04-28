@@ -141,13 +141,13 @@ function SeatContent() {
   );
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white p-8 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#020202] text-white p-3 md:p-6 font-sans relative overflow-hidden">
       <Toaster position="top-right" />
       
       <div className="max-w-6xl mx-auto relative z-10">
         
         {/* TOP NAV */}
-        <div className="flex justify-between items-start mb-12">
+        <div className="flex justify-between items-start mb-4">
           <button 
             onClick={() => router.back()} 
             className="group flex items-center gap-3 text-zinc-600 hover:text-white transition-all text-[9px] font-[1000] uppercase tracking-widest"
@@ -155,7 +155,7 @@ function SeatContent() {
             <div className="w-8 h-8 flex items-center justify-center border border-white/5 rounded-full group-hover:border-red-600/50 group-hover:bg-red-600/5 transition-all">
               <ArrowLeft size={12} />
             </div>
-            Back to rooms
+            Trở lại
           </button>
 
           <div className="flex bg-[#0a0a0a] border border-white/5 rounded-2xl p-1.5 shadow-2xl">
@@ -168,7 +168,7 @@ function SeatContent() {
         {/* HEADER */}
         <header className="mb-16">
             <div className="flex items-center gap-3 text-red-600 font-black text-[10px] uppercase tracking-[0.4em] mb-4">
-              <ShieldCheck size={16} /> {cinemaData.name || "Vinacenter Admin"}
+              <ShieldCheck size={16} /> {cinemaData.name || "A&K Admin"}
             </div>
             <h1 className="text-5xl font-[1000] italic uppercase tracking-tighter text-white">
               {roomData.name || "Seat Layout"}
