@@ -13,6 +13,7 @@
     "bcrypt": "^5.1.1",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",
+    "framer-motion": "^12.38.0",
     "js-cookie": "^3.0.5",
     "lucide": "^1.11.0",
     "lucide-react": "^0.575.0",

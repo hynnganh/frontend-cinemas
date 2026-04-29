@@ -48,11 +48,13 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   const MENU_ITEMS = [
     { label: "Tổng quan", icon: <LayoutDashboard size={20} />, href: "/super-admin" },
+    { label: "Thể loại", icon: <Tag size={20} />, href: "/super-admin/genre" },
     { label: "Phim ảnh", icon: <Film size={20} />, href: "/super-admin/movie" },
     { label: "Hệ thống rạp", icon: <MapPin size={20} />, href: "/super-admin/cinema" },
     { label: "Lịch chiếu", icon: <Calendar size={20} />, href: "/super-admin/showtime" },
     { label: "Sự kiện", icon: <Tag size={20} />, href: "/super-admin/event" },
     { label: "Voucher", icon: <Zap size={20} />, href: "/super-admin/voucher" },
+    { label: "Banner", icon: <BarChart3 size={20} />, href: "/super-admin/banner" },
     { label: "Quản lý đơn hàng", icon: <MessageSquare size={20} />, href: "/super-admin/order" },
     { label: "Người dùng", icon: <Users size={20} />, href: "/super-admin/user" },
     { label: "Giá vé & Ghế", icon: <Ticket size={20} />, href: "/super-admin/seat-price" },
