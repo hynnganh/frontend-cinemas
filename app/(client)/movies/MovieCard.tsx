@@ -1,19 +1,34 @@
 "use client";
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from "next/link";
 import { Ticket, Star, CalendarDays, Info } from "lucide-react";
-import { getImageUrl } from "@/app/lib/api"; // <-- THÊM DÒNG NÀY
+import { getImageUrl } from "@/app/lib/api";
 
 interface MovieCardProps {
   id: number;
   title: string;
-  image: string;       // Tương ứng với posterUrl từ API
+  image: string;       // posterUrl từ API
   rating?: number | string | null;
   status?: string;     // "SHOWING" hoặc "COMING_SOON"
 }
 
 export default function MovieCard({ id, title, image, rating, status }: MovieCardProps) {
   const isShowing = status === "SHOWING";
+
+  /**
+   * FIX HIỂN THỊ ẢNH:
+   * Kiểm tra nếu image là một URL tuyệt đối (Cloudinary) thì dùng luôn.
+   * Nếu là tên file (Local) thì mới đi qua hàm getImageUrl.
+   */
+  const finalImageUrl = useMemo(() => {
+    if (!image) return "https://png.pngtree.com/png-clipart/20190611/original/pngtree-surprised-face-expression-png-image_2888052.jpg";
+    
+    if (image.startsWith('http')) {
+      return image;
+    }
+    
+    return getImageUrl(image);
+  }, [image]);
 
   // NGHIỆP VỤ RATING: 
   const hasRating = rating && Number(rating) > 0;
@@ -30,7 +45,7 @@ export default function MovieCard({ id, title, image, rating, status }: MovieCar
       {/* 1. KHU VỰC POSTER (IMAGE CONTAINER) */}
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-zinc-900">
         <img
-          src={getImageUrl(image)} // <-- SỬA DÒNG NÀY ĐỂ TÁI SỬ DỤNG LOGIC API
+          src={finalImageUrl} 
           alt={title}
           className={`w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 
             ${!isShowing && 'grayscale-[0.3] group-hover:grayscale-0'}`} 

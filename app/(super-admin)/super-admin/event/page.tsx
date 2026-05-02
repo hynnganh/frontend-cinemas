@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Trash2, Edit3, MapPin, Film, Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit3, MapPin, Film, Sparkles, Loader2, AlertCircle, Calendar } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 import PromotionModal from './EventModal';
@@ -17,17 +17,14 @@ export default function AdminPromotionManager() {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-  // --- LẤY DANH SÁCH SỰ KIỆN ---
   const fetchPromotions = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiRequest('/api/v1/promotions');
       const json = await res.json();
-      const rawData = json.data?.content || json.data || [];
-      
+      const rawData = json.data?.content || json.data || json || [];
       if (Array.isArray(rawData)) {
-        // Sắp xếp ID mới nhất lên đầu
-        const sortedData = [...rawData].sort((a, b) => b.id - a.id);
+        const sortedData = [...rawData].sort((a, b) => (b.id || 0) - (a.id || 0));
         setPromotions(sortedData);
       } else {
         setPromotions([]);
@@ -42,11 +39,10 @@ export default function AdminPromotionManager() {
 
   useEffect(() => { fetchPromotions(); }, [fetchPromotions]);
 
-  // --- THỰC THI XÓA ---
   const executeDelete = async () => {
     if (!promoToDelete) return;
     try {
-      const res = await apiRequest(`/api/v1/promotions/${promoToDelete}`, { method: 'DELETE' } as any);
+      const res = await apiRequest(`/api/v1/promotions/${promoToDelete}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success("Đã xóa sự kiện thành công");
         fetchPromotions();
@@ -61,16 +57,19 @@ export default function AdminPromotionManager() {
     }
   };
 
-  // --- BỘ LỌC TÌM KIẾM ---
   const filteredPromotions = promotions.filter(p => 
     p.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const stripHtml = (html: string) => {
+    if (!html) return "Chương trình chưa cập nhật mô tả chi tiết.";
+    return html.replace(/<[^>]*>?/gm, '');
+  };
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans">
       <Toaster position="top-right" />
       
-      {/* Modal Thêm/Sửa Sự Kiện */}
       <PromotionModal 
         isOpen={isModalOpen} 
         mode={modalMode} 
@@ -79,141 +78,131 @@ export default function AdminPromotionManager() {
         onRefresh={fetchPromotions} 
       />
 
-      {/* Modal Xác Nhận Xóa */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="bg-zinc-950 border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full text-center shadow-2xl">
-            <div className="w-20 h-20 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Trash2 size={40} className="text-red-500" />
+      <header className="bg-[#050505] border-b border-white/[0.05]">
+        <div className="max-w-[1400px] mx-auto px-6 py-5 md:px-10 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-4 group">
+            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.2)]">
+              <Sparkles className="text-white" size={22} />
             </div>
-            <h3 className="text-xl font-black uppercase italic tracking-tighter text-white">Xác nhận xóa?</h3>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase mt-2 tracking-widest leading-relaxed">
-              Dữ liệu sự kiện sẽ bị loại bỏ vĩnh viễn khỏi hệ thống
-            </p>
-            <div className="flex gap-4 mt-8">
-              <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-4 bg-zinc-900 hover:bg-zinc-800 rounded-2xl font-black uppercase text-[10px] text-zinc-400 transition-colors">Hủy bỏ</button>
-              <button onClick={executeDelete} className="flex-1 py-4 bg-red-600 hover:bg-red-700 rounded-2xl font-black uppercase text-[10px] text-white shadow-lg shadow-red-600/20 transition-all">Đồng ý xóa</button>
+            <div>
+              <h1 className="text-2xl font-[1000] uppercase italic tracking-tighter text-white leading-none">Sự Kiện</h1>
+              <p className="text-[8px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1.5">Promotion Hub</p>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Thanh Tiêu Đề & Công Cụ */}
-      <header className="p-8 md:px-12 flex flex-col md:flex-row justify-between items-center gap-6 sticky top-0 z-50 bg-[#050505]/80 backdrop-blur-xl border-b border-white/5">
-        <div className="flex items-center gap-5">
-          <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20">
-            <Sparkles className="text-white" size={28} />
+          
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-80 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-red-500 transition-colors" size={16} />
+              <input 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+                placeholder="Tìm kiếm sự kiện..." 
+                className="w-full bg-zinc-900/40 border border-white/5 pl-11 pr-4 py-3 rounded-2xl text-[11px] font-bold focus:border-red-600/30 outline-none transition-all placeholder:text-zinc-700 text-white shadow-inner" 
+              />
+            </div>
+            <button 
+              onClick={() => { setModalMode('create'); setSelectedPromo(null); setIsModalOpen(true); }} 
+              className="bg-white text-black h-[48px] px-6 rounded-2xl font-black uppercase text-[10px] flex items-center gap-2 transition-all hover:bg-red-600 hover:text-white active:scale-95 shadow-lg shrink-0 tracking-widest"
+            >
+              <Plus size={16} strokeWidth={3} /> Tạo mới
+            </button>
           </div>
-          <div>
-            <h1 className="text-3xl font-[1000] uppercase italic tracking-tighter leading-none text-white">Sự Kiện</h1>
-            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em] mt-1">Quản lý chiến dịch ưu đãi</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="relative flex-1 md:w-80 group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" size={18} />
-            <input 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-              placeholder="Tìm kiếm theo tiêu đề..." 
-              className="w-full bg-zinc-900/40 border border-white/5 pl-14 pr-6 py-4 rounded-2xl text-[11px] font-bold focus:border-red-600/50 outline-none transition-all placeholder:text-zinc-700 text-white" 
-            />
-          </div>
-          <button 
-            onClick={() => { setModalMode('create'); setSelectedPromo(null); setIsModalOpen(true); }} 
-            className="bg-white text-black h-[52px] px-8 rounded-2xl font-[1000] uppercase text-[11px] flex items-center gap-3 transition-all hover:bg-red-600 hover:text-white active:scale-95 shadow-xl shadow-white/5 shrink-0"
-          >
-            <Plus size={18} /> Tạo Sự Kiện
-          </button>
         </div>
       </header>
 
-      {/* Danh Sách Sự Kiện */}
-      <main className="p-8 md:p-12 max-w-[1400px] mx-auto">
+      {/* Main Container bám sát Header */}
+      <main className="p-6 md:p-10 max-w-[1400px] mx-auto">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-40 gap-4">
-            <Loader2 className="animate-spin text-red-600" size={48} />
-            <p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest">Đang kết nối dữ liệu...</p>
+            <Loader2 className="animate-spin text-red-600" size={40} />
+            <p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest italic">Syncing...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-5">
             {filteredPromotions.length > 0 ? filteredPromotions.map((p) => (
               <div 
                 key={p.id} 
-                className="bg-zinc-900/20 border border-white/5 rounded-[2.5rem] p-5 flex flex-col md:flex-row items-center gap-8 group hover:bg-zinc-900/40 hover:border-white/10 transition-all duration-500"
+                className="bg-zinc-950/40 border border-white/[0.03] rounded-[2.5rem] p-5 flex flex-col lg:flex-row items-center gap-6 group hover:bg-zinc-900/30 hover:border-white/[0.08] transition-all duration-500"
               >
-                {/* Ảnh Đại Diện Sự Kiện */}
-                <div className="w-full md:w-56 aspect-[16/10] rounded-[1.5rem] overflow-hidden bg-zinc-950 border border-white/5 relative shadow-2xl">
+                {/* Thumbnail */}
+                <div className="w-full lg:w-64 aspect-video lg:aspect-[4/3] rounded-[1.8rem] overflow-hidden bg-zinc-900 relative shrink-0">
                   <img 
-                    src={p.thumbnail?.startsWith("/") ? `${API_BASE}${p.thumbnail}` : p.thumbnail} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
-                    alt="Hình ảnh sự kiện" 
+                    src={p.thumbnail?.startsWith("/") ? `${API_BASE}${p.thumbnail}` : (p.thumbnail || "https://placehold.co/600x400?text=A%26K+Cinema")} 
+                    className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" 
+                    alt={p.title} 
                   />
-                  <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/10">
-                      <span className="text-[9px] font-black text-white uppercase italic tracking-tighter">ID: {p.id}</span>
+                  <div className="absolute top-4 left-4 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/10">
+                      <span className="text-[8px] font-black text-white italic">#ID-{p.id}</span>
                   </div>
                 </div>
 
-                {/* Thông Tin Chi Tiết */}
-                <div className="flex-1 min-w-0 text-center md:text-left">
-                  <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>
-                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Đang diễn ra</span>
+                {/* Info */}
+                <div className="flex-1 min-w-0 w-full">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-md text-[8px] font-black uppercase tracking-tighter">
+                      Hoạt động
+                    </span>
+                    <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest flex items-center gap-1">
+                      <Calendar size={10} /> {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '2024'}
+                    </span>
                   </div>
                   
-                  <h4 className="text-2xl font-[1000] uppercase italic tracking-tighter truncate group-hover:text-red-500 transition-colors duration-300 text-white">
+                  <h4 className="text-xl md:text-2xl font-[1000] uppercase italic tracking-tighter text-white group-hover:text-red-500 transition-colors leading-tight">
                     {p.title}
                   </h4>
-                  <p className="text-xs text-zinc-500 font-medium mt-1 line-clamp-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                    {p.content || "Chương trình chưa cập nhật mô tả chi tiết."}
+                  <p className="text-[11px] text-zinc-500 font-medium mt-2 line-clamp-2 leading-relaxed opacity-60">
+                    {stripHtml(p.content)}
                   </p>
                   
-                  <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-5">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl text-[9px] font-black uppercase text-zinc-300 border border-white/5">
-                      <MapPin size={10} className="text-red-500" /> {p.cinemaItem?.name || "Toàn hệ thống"}
+                  <div className="flex flex-wrap gap-2 mt-5">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900/80 border border-white/5 rounded-xl text-[8px] font-black uppercase text-zinc-400">
+                      <MapPin size={10} className="text-red-500" /> {p.cinemaItem?.name || "Hệ Thống"}
                     </div>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl text-[9px] font-black uppercase text-zinc-300 border border-white/5">
-                      <Film size={10} className="text-red-500" /> {p.movie?.title || "Tất cả phim"}
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900/80 border border-white/5 rounded-xl text-[8px] font-black uppercase text-zinc-400">
+                      <Film size={10} className="text-red-500" /> {p.movie?.title || "Phim"}
                     </div>
                   </div>
                 </div>
 
-                {/* Nút Điều Khiển */}
-                <div className="flex gap-3 shrink-0">
+                {/* Actions */}
+                <div className="flex lg:flex-col gap-2 shrink-0 w-full lg:w-auto">
                   <button 
                     onClick={() => { setSelectedPromo(p); setModalMode('edit'); setIsModalOpen(true); }} 
-                    className="w-14 h-14 bg-zinc-900/50 hover:bg-white hover:text-black rounded-2xl transition-all flex items-center justify-center border border-white/5 group/btn shadow-lg"
-                    title="Chỉnh sửa sự kiện"
+                    className="flex-1 lg:w-12 h-12 bg-zinc-900 hover:bg-white hover:text-black rounded-2xl transition-all flex items-center justify-center border border-white/5"
                   >
-                    <Edit3 size={20} className="group-hover/btn:scale-110 transition-transform" />
+                    <Edit3 size={18} />
                   </button>
                   <button 
                     onClick={() => { setPromoToDelete(p.id); setIsDeleteModalOpen(true); }} 
-                    className="w-14 h-14 bg-zinc-900/50 hover:bg-red-600 hover:text-white rounded-2xl transition-all flex items-center justify-center border border-white/5 group/btn shadow-lg text-zinc-400"
-                    title="Gỡ bỏ sự kiện"
+                    className="flex-1 lg:w-12 h-12 bg-zinc-900 hover:bg-red-600 hover:text-white rounded-2xl transition-all flex items-center justify-center border border-white/5 text-zinc-500"
                   >
-                    <Trash2 size={20} className="group-hover/btn:scale-110 transition-transform" />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>
             )) : (
-              <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed border-white/5 rounded-[3rem] bg-zinc-900/10">
-                <AlertCircle size={60} className="text-zinc-800 mb-6" />
-                <p className="font-black uppercase tracking-[0.4em] text-zinc-600 text-sm text-center">
-                  Không tìm thấy sự kiện nào
-                </p>
-                <button 
-                  onClick={() => { setModalMode('create'); setSelectedPromo(null); setIsModalOpen(true); }}
-                  className="mt-6 text-[10px] font-bold text-red-600 uppercase hover:underline tracking-widest"
-                >
-                  Bắt đầu tạo sự kiện đầu tiên của bạn
-                </button>
+              <div className="flex flex-col items-center justify-center py-32 border border-dashed border-white/10 rounded-[3rem] bg-zinc-900/10">
+                <AlertCircle size={40} className="text-zinc-800 mb-4" />
+                <p className="font-black uppercase tracking-[0.3em] text-zinc-700 text-[10px]">Trống</p>
               </div>
             )}
           </div>
         )}
       </main>
+
+      {/* Delete Modal giữ nguyên logic nhưng làm gọn UI */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+          <div className="bg-zinc-950 border border-white/5 p-8 rounded-[2.5rem] max-w-sm w-full text-center">
+            <Trash2 size={40} className="text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-black uppercase italic tracking-tighter">Xác nhận xóa?</h3>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-3 bg-zinc-900 rounded-xl font-black uppercase text-[10px]">Hủy</button>
+              <button onClick={executeDelete} className="flex-1 py-3 bg-red-600 rounded-xl font-black uppercase text-[10px]">Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

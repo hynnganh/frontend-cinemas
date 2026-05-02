@@ -121,7 +121,9 @@ export default function MoviesPage() {
                     <div className="flex items-center gap-5">
                       <div className="relative w-12 h-16 shrink-0 shadow-2xl">
                         <img 
-                          src={getImageUrl(movie.posterUrl)} 
+                          src={movie.posterUrl && movie.posterUrl.startsWith('http') 
+                                ? movie.posterUrl 
+                                : getImageUrl(movie.posterUrl)}
                           className="w-full h-full object-cover rounded-xl border border-white/10 group-hover:border-red-600/50 transition-all" 
                           onError={(e) => (e.currentTarget.src = "https://placehold.co/100x150?text=No+Poster")}
                         />

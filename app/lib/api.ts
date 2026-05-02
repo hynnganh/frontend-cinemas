@@ -1,10 +1,7 @@
 export const BASE_URL = "http://localhost:8080";
 
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  // Lấy token an toàn từ localStorage
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  
-  // Kiểm tra nếu body là FormData (để upload file)
   const isFormData = options.body instanceof FormData;
 
   const headers: Record<string, string> = {
@@ -12,23 +9,36 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     ...(options.headers as Record<string, string>),
   };
 
-  // Nếu KHÔNG phải FormData thì mới set Content-Type là JSON
   if (!isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
 
-  // Xử lý endpoint để tránh lỗi undefined hoặc thừa dấu /
   const safeEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const fullUrl = `${BASE_URL}${safeEndpoint}`;
 
   return fetch(fullUrl, { ...options, headers });
 }
 
-export const getImageUrl = (path: string) => {
-  if (!path) return "https://placehold.co/400x600?text=No+Poster";
-  if (path.startsWith("http")) return path;
-  
-  // Loại bỏ dấu / ở đầu nếu có để nối chuỗi chuẩn
+/**
+ * FIX: Hàm lấy ảnh chuẩn cho cả Cloudinary và Local Storage
+ */
+export const getImageUrl = (path: string | null | undefined) => {
+  // 1. Nếu không có path, trả về ảnh placeholder
+  if (!path) {
+    return "https://placehold.co/400x600?text=No+Poster";
+  }
+
+  // 2. Nếu path là một URL hoàn chỉnh (ví dụ link từ Cloudinary: https://res.cloudinary.com/...)
+  // Trả về luôn path đó mà không nối thêm BASE_URL
+  if (path.startsWith("http")) {
+    return path;
+  }
+
+  // 3. Nếu path là đường dẫn tương đối (ví dụ lưu trong DB là "poster1.jpg" hoặc "/poster1.jpg")
+  // Tiến hành làm sạch path (xóa dấu / ở đầu)
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+
+  // Trả về URL trỏ đến thư mục tĩnh trên Backend Spring Boot
+  // Lưu ý: Đảm bảo Spring Boot đã cấu hình Resource Handler cho thư mục /uploads/
   return `${BASE_URL}/uploads/movies/${cleanPath}`;
 };

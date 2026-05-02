@@ -1,46 +1,31 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { 
-  Search, Plus, Box, Zap, Edit2, Trash2, 
-  Loader2, ImageIcon, Package, X, Save, AlertCircle
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Plus, Edit3, Trash2, Loader2, ImageIcon, AlertCircle, UtensilsCrossed, Sparkles } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api';
-import toast from 'react-hot-toast';
-
-interface ComboDTO {
-  id?: number;
-  name: string;
-  description: string;
-  imageUrl: string;
-  price: number;
-}
+import toast, { Toaster } from 'react-hot-toast';
+import ComboForm from './ComboForm';
 
 export default function FoodManagement() {
   const [combos, setCombos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // States cho Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  
-  const [formData, setFormData] = useState<ComboDTO>({
-    name: '',
-    description: '',
-    imageUrl: '',
-    price: 0
-  });
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchCombos = async () => {
     try {
       setLoading(true);
       const res = await apiRequest('/api/v1/combos');
       const result = await res.json();
-      setCombos(result.data || result); 
+      const rawData = result.data || result || [];
+      if (Array.isArray(rawData)) {
+        setCombos([...rawData].sort((a, b) => (b.id || 0) - (a.id || 0)));
+      }
     } catch (error) {
-      toast.error("Lỗi kết nối máy chủ!");
+      toast.error("Không thể kết nối máy chủ");
     } finally {
       setLoading(false);
     }
@@ -48,243 +33,183 @@ export default function FoodManagement() {
 
   useEffect(() => { fetchCombos(); }, []);
 
-  // --- XỬ LÝ XÓA (FIX LẠI KHÔNG DÙNG WINDOW.CONFIRM) ---
-  const triggerDelete = (id: number) => {
-    setItemToDelete(id);
-    setIsDeleteModalOpen(true);
+  const handleFormSubmit = async (data: FormData) => {
+    const isUpdate = !!editingItem;
+    const endpoint = isUpdate ? `/api/v1/combos/${editingItem.id}` : '/api/v1/combos';
+    setIsSubmitting(true);
+    const toastId = toast.loading(isUpdate ? "Đang cập nhật..." : "Đang tạo...");
+
+    try {
+      const res = await apiRequest(endpoint, { method: isUpdate ? "PUT" : "POST", body: data });
+      if (res.ok) {
+        toast.success("Thành công!", { id: toastId });
+        setIsModalOpen(false);
+        fetchCombos();
+      } else {
+        toast.error("Thao tác thất bại", { id: toastId });
+      }
+    } catch (error) {
+      toast.error("Lỗi hệ thống", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const confirmDelete = async () => {
     if (!itemToDelete) return;
-    const toastId = toast.loading("Đang loại bỏ combo...");
+    const toastId = toast.loading("Đang xóa...");
     try {
       const res = await apiRequest(`/api/v1/combos/${itemToDelete}`, { method: 'DELETE' });
       if (res.ok) {
-        toast.success("Xóa thành công!", { id: toastId });
+        toast.success("Đã xóa vĩnh viễn", { id: toastId });
         setIsDeleteModalOpen(false);
         fetchCombos();
-      } else {
-        toast.error("Không thể xóa lúc này!", { id: toastId });
       }
-    } catch (e) { toast.error("Lỗi hệ thống!", { id: toastId }); }
-  };
-
-  // --- THÊM RÀNG BUỘC KHI SUBMIT ---
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Ràng buộc dữ liệu nhẹ ở Frontend
-    if (formData.name.trim().length < 3) return toast.error("Tên combo phải ít nhất 3 ký tự!");
-    if (formData.price <= 0) return toast.error("Giá bán phải lớn hơn 0!");
-
-    const isUpdate = !!editingItem;
-    const endpoint = isUpdate ? `/api/v1/combos/${editingItem.id}` : '/api/v1/combos';
-    
-    const toastId = toast.loading(isUpdate ? "Đang cập nhật..." : "Đang tạo mới...");
-    try {
-      const res = await apiRequest(endpoint, {
-        method: isUpdate ? 'PUT' : 'POST',
-        body: JSON.stringify(formData)
-      });
-      
-      if (res.ok) {
-        toast.success(isUpdate ? "Cập nhật thành công!" : "Đã thêm combo!", { id: toastId });
-        setIsModalOpen(false);
-        fetchCombos();
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Thao tác thất bại!", { id: toastId });
-      }
-    } catch (e) { toast.error("Lỗi kết nối API!", { id: toastId }); }
-  };
-
-  const openModal = (item: any = null) => {
-    if (item) {
-      setEditingItem(item);
-      setFormData({ 
-        name: item.name, 
-        description: item.description || '', 
-        price: item.price, 
-        imageUrl: item.imageUrl || '' 
-      });
-    } else {
-      setEditingItem(null);
-      setFormData({ name: '', description: '', price: 0, imageUrl: '' });
+    } catch {
+      toast.error("Không thể xóa", { id: toastId });
     }
-    setIsModalOpen(true);
   };
 
-  const filteredItems = combos.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = useMemo(() => 
+    combos.filter(c => (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())),
+  [combos, searchTerm]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700 p-2 md:p-6 no-scrollbar">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-[1000] uppercase italic tracking-tighter text-white">
-            QUẢN LÝ <span className="text-red-600">COMBO & ĐỒ ĂN</span>
-          </h1>
-          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1 italic">
-            A&K Cinema / F&B Internal Core
-          </p>
-        </div>
-        <button onClick={() => openModal()} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-red-500 transition-all shadow-lg shadow-red-600/20 active:scale-95 w-fit">
-          <Plus size={16} /> Tạo Combo Mới
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans">
+      <Toaster position="top-right" />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Tổng Combo" value={combos.length.toString()} icon={<Box size={20}/>} color="text-blue-500" />
-        <StatCard title="Trạng thái" value="Live" icon={<Zap size={20}/>} color="text-amber-500" />
-        <StatCard title="Giá cao nhất" value={combos.length > 0 ? `${Math.max(...combos.map(o => o.price || 0)).toLocaleString()}đ` : "0đ"} icon={<Package size={20}/>} color="text-red-500" />
-      </div>
-
-      {/* Table Section */}
-      <div className="bg-zinc-900/30 border border-white/5 rounded-[32px] overflow-hidden backdrop-blur-md">
-        <div className="p-6 border-b border-white/5">
-           <div className="relative w-full md:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={14} />
-            <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Tìm kiếm nhanh..." className="w-full bg-black/40 border border-white/5 rounded-xl py-2.5 pl-12 pr-4 text-xs outline-none focus:border-red-600/30 transition-all text-white font-bold" />
+      {/* HEADER: PHONG CÁCH "SỰ KIỆN" (BANNER NGANG) */}
+      <header className="bg-[#050505] border-b border-white/[0.05]">
+        <div className="max-w-[1400px] mx-auto px-6 py-5 md:px-10 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-4 group">
+            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.2)]">
+              <UtensilsCrossed className="text-white" size={22} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-[1000] uppercase italic tracking-tighter text-white leading-none">Thực Đơn</h1>
+              <p className="text-[8px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1.5">Food & Combo Hub</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-80 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-red-500 transition-colors" size={16} />
+              <input 
+                value={searchTerm || ''} 
+                onChange={e => setSearchTerm(e.target.value)} 
+                placeholder="Tìm món nhanh..." 
+                className="w-full bg-zinc-900/40 border border-white/5 pl-11 pr-4 py-3 rounded-2xl text-[11px] font-bold focus:border-red-600/30 outline-none transition-all placeholder:text-zinc-700 text-white shadow-inner" 
+              />
+            </div>
+            <button 
+              onClick={() => { setEditingItem(null); setIsModalOpen(true); }} 
+              className="bg-white text-black h-[48px] px-6 rounded-2xl font-black uppercase text-[10px] flex items-center gap-2 transition-all hover:bg-red-600 hover:text-white active:scale-95 shadow-lg shrink-0 tracking-widest"
+            >
+              <Plus size={16} strokeWidth={3} /> Tạo mới
+            </button>
           </div>
         </div>
+      </header>
 
-        <div className="overflow-x-auto no-scrollbar">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="animate-spin text-red-600" size={40} />
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 italic tracking-[0.3em]">Syncing...</p>
-            </div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 border-b border-white/5">
-                  <th className="px-8 py-5">Sản phẩm</th>
-                  <th className="px-6 py-5">Chi tiết</th>
-                  <th className="px-6 py-5 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredItems.map((item) => (
-                  <tr key={item.id} className="group hover:bg-white/[0.02] transition-colors">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-white/5 overflow-hidden flex items-center justify-center shadow-inner shrink-0">
-                          {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" /> : <ImageIcon size={20} className="text-zinc-700" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-white leading-none mb-1 uppercase italic tracking-tight">{item.name}</p>
-                          <p className="text-[11px] text-red-600 font-black italic tracking-tighter">{item.price?.toLocaleString()}đ</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 max-w-[250px]">
-                      <p className="text-[11px] text-zinc-500 italic line-clamp-2 leading-relaxed font-medium">
-                        {item.description || "N/A"}
-                      </p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <div className="flex justify-end gap-2 md:opacity-0 md:group-hover:opacity-100 transition-all">
-                        <button onClick={() => openModal(item)} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all"><Edit2 size={14} /></button>
-                        <button onClick={() => triggerDelete(item.id)} className="p-2.5 bg-red-600/5 hover:bg-red-600/20 rounded-xl text-zinc-500 hover:text-red-600 transition-all"><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      {/* NỘI DUNG: QUAY LẠI DẠNG CARD GRID (NHƯ CŨ) */}
+      <main className="p-6 md:p-10 max-w-[1400px] mx-auto">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-40 gap-4">
+            <Loader2 className="animate-spin text-red-600" size={40} />
+            <p className="text-[10px] font-black uppercase text-zinc-700 tracking-widest italic">Syncing...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            {filteredItems.length > 0 ? filteredItems.map((item) => (
+              <div 
+                key={item.id} 
+                className="group relative bg-zinc-900/20 border border-white/5 rounded-[2.5rem] overflow-hidden hover:bg-zinc-900/40 hover:border-red-600/30 transition-all duration-500 shadow-xl"
+              >
+                {/* Ảnh sản phẩm vuông */}
+                <div className="relative aspect-square overflow-hidden bg-zinc-950">
+                  {item.imageUrl ? (
+                    <img 
+                      src={item.imageUrl} 
+                      alt={item.name} 
+                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-zinc-800 font-black text-[10px]">NO IMAGE</div>
+                  )}
+                  
+                  {/* Overlay Gradient & Giá */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent opacity-90"></div>
+                  <div className="absolute bottom-4 left-5 right-5 flex justify-between items-end">
+                    <p className="text-white font-[1000] text-lg italic tracking-tighter">
+                      {(item.price || 0).toLocaleString()}<span className="text-[10px] text-red-500 ml-0.5 text-not-italic">đ</span>
+                    </p>
+                    <div className="w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 text-white/50 group-hover:text-red-500 transition-colors">
+                       <Sparkles size={12} />
+                    </div>
+                  </div>
 
-      {/* --- MODAL THÊM / SỬA (CÓ RÀNG BUỘC HTML5) --- */}
+                  {/* Nút xóa nhanh */}
+                  <button 
+                    onClick={() => { setItemToDelete(item.id!); setIsDeleteModalOpen(true); }}
+                    className="absolute top-4 right-4 w-9 h-9 bg-black/60 backdrop-blur-md text-white/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-600 hover:text-white transition-all z-10"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                {/* Thông tin Text bên dưới */}
+                <div className="p-5">
+                  <h3 className="text-[12px] font-black uppercase italic text-zinc-100 mb-1 line-clamp-1 group-hover:text-red-500 transition-colors tracking-tight">
+                    {item.name}
+                  </h3>
+                  <p className="text-zinc-600 text-[10px] font-bold line-clamp-1 mb-5 italic uppercase opacity-60">
+                    {item.description || "Chưa có mô tả chi tiết"}
+                  </p>
+                  
+                  <button 
+                    onClick={() => { setEditingItem(item); setIsModalOpen(true); }} 
+                    className="w-full py-3 bg-zinc-800/40 hover:bg-white hover:text-black rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border border-white/5"
+                  >
+                    Chỉnh sửa
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <div className="col-span-full flex flex-col items-center justify-center py-32 border border-dashed border-white/10 rounded-[3rem] bg-zinc-900/10">
+                <AlertCircle size={40} className="text-zinc-800 mb-4" />
+                <p className="font-black uppercase tracking-[0.3em] text-zinc-700 text-[10px]">Danh sách trống</p>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* MODAL THÊM/SỬA */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-zinc-900 border border-white/10 rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-zinc-900/50">
-              <h2 className="text-xl font-[1000] text-white uppercase italic tracking-tighter">
-                {editingItem ? 'Update' : 'Create'} <span className="text-red-600">Combo</span>
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 text-zinc-500 hover:text-white transition-colors"><X size={20}/></button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-8 space-y-5">
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Tên sản phẩm</label>
-                  <input required minLength={3} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-sm outline-none focus:border-red-600/50 text-white font-bold italic" placeholder="Nhập tên combo..." />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Giá bán (VNĐ)</label>
-                  <input required type="number" min={1000} value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-sm outline-none focus:border-red-600/50 text-white font-mono font-black" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">URL Hình ảnh</label>
-                  <input required type="url" value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-sm outline-none focus:border-red-600/50 text-white font-medium" placeholder="https://..." />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Mô tả</label>
-                  <textarea rows={3} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-sm outline-none focus:border-red-600/50 text-white resize-none italic font-medium" placeholder="Chi tiết..." />
-                </div>
-              </div>
-              <button type="submit" className="w-full py-4 bg-white text-black rounded-2xl font-[1000] text-[11px] uppercase tracking-[0.2em] hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2 mt-4 active:scale-95 shadow-xl shadow-white/5">
-                <Save size={14} /> {editingItem ? 'Lưu cập nhật' : 'Xác nhận tạo'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <ComboForm 
+          initialData={editingItem} 
+          isSubmitting={isSubmitting} 
+          onClose={() => setIsModalOpen(false)} 
+          onSubmit={handleFormSubmit} 
+        />
       )}
 
-      {/* --- CUSTOM DELETE MODAL (BÀ CẦN CÁI NÀY ĐỂ FIX "LOCALHOST SAYS") --- */}
+      {/* DELETE MODAL */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border border-white/10 rounded-[2rem] w-full max-w-sm overflow-hidden shadow-2xl">
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-red-600/10 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <AlertCircle size={32} />
-              </div>
-              <h2 className="text-xl font-[1000] text-white uppercase italic tracking-tighter mb-2">
-                Xác nhận <span className="text-red-600">Xóa?</span>
-              </h2>
-              <p className="text-xs text-zinc-500 font-medium leading-relaxed italic px-4">
-                Dữ liệu sẽ bị gỡ khỏi hệ thống vĩnh viễn. Bà có chắc chắn không?
-              </p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+          <div className="bg-zinc-950 border border-white/5 p-8 rounded-[2.5rem] max-w-sm w-full text-center shadow-2xl">
+            <div className="w-16 h-16 bg-red-600/10 rounded-3xl flex items-center justify-center mx-auto mb-6 text-red-600">
+              <Trash2 size={32} strokeWidth={2.5} />
             </div>
-            
-            <div className="flex border-t border-white/5">
-              <button 
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:bg-white/[0.02] transition-all"
-              >
-                Hủy
-              </button>
-              <button 
-                onClick={confirmDelete}
-                className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-600 hover:text-white transition-all border-l border-white/5"
-              >
-                Xác nhận xóa
-              </button>
+            <h3 className="text-xl font-black uppercase italic tracking-tighter text-white mb-2">Xóa mục này?</h3>
+            <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-tight italic opacity-60 mb-8">Hành động này không thể hoàn tác.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-4 bg-zinc-900 text-zinc-500 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all">Hủy</button>
+              <button onClick={confirmDelete} className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all">Xóa ngay</button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({ title, value, icon, color }: { title: string, value: string, icon: React.ReactNode, color: string }) {
-  return (
-    <div className="bg-zinc-900/40 border border-white/5 p-6 rounded-[32px] relative overflow-hidden group hover:border-white/10 transition-all">
-      <div className={`p-3 rounded-2xl bg-black/40 w-fit mb-4 ${color} group-hover:scale-110 transition-transform relative z-10`}>{icon}</div>
-      <div className="relative z-10">
-        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">{title}</p>
-        <h3 className="text-3xl font-[1000] text-white italic tracking-tighter">{value}</h3>
-      </div>
-      <div className="absolute -bottom-4 -right-4 opacity-[0.03] group-hover:opacity-[0.08] transition-all duration-500">
-        {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, { size: 100, strokeWidth: 1 })}
-      </div>
     </div>
   );
 }

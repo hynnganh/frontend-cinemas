@@ -17,7 +17,15 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [genres, setGenres] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [posterPreview, setPosterPreview] = useState(initialData?.posterUrl ? getImageUrl(initialData.posterUrl) : "");
+
+  // --- FIX 1: Khởi tạo Preview ảnh thông minh ---
+  const [posterPreview, setPosterPreview] = useState(() => {
+    if (!initialData?.posterUrl) return "";
+    // Nếu là link Cloudinary (bắt đầu bằng http) thì dùng luôn, ngược lại qua getImageUrl
+    return initialData.posterUrl.startsWith('http') 
+      ? initialData.posterUrl 
+      : getImageUrl(initialData.posterUrl);
+  });
 
   const basePath = pathname.includes('/super-admin') ? '/super-admin/movie' : '/admin/movies';
 
@@ -36,6 +44,8 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // Khi tạo mới thì bắt buộc có file, khi edit thì không bắt buộc (giữ ảnh cũ)
     if (type === 'create' && !selectedFile) return toast.error("Thiếu poster!");
     
     setIsSubmitting(true);
@@ -57,25 +67,49 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
     };
 
     const formDataPayload = new FormData();
+    // Gửi kèm JSON data dưới dạng Blob (phù hợp với @RequestPart phía Spring Boot)
     formDataPayload.append('movie', new Blob([JSON.stringify(movieData)], { type: 'application/json' }));
-    if (selectedFile) formDataPayload.append('file', selectedFile);
+    
+    // --- FIX 2: Chỉ append file nếu người dùng có chọn file mới ---
+    if (selectedFile) {
+      formDataPayload.append('file', selectedFile);
+    }
 
     try {
       const url = type === 'edit' ? `/api/v1/movies/${initialData?.id}` : `/api/v1/movies`;
-      const response = await apiRequest(url, { method: type === 'edit' ? 'PUT' : 'POST', body: formDataPayload });
+      
+      // Sử dụng PUT cho edit, POST cho create
+      const response = await apiRequest(url, { 
+        method: type === 'edit' ? 'PUT' : 'POST', 
+        body: formDataPayload 
+      });
+
       if (response.ok) {
         toast.success('Thành công!', { id: loadingToast });
-        setTimeout(() => { router.push(basePath); router.refresh(); }, 500);
-      } else { toast.error("Lỗi cập nhật!", { id: loadingToast }); }
-    } catch (error) { toast.error('Lỗi server!', { id: loadingToast }); } 
-    finally { setIsSubmitting(false); }
+        setTimeout(() => { 
+          router.push(basePath); 
+          router.refresh(); 
+        }, 500);
+      } else { 
+        const errData = await response.json();
+        toast.error(errData.message || "Lỗi cập nhật!", { id: loadingToast }); 
+      }
+    } catch (error) { 
+      toast.error('Lỗi server!', { id: loadingToast }); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   return (
     <div className="max-w-5xl mx-auto p-2 text-white animate-in fade-in duration-500">
       <Toaster position="top-right" />
       
-      <button onClick={() => router.push(basePath)} className="flex items-center gap-1.5 text-zinc-500 hover:text-red-500 transition-all mb-4 font-black text-[9px] uppercase tracking-widest">
+      <button 
+        type="button"
+        onClick={() => router.push(basePath)} 
+        className="flex items-center gap-1.5 text-zinc-500 hover:text-red-500 transition-all mb-4 font-black text-[9px] uppercase tracking-widest"
+      >
         <ArrowLeft size={12} /> Quay lại
       </button>
 
@@ -142,7 +176,10 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
                </div>
                <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => {
                  const file = e.target.files?.[0];
-                 if (file) { setSelectedFile(file); setPosterPreview(URL.createObjectURL(file)); }
+                 if (file) { 
+                    setSelectedFile(file); 
+                    setPosterPreview(URL.createObjectURL(file)); 
+                 }
                }} />
             </div>
 
