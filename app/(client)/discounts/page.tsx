@@ -1,15 +1,13 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react'; // Thêm useMemo
 import { Ticket, Loader2, MapPin, Copy, CheckCircle2, ArrowRight, Wallet, Sparkles, Clock, Zap } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api';
 import { useRouter } from 'next/navigation';
-import router from 'next/router';
 
 const VoucherCard = ({ voucher }: { voucher: any }) => {
   const [copied, setCopied] = useState(false);
   const router = useRouter();
 
-  // Hàm định dạng tiền tệ gọn (ví dụ 50000 -> 50K hoặc 50.000)
   const formatDiscount = (value: number) => {
     if (value >= 1000) {
       return (value / 1000).toLocaleString() + "K";
@@ -27,7 +25,7 @@ const VoucherCard = ({ voucher }: { voucher: any }) => {
     <div className="group relative bg-[#0f0f11] border border-white/5 rounded-[2rem] p-1 transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)]">
       <div className="relative flex flex-col md:flex-row items-center gap-6 bg-[#0f0f11] rounded-[1.9rem] p-5 z-10 overflow-hidden">
         
-        {/* Khối Trái: Visual Ticket (Hiển thị số tiền giảm) */}
+        {/* Khối Trái: Visual Ticket */}
         <div className="relative shrink-0 w-full md:w-36 h-28 bg-gradient-to-br from-zinc-800 to-black rounded-2xl flex flex-col items-center justify-center border border-white/10 shadow-2xl">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 to-red-900" />
           
@@ -41,16 +39,8 @@ const VoucherCard = ({ voucher }: { voucher: any }) => {
              </div>
           </div>
 
-          {/* Răng cưa vé rạp phim */}
           <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-[#050505] rounded-full border border-white/5 shadow-inner" />
           <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-[#050505] rounded-full border border-white/5 shadow-inner" />
-          
-          {/* Đường line đứt khúc trang trí */}
-          <div className="absolute bottom-2 w-full flex justify-center gap-1 opacity-20">
-            {[...Array(8)].map((_, i) => (
-                <div key={i} className="w-1.5 h-0.5 bg-white rounded-full" />
-            ))}
-          </div>
         </div>
 
         {/* Khối Giữa: Nội dung chính */}
@@ -104,6 +94,7 @@ const VoucherCard = ({ voucher }: { voucher: any }) => {
 export default function MyVoucherWallet() {
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchVouchers = async () => {
@@ -118,6 +109,19 @@ export default function MyVoucherWallet() {
     };
     fetchVouchers();
   }, []);
+
+  // LOGIC CHÍNH: Lọc voucher còn hạn
+  const activeVouchers = useMemo(() => {
+    const now = new Date();
+    // Đặt về 0h để so sánh chính xác theo ngày
+    now.setHours(0, 0, 0, 0);
+
+    return vouchers.filter(v => {
+      const expiryDate = new Date(v.endDate);
+      // Nếu ngày hết hạn lớn hơn hoặc bằng ngày hiện tại
+      return expiryDate >= now;
+    });
+  }, [vouchers]);
 
   if (loading) return (
     <div className="h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
@@ -134,7 +138,7 @@ export default function MyVoucherWallet() {
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 border-b border-white/5 pb-10">
             <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-gradient-to-tr from-red-600 to-red-900 rounded-[2rem] flex items-center justify-center shadow-[0_0_40px_rgba(220,38,38,0.3)] rotate-3 group-hover:rotate-0 transition-transform">
+              <div className="w-20 h-20 bg-gradient-to-tr from-red-600 to-red-900 rounded-[2rem] flex items-center justify-center shadow-[0_0_40px_rgba(220,38,38,0.3)] rotate-3">
                 <Ticket className="text-white -rotate-12" size={36} strokeWidth={2} />
               </div>
               <div>
@@ -149,25 +153,28 @@ export default function MyVoucherWallet() {
             </div>
             
             <div className="bg-zinc-900/40 backdrop-blur-md px-10 py-5 rounded-3xl border border-white/5 flex flex-col items-center">
-               <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Khả dụng</span>
-               <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-[1000] text-white italic">{vouchers.length}</span>
+                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Khả dụng</span>
+                <div className="flex items-baseline gap-2">
+                  {/* Dùng độ dài của mảng đã lọc */}
+                  <span className="text-4xl font-[1000] text-white italic">{activeVouchers.length}</span>
                   <span className="text-[10px] font-bold text-red-600 uppercase italic">Mã</span>
-               </div>
+                </div>
             </div>
           </div>
 
-          {/* List */}
-          {vouchers.length > 0 ? (
+          {/* List - Render activeVouchers thay vì vouchers gốc */}
+          {activeVouchers.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-5 duration-700">
-              {vouchers.map((v, i) => (
+              {activeVouchers.map((v, i) => (
                 <VoucherCard key={v.id || i} voucher={v} />
               ))}
             </div>
           ) : (
             <div className="py-40 flex flex-col items-center justify-center bg-zinc-900/10 rounded-[4rem] border-2 border-dashed border-white/5">
               <Ticket size={48} className="text-zinc-800 mb-6" />
-              <p className="text-zinc-500 text-xs font-black uppercase tracking-[0.3em] italic">Bạn chưa có mã giảm giá nào</p>
+              <p className="text-zinc-500 text-xs font-black uppercase tracking-[0.3em] italic text-center px-4">
+                Bạn không có mã giảm giá nào còn hạn sử dụng
+              </p>
               <button 
                 onClick={() => router.push('/')}
                 className="mt-8 text-red-600 text-[10px] font-black uppercase tracking-[0.2em] hover:text-white transition-colors"
