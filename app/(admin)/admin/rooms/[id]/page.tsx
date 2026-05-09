@@ -1,9 +1,9 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { apiRequest } from '@/app/lib/api';
-import { ChevronLeft, Heart } from 'lucide-react'; // Thêm icon Heart
+import { ChevronLeft, Heart, Trash2, Plus, Save, RefreshCcw, AlertTriangle, Lock } from 'lucide-react';
 
 export default function SeatDesignerPage() {
   const params = useParams();
@@ -18,99 +18,193 @@ export default function SeatDesignerPage() {
   const [config, setConfig] = useState({ rows: 10, cols: 12 });
   const [manualSeat, setManualSeat] = useState({ row: 'A', num: '1' });
 
-  const whiteToast = {
-    style: { background: '#ffffff', color: '#000000', fontSize: '12px', fontWeight: '900', borderRadius: '12px', padding: '16px' }
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning'
+  });
+
+  const whiteToast: any = {
+    style: { 
+      background: '#ffffff', 
+      color: '#000000', 
+      fontSize: '12px', 
+      fontWeight: '900', 
+      borderRadius: '12px', 
+      padding: '16px',
+      border: '1px solid #eee'
+    }
   };
 
-  const taiDuLieu = useCallback(async () => {
-    if (!roomId) return;
-    try {
-      setDangTai(true);
-      const [resSeats, resRoom] = await Promise.all([
-        apiRequest(`/api/v1/seats/room/${roomId}`),
-        apiRequest(`/api/v1/rooms/${roomId}`)
-      ]);
+const taiDuLieu = useCallback(async () => {
+  if (!roomId) return;
 
-      if (resSeats.ok) {
-        const dataSeats = await resSeats.json();
-        setDanhSachGhe(dataSeats.data || []);
-      }
-      if (resRoom.ok) {
-        const dataRoom = await resRoom.json();
-        setRoomInfo(dataRoom.data);
-      }
-    } catch (err) {
-      toast.error("Lỗi tải dữ liệu!", whiteToast);
-    } finally {
-      setDangTai(false);
+  try {
+    setDangTai(true);
+
+    // ===== LOAD SEATS =====
+    const resSeats = await apiRequest(`/api/v1/seats/room/${roomId}`);
+    const resultSeats = await resSeats.json();
+    const seatsData = resultSeats.data || [];
+
+    setDanhSachGhe(seatsData);
+
+    // ===== CASE 1: phòng đã có ghế =====
+    if (seatsData.length > 0 && seatsData[0]?.room) {
+      const roomData = seatsData[0].room;
+
+      setRoomInfo({
+        id: roomData.id,
+        name: roomData.name,
+        totalSeats: roomData.totalSeats || 0
+      });
+      return;
     }
-  }, [roomId]);
+
+    // ===== CASE 2: phòng chưa có ghế =====
+    const resRoom = await apiRequest(`/api/v1/rooms/${roomId}`);
+
+    if (!resRoom.ok) throw new Error("Không load được room");
+
+    const roomResult = await resRoom.json();
+    const rawRoom = roomResult.data;
+
+    setRoomInfo({
+      id: rawRoom.id,
+      name: rawRoom.name,
+      totalSeats: rawRoom.totalSeats || 0
+    });
+
+  } catch (err) {
+    console.error("Load error:", err);
+    toast.error("Lỗi tải dữ liệu!", whiteToast);
+  } finally {
+    setDangTai(false);
+  }
+}, [roomId]);
 
   useEffect(() => { taiDuLieu(); }, [taiDuLieu]);
 
-  const handleGenerate = async () => {
-    const totalToGenerate = config.rows * config.cols;
-    const maxCapacity = roomInfo?.capacity || 999;
-
-    if (totalToGenerate > maxCapacity) {
-      return toast.error(`Vượt quá sức chứa phòng (${maxCapacity} ghế)!`, whiteToast);
-    }
-
-    toast((t) => (
-      <div className="flex flex-col gap-3">
-        <p className="font-black text-[10px] uppercase tracking-tighter">Xóa sạch sơ đồ cũ và tạo mới {totalToGenerate} ghế?</p>
-        <div className="flex gap-2">
-          <button onClick={async () => { toast.dismiss(t.id); thucHienResetVaTaoMoi(); }} className="bg-red-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase">Xác nhận</button>
-          <button onClick={() => toast.dismiss(t.id)} className="bg-zinc-100 px-4 py-2 rounded-lg text-[10px] font-black text-black uppercase">Hủy</button>
-        </div>
-      </div>
-    ), { ...whiteToast, duration: 6000 });
+  const openConfirm = (title: string, message: string, onConfirm: () => void, type: 'danger' | 'warning' | 'info' = 'warning') => {
+    setModalConfig({ isOpen: true, title, message, onConfirm, type });
   };
 
-  const thucHienResetVaTaoMoi = async () => {
-    const loading = toast.loading("Đang dọn dẹp...", whiteToast);
-    try {
-      if (danhSachGhe.length > 0) {
-        const deletePromises = danhSachGhe
-          .filter(ghe => !String(ghe.id).startsWith('temp-'))
-          .map(ghe => apiRequest(`/api/v1/seats/${ghe.id}`, { method: 'DELETE' }));
-        await Promise.all(deletePromises);
-      }
-      const query = `?roomId=${roomId}&rows=${config.rows}&seatsPerRow=${config.cols}`;
-      const res = await apiRequest(`/api/v1/seats/generate${query}`, { method: 'POST' });
+  const closeConfirm = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
 
+  const checkSeatEligibility = async (seatId: any) => {
+    try {
+      const res = await apiRequest(`/api/v1/seats/${seatId}/check-tickets`);
       if (res.ok) {
-        toast.success("Đã làm mới sơ đồ!", { id: loading, ...whiteToast });
-        taiDuLieu(); 
+        const result = await res.json();
+        return result.data.canDelete; 
       }
-    } catch (err) {
-      toast.error("Lỗi hệ thống!", { id: loading, ...whiteToast });
+      return false;
+    } catch { return false; }
+  };
+
+  const handleXoaGhe = async (ghe: any) => {
+    const isTemp = String(ghe.id).startsWith('temp-');
+    if (isTemp) {
+      setDanhSachGhe(prev => prev.filter(s => s.id !== ghe.id));
+      return;
     }
+
+    const loadingCheck = toast.loading("Đang kiểm tra vé...", whiteToast);
+    const canDelete = await checkSeatEligibility(ghe.id);
+    toast.dismiss(loadingCheck);
+
+    if (!canDelete) {
+      return openConfirm(
+        "Không thể xóa!",
+        `Ghế ${ghe.seatRow}${ghe.seatNumber} hiện đang có vé đã đặt.`,
+        closeConfirm,
+        'info'
+      );
+    }
+
+    openConfirm(
+      "Xác nhận xóa ghế?",
+      `Xóa vĩnh viễn ghế ${ghe.seatRow}${ghe.seatNumber}?`,
+      async () => {
+        closeConfirm();
+        const loading = toast.loading("Đang xóa...", whiteToast);
+        try {
+          const res = await apiRequest(`/api/v1/seats/${ghe.id}`, { method: 'DELETE' });
+          if (res.ok) {
+            setDanhSachGhe(prev => prev.filter(s => s.id !== ghe.id));
+            toast.success("Đã xóa!", { id: loading, ...whiteToast });
+          }
+        } catch { toast.error("Lỗi xóa!", { id: loading, ...whiteToast }); }
+      },
+      'danger'
+    );
+  };
+
+  const handleResetSạchSẽ = () => {
+    if (danhSachGhe.length === 0) return toast.error("Phòng đang trống!", whiteToast);
+    openConfirm(
+      "Dọn sạch sơ đồ?",
+      `Xóa tất cả ghế (trừ ghế đã có vé).`,
+      async () => {
+        closeConfirm();
+        const loading = toast.loading("Đang xử lý...", whiteToast);
+        try {
+          const realSeats = danhSachGhe.filter(g => !String(g.id).startsWith('temp-'));
+          const checkResults = await Promise.all(realSeats.map(g => checkSeatEligibility(g.id)));
+          const idsToDelete = realSeats.filter((_, idx) => checkResults[idx]).map(g => g.id);
+
+          if (idsToDelete.length > 0) {
+            await Promise.all(idsToDelete.map(id => apiRequest(`/api/v1/seats/${id}`, { method: 'DELETE' })));
+          }
+          taiDuLieu();
+          toast.success(`Đã dọn dẹp xong!`, { id: loading, ...whiteToast });
+        } catch { toast.error("Lỗi reset!", { id: loading, ...whiteToast }); }
+      },
+      'danger'
+    );
+  };
+
+  const handleGenerateMultiple = () => {
+    const totalToGenerate = config.rows * config.cols;
+    const maxCapacity = roomInfo?.totalSeats || 0;
+    if (totalToGenerate > maxCapacity) return toast.error(`Vượt sức chứa (${maxCapacity})!`, whiteToast);
+
+    openConfirm(
+      "Tạo sơ đồ hàng loạt?",
+      `Khởi tạo ${config.rows} hàng x ${config.cols} cột.`,
+      async () => {
+        closeConfirm();
+        const loading = toast.loading("Đang tạo...", whiteToast);
+        try {
+          const query = `?roomId=${roomId}&rows=${config.rows}&seatsPerRow=${config.cols}`;
+          const res = await apiRequest(`/api/v1/seats/generate${query}`, { method: 'POST' });
+          if (res.ok) {
+            toast.success("Thành công!", { id: loading, ...whiteToast });
+            taiDuLieu();
+          }
+        } catch { toast.error("Lỗi server!", whiteToast); }
+      }
+    );
   };
 
   const handleAddSingleSeat = () => {
     const row = manualSeat.row.trim().toUpperCase();
     const num = parseInt(manualSeat.num);
-    const maxCapacity = roomInfo?.capacity || 999;
-
-    if (danhSachGhe.length >= maxCapacity) return toast.error("Phòng đầy!", whiteToast);
+    const maxCapacity = roomInfo?.totalSeats || 0;
     if (!row || isNaN(num)) return toast.error("Nhập đủ thông tin!", whiteToast);
+    if (danhSachGhe.length >= maxCapacity) return toast.error("Phòng đầy!", whiteToast);
+    if (danhSachGhe.some(g => g.seatRow === row && Number(g.seatNumber) === num)) return toast.error("Trùng ghế!", whiteToast);
 
-    if (danhSachGhe.some(g => g.seatRow === row && Number(g.seatNumber) === num)) {
-      return toast.error(`Ghế ${row}${num} đã có!`, whiteToast);
-    }
-
-    const newSeat = { 
-      id: `temp-${Date.now()}`, 
-      seatRow: row, 
-      seatNumber: num, 
-      seatType: 'NORMAL', 
-      price: 60000, 
-      roomId: Number(roomId), 
-      isNew: true 
-    };
-
-    setDanhSachGhe([...danhSachGhe, newSeat]);
+    const newSeat = { id: `temp-${Date.now()}`, seatRow: row, seatNumber: num, seatType: 'NORMAL', price: 60000, roomId: Number(roomId) };
+    setDanhSachGhe(prev => [...prev, newSeat]);
     setManualSeat(prev => ({ ...prev, num: (num + 1).toString() }));
   };
 
@@ -124,142 +218,157 @@ export default function SeatDesignerPage() {
         return apiRequest(isNew ? `/api/v1/seats` : `/api/v1/seats/${ghe.id}`, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(body) });
       });
       await Promise.all(promises);
-      toast.success("Đã lưu sơ đồ!", { id: loading, ...whiteToast });
+      toast.success("Đã đồng bộ!", { id: loading, ...whiteToast });
       taiDuLieu();
-    } catch (err) {
-      toast.error("Lưu thất bại!", { id: loading, ...whiteToast });
-    } finally {
-      setDangLuu(false);
-    }
+    } catch { toast.error("Lỗi lưu!", whiteToast); } finally { setDangLuu(false); }
   };
 
   const toggleSeatType = (ghe: any) => {
     const types = ['NORMAL', 'VIP', 'SWEETBOX'];
-    const prices = { 'NORMAL': 60000, 'VIP': 90000, 'SWEETBOX': 150000 };
+    const prices: any = { 'NORMAL': 60000, 'VIP': 90000, 'SWEETBOX': 150000 };
     const nextType = types[(types.indexOf(ghe.seatType) + 1) % types.length];
-    setDanhSachGhe(danhSachGhe.map(s => s.id === ghe.id ? { ...s, seatType: nextType, price: prices[nextType as keyof typeof prices] } : s));
+    setDanhSachGhe(danhSachGhe.map(s => s.id === ghe.id ? { ...s, seatType: nextType, price: prices[nextType] } : s));
   };
 
-  const groupedSeats = danhSachGhe.reduce((acc: any, ghe: any) => {
-    const row = ghe.seatRow;
-    if (!acc[row]) acc[row] = [];
-    acc[row].push(ghe);
-    return acc;
-  }, {});
-  
-  const sortedRows = Object.keys(groupedSeats).sort();
-  const maxCol = Math.max(config.cols, ...danhSachGhe.map(g => Number(g.seatNumber) || 0));
+  const groupedSeats: any = useMemo(() => {
+    return danhSachGhe.reduce((acc: any, ghe: any) => {
+      const row = ghe.seatRow;
+      if (!acc[row]) acc[row] = [];
+      acc[row].push(ghe);
+      return acc;
+    }, {});
+  }, [danhSachGhe]);
+
+  const sortedRows = useMemo(() => Object.keys(groupedSeats).sort(), [groupedSeats]);
+  const maxColNum = useMemo(() => Math.max(config.cols, ...danhSachGhe.map(g => Number(g.seatNumber) || 0)), [danhSachGhe, config.cols]);
+
+  const CustomModal = () => {
+    if (!modalConfig.isOpen) return null;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeConfirm}></div>
+        <div className="bg-[#111] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden relative z-10 shadow-2xl">
+          <div className="p-6">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 
+              ${modalConfig.type === 'danger' ? 'bg-red-500/10 text-red-500' : 
+                modalConfig.type === 'info' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'}`}>
+              {modalConfig.type === 'info' ? <Lock size={24} /> : <AlertTriangle size={24} />}
+            </div>
+            <h3 className="text-lg font-black text-white uppercase italic tracking-wider mb-2">{modalConfig.title}</h3>
+            <p className="text-zinc-400 text-xs leading-relaxed font-medium">{modalConfig.message}</p>
+          </div>
+          <div className="flex border-t border-white/5">
+            {modalConfig.type !== 'info' && (
+              <button onClick={closeConfirm} className="flex-1 px-6 py-4 text-[10px] font-black uppercase text-zinc-500 hover:bg-white/5 transition-all">Hủy bỏ</button>
+            )}
+            <button onClick={modalConfig.type === 'info' ? closeConfirm : modalConfig.onConfirm} 
+              className={`flex-1 px-6 py-4 text-[10px] font-black uppercase text-white transition-all 
+                ${modalConfig.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 
+                  modalConfig.type === 'info' ? 'bg-zinc-800 hover:bg-zinc-700' : 'bg-amber-600 hover:bg-amber-700'}`}>
+              {modalConfig.type === 'info' ? 'Đã hiểu' : 'Xác nhận'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (dangTai) return <div className="h-screen bg-black flex items-center justify-center font-black text-red-600 animate-pulse uppercase tracking-[0.5em]">Loading Designer...</div>;
 
   return (
-    <div className="h-screen bg-[#050505] text-zinc-400 flex flex-col font-sans overflow-hidden">
+    <div className="h-screen bg-[#050505] text-zinc-400 flex flex-col overflow-hidden font-sans">
+      <Toaster position="top-right" />
+      <CustomModal />
       
-      {/* HEADER */}
-      <header className="flex-none h-[70px] px-4 border-b border-white/5 flex justify-between items-center bg-[#050505] z-30">
+      <header className="h-[70px] px-6 border-b border-white/5 flex justify-between items-center bg-[#050505] z-30">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="w-10 h-10 flex items-center justify-center bg-zinc-900/50 border border-white/5 rounded-xl hover:bg-white hover:text-black transition-all group">
+          <button onClick={() => router.back()} className="w-10 h-10 flex items-center justify-center bg-zinc-900/50 border border-white/5 rounded-xl hover:bg-white hover:text-black transition-all">
             <ChevronLeft size={18} strokeWidth={3} />
           </button>
           <div>
-            <h1 className="text-lg font-[1000] uppercase italic text-white tracking-tighter leading-none">SƠ ĐỒ: {roomInfo?.roomName}</h1>
-            <p className="text-zinc-600 text-[10px] mt-1 font-bold uppercase tracking-widest">Sức chứa: {danhSachGhe.length} / {roomInfo?.capacity}</p>
+            <h1 className="text-sm font-black text-white tracking-widest uppercase italic leading-none">
+              {roomInfo?.name || "PHÒNG CHƯA ĐẶT TÊN"}
+            </h1>
+            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.2em] mt-1.5">
+              Sức chứa: {danhSachGhe.length} / {roomInfo?.totalSeats || 0}
+            </p>
           </div>
         </div>
-        <button onClick={handleSaveAll} disabled={dangLuu} className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-[1000] text-[10px] uppercase tracking-widest transition-all">
-          {dangLuu ? "..." : "LƯU THAY ĐỔI"}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleResetSạchSẽ} className="px-4 py-2 bg-zinc-900 border border-white/5 hover:bg-red-600 text-white rounded-lg font-black text-[9px] uppercase transition-all flex items-center gap-2">
+            <Trash2 size={12} /> Reset Sạch
+          </button>
+          <button onClick={handleSaveAll} disabled={dangLuu} className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-black text-[9px] uppercase transition-all flex items-center gap-2 shadow-lg shadow-red-600/20">
+            <Save size={12} /> {dangLuu ? "Saving..." : "Lưu database"}
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* SIDEBAR */}
-        <aside className="w-[280px] flex-shrink-0 bg-[#0a0a0a] border-r border-white/5 p-5 flex flex-col gap-5 overflow-y-auto">
-          <div className="bg-[#111] border border-white/5 rounded-2xl p-4">
-            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">■ GEN SƠ ĐỒ</h3>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <input type="number" value={config.rows} onChange={(e) => setConfig({...config, rows: +e.target.value})} className="bg-[#1a1a1a] border border-white/5 rounded-lg py-2 text-white text-center outline-none" />
-              <input type="number" value={config.cols} onChange={(e) => setConfig({...config, cols: +e.target.value})} className="bg-[#1a1a1a] border border-white/5 rounded-lg py-2 text-white text-center outline-none" />
+        <aside className="w-[260px] bg-[#0a0a0a] border-r border-white/5 p-5 flex flex-col gap-6">
+          <div className="space-y-4">
+            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2 italic"><RefreshCcw size={10} /> Gen tự động</label>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" value={config.rows} onChange={(e) => setConfig({...config, rows: +e.target.value})} className="bg-zinc-900 border border-white/5 rounded-lg py-2 text-white text-center text-xs outline-none" />
+              <input type="number" value={config.cols} onChange={(e) => setConfig({...config, cols: +e.target.value})} className="bg-zinc-900 border border-white/5 rounded-lg py-2 text-white text-center text-xs outline-none" />
             </div>
-            <button onClick={handleGenerate} className="w-full py-2.5 bg-white text-black hover:bg-red-600 hover:text-white rounded-lg font-black text-[9px] uppercase transition-all">RESET & TẠO MỚI</button>
+            <button onClick={handleGenerateMultiple} className="w-full py-3 bg-white text-black hover:bg-red-600 hover:text-white rounded-xl font-black text-[9px] uppercase transition-all italic">Tạo hàng loạt</button>
           </div>
 
-          <div className="bg-[#111] border border-white/5 rounded-2xl p-4">
-            <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">+ THÊM GHẾ LẺ</h3>
-            <div className="flex gap-2 mb-4">
-              <input type="text" value={manualSeat.row} onChange={(e) => setManualSeat({...manualSeat, row: e.target.value})} className="w-1/2 bg-[#1a1a1a] border border-white/5 rounded-lg py-2 text-center text-white font-bold" />
-              <input type="number" value={manualSeat.num} onChange={(e) => setManualSeat({...manualSeat, num: e.target.value})} className="w-1/2 bg-[#1a1a1a] border border-white/5 rounded-lg py-2 text-center text-white font-bold" />
+          <div className="space-y-4 pt-6 border-t border-white/5">
+            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2 italic"><Plus size={10} /> Thêm ghế lẻ</label>
+            <div className="flex gap-2">
+              <input type="text" value={manualSeat.row} onChange={(e) => setManualSeat({...manualSeat, row: e.target.value})} className="w-1/2 bg-zinc-900 border border-white/5 rounded-lg py-2 text-center text-white text-xs font-bold uppercase" />
+              <input type="number" value={manualSeat.num} onChange={(e) => setManualSeat({...manualSeat, num: e.target.value})} className="w-1/2 bg-zinc-900 border border-white/5 rounded-lg py-2 text-center text-white text-xs font-bold" />
             </div>
-            <button onClick={handleAddSingleSeat} className="w-full py-2.5 bg-zinc-800 text-white hover:bg-zinc-700 rounded-lg font-black text-[9px] uppercase">CHÈN GHẾ</button>
+            <button onClick={handleAddSingleSeat} className="w-full py-3 bg-zinc-800 text-white hover:bg-zinc-700 rounded-xl font-black text-[9px] uppercase italic">Chèn ghế</button>
+          </div>
+
+          <div className="mt-auto p-4 bg-zinc-900/30 rounded-xl border border-white/5">
+              <p className="text-[8px] font-bold text-zinc-500 uppercase mb-2">Chú thích</p>
+              <div className="space-y-1.5 text-[9px]">
+                 <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 bg-zinc-800 rounded-sm"></div> Normal</div>
+                 <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 bg-amber-500/40 rounded-sm"></div> VIP</div>
+                 <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 bg-pink-500/40 rounded-sm"></div> Sweetbox</div>
+              </div>
           </div>
         </aside>
 
-        {/* MAIN VIEWPORT */}
-        <main className="flex-1 bg-[#050505] overflow-auto relative p-10 flex flex-col items-center">
-          <div className="w-full max-w-2xl flex flex-col items-center mb-16">
-            <div className="w-full h-[2px] bg-zinc-800 rounded-full"></div>
-            <span className="text-[8px] font-black tracking-[1em] text-zinc-700 uppercase mt-3">Screen Area</span>
+        <main className="flex-1 bg-[#050505] overflow-auto p-12 flex flex-col items-center custom-scrollbar">
+          <div className="w-full max-w-xl mb-20 relative opacity-40">
+            <div className="w-full h-[1px] bg-white"></div>
+            <p className="text-[8px] font-black tracking-[1.5em] text-white text-center mt-2 uppercase italic">Screen Area</p>
           </div>
 
-          {/* GRID GHẾ */}
-<div className="flex flex-col items-center gap-1.5 pb-24 min-w-max">
-  {sortedRows.map((rowLetter) => (
-    <div key={rowLetter} className="flex items-center gap-6">
-      {/* Nhãn hàng bên trái */}
-      <div className="w-6 text-center font-black text-zinc-800 text-[11px] uppercase select-none">
-        {rowLetter}
-      </div>
-      
-      <div className="flex items-center gap-1.5">
-        {Array.from({ length: maxCol }).map((_, index) => {
-          const seatNum = index + 1;
-          const ghe = groupedSeats[rowLetter].find((g: any) => Number(g.seatNumber) === seatNum);
-          
-          // Nếu ô trống, vẫn giữ w-10 để đảm bảo hàng cột thẳng hàng
-          if (!ghe) return <div key={`empty-${rowLetter}-${seatNum}`} className="w-10 h-10 flex-shrink-0" />;
-
-          const isSweet = ghe.seatType === 'SWEETBOX';
-
-          return (
-            <div 
-              key={ghe.id} 
-              onClick={() => toggleSeatType(ghe)}
-              className={`
-                h-10 flex-shrink-0 rounded-xl flex flex-col items-center justify-center border relative group cursor-pointer transition-all duration-300 hover:scale-105 z-10
-                ${isSweet 
-                  ? 'w-[86px] bg-pink-600/10 border-pink-500/40 text-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.1)]' 
-                  : ghe.seatType === 'VIP'
-                    ? 'w-10 bg-amber-600/10 border-amber-500/40 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                    : 'w-10 bg-zinc-900/50 border-white/5 text-zinc-400 hover:border-zinc-500'
-                }
-              `}
-            >
-              {isSweet && <Heart size={10} className="mb-0.5 animate-pulse" />}
-              <span className="text-[10px] font-black tracking-tighter uppercase select-none">
-                {ghe.seatRow}{ghe.seatNumber}
-              </span>
-              
-              {/* Nút xóa ghế nhanh */}
-              <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setDanhSachGhe(danhSachGhe.filter(s => s.id !== ghe.id)); 
-                }} 
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all border border-white/10 text-[10px] shadow-xl z-20"
-              >
-                ×
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Nhãn hàng bên phải */}
-      <div className="w-6 text-center font-black text-zinc-800 text-[11px] uppercase select-none">
-        {rowLetter}
-      </div>
-    </div>
-  ))}
-</div>
+          <div className="flex flex-col items-center gap-1.5 pb-32">
+            {sortedRows.map((rowLetter) => (
+              <div key={rowLetter} className="flex items-center gap-5">
+                <span className="w-5 text-right font-black text-zinc-800 text-[10px] uppercase italic">{rowLetter}</span>
+                <div className="flex gap-1.5">
+                  {Array.from({ length: maxColNum }).map((_, index) => {
+                    const seatNum = index + 1;
+                    const ghe = (groupedSeats[rowLetter] || []).find((g: any) => Number(g.seatNumber) === seatNum);
+                    if (!ghe) return <div key={index} className="w-7 h-7 border border-dashed border-white/5 rounded-md" />;
+                    const isSweet = ghe.seatType === 'SWEETBOX';
+                    const isVip = ghe.seatType === 'VIP';
+                    return (
+                      <div key={ghe.id} onClick={() => toggleSeatType(ghe)}
+                        className={`h-7 flex-shrink-0 rounded-lg flex flex-col items-center justify-center border relative group cursor-pointer transition-all active:scale-90
+                          ${isSweet ? 'w-[59px] bg-pink-500/10 border-pink-500/30 text-pink-400' : 
+                            isVip ? 'w-7 bg-amber-500/10 border-amber-500/30 text-amber-500' : 
+                            'w-7 bg-zinc-900 border-white/5 text-zinc-500'}`}>
+                        {isSweet && <Heart size={8} fill="currentColor" className="mb-0.5 animate-pulse" />}
+                        <span className="text-[8px] font-black select-none tracking-tighter">{ghe.seatRow}{ghe.seatNumber}</span>
+                        <button onClick={(e) => { e.stopPropagation(); handleXoaGhe(ghe); }}
+                          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20 text-[10px] font-bold">×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <span className="w-5 text-left font-black text-zinc-800 text-[10px] uppercase italic">{rowLetter}</span>
+              </div>
+            ))}
+          </div>
         </main>
       </div>
     </div>

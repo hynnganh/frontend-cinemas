@@ -2,22 +2,20 @@
 import React from 'react';
 import { 
   LayoutDashboard, 
-  Film, 
   Monitor, 
   Calendar, 
   Users, 
-  Box, 
   Ticket, 
-  MessageSquare, 
-  History, 
-  LogOut, 
-  Warehouse
+  LogOut 
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
+import toast from 'react-hot-toast';
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const navLinks = [
     { name: 'Tổng quan', icon: LayoutDashboard, href: '/admin' },
@@ -26,6 +24,24 @@ export default function AdminSidebar() {
     { name: 'Quản lý Vé', icon: Ticket, href: '/admin/tickets' }, 
     { name: 'Khách hàng', icon: Users, href: '/admin/users' },
   ];
+
+  // Logic đăng xuất hệ thống
+  const handleLogout = () => {
+    // 1. Xóa dữ liệu trong LocalStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('roles');
+
+    // 2. Xóa dữ liệu trong Cookies
+    Cookies.remove('token');
+    Cookies.remove('role');
+
+    // 3. Thông báo cho người dùng
+    toast.success("Đăng xuất thành công!");
+
+    // 4. Điều hướng về trang đăng nhập và làm mới trạng thái router
+    router.push('/login');
+    router.refresh();
+  };
 
   return (
     <aside className="w-64 h-screen bg-[#080808] border-r border-white/5 flex flex-col sticky top-0 overflow-hidden">
@@ -40,7 +56,7 @@ export default function AdminSidebar() {
         </div>
       </div>
 
-      {/* Navigation - Ẩn thanh cuộn */}
+      {/* Navigation */}
       <nav className="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar py-2">
         {navLinks.map((link) => {
           const isActive = pathname === link.href;
@@ -61,10 +77,13 @@ export default function AdminSidebar() {
         })}
       </nav>
 
-      {/* Logout Section */}
+      {/* Logout Section - Đã fix logic onClick */}
       <div className="p-4 mt-auto border-t border-white/5 shrink-0 bg-black/50">
-        <button className="w-full flex items-center gap-3 px-4 py-3 text-zinc-600 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-red-500/5 rounded-xl">
-          <LogOut size={16} /> 
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 text-zinc-600 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-red-500/5 rounded-xl group"
+        >
+          <LogOut size={16} className="group-hover:translate-x-1 transition-transform" /> 
           <span>Đăng xuất hệ thống</span>
         </button>
       </div>
