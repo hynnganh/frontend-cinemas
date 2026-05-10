@@ -3,8 +3,10 @@ import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api'; 
-import SeatMap from '../SeatMap'; // Import file SeatMap cùng cấp thư mục
+import SeatMap from '../SeatMap'; 
 import toast, { Toaster } from 'react-hot-toast';
+import { getImageUrl } from "@/app/lib/api";
+import { Armchair } from 'lucide-react';
 
 export default function BookingPage({ params }: { params: Promise<{ showtimeId: string }> }) {
   const { showtimeId } = use(params);
@@ -32,12 +34,40 @@ export default function BookingPage({ params }: { params: Promise<{ showtimeId: 
   }, [showtimeId]);
 
   const handleNext = () => {
-    sessionStorage.setItem('booking_data', JSON.stringify({
+    if (selectedSeats.length === 0) {
+  toast.error("Vui lòng chọn ghế để tiếp tục!", {
+    duration: 3000,
+    position: 'top-center',
+    style: {
+      borderRadius: '12px',
+      background: '#1a1a1a', // Nền tối cực sang
+      color: '#fff',
+      border: '1px solid #dc2626',
+      fontSize: '11px', // Nhỏ lại chút cho tinh tế
+      fontWeight: '900', // Đậm chất IT
+      textTransform: 'uppercase',
+      letterSpacing: '1px'
+    },
+    // Sử dụng Component icon thay vì emoji "phèn"
+    icon: <Armchair size={18} className="text-red-600" />, 
+  });
+  return;
+}
+
+    const bookingData = {
       showtimeId,
       movieTitle: showtimeInfo?.movie?.title,
-      selectedSeats,
+      movieImage: getImageUrl(showtimeInfo?.movie?.posterUrl), 
+      cinemaItemId: showtimeInfo?.cinemaItem?.id,
+      cinemaName: showtimeInfo?.cinemaItem?.cinema?.name, 
+      roomName: showtimeInfo?.cinemaItem?.name,
+      date: new Date(showtimeInfo?.startTime).toLocaleDateString('vi-VN'),
+      time: new Date(showtimeInfo?.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      selectedSeats, 
       seatPrice: selectedSeats.reduce((sum, s) => sum + s.price, 0)
-    }));
+    };
+
+    sessionStorage.setItem('booking_data', JSON.stringify(bookingData));
     router.push(`/booking/${showtimeId}/combos`);
   };
 
@@ -58,12 +88,12 @@ export default function BookingPage({ params }: { params: Promise<{ showtimeId: 
           onToggleSeat={(seat) => setSelectedSeats(prev => prev.find(s => s.id === seat.id) ? prev.filter(s => s.id !== seat.id) : [...prev, seat])} 
         />
       </div>
-      <div className="p-8 bg-zinc-950 border-t border-white/5 flex justify-between items-center sticky bottom-0">
+      <div className="p-8 ml-8 bg-zinc-950 border-t border-white/5 flex justify-between items-center sticky bottom-0">
         <div>
           <p className="text-[10px] text-zinc-500 font-black uppercase">Ghế: <span className="text-white">{selectedSeats.map(s => s.seatRow + s.seatNumber).join(', ') || '...'}</span></p>
           <div className="text-2xl font-[1000] text-red-600 italic">{(selectedSeats.reduce((sum, s) => sum + s.price, 0)).toLocaleString()}đ</div>
         </div>
-        <button onClick={handleNext} disabled={selectedSeats.length === 0} className="px-10 py-4 bg-white text-black font-black uppercase italic rounded-2xl disabled:opacity-20 hover:bg-red-600 hover:text-white transition-all">Chọn Combo <ArrowRight className="inline ml-2" size={16}/></button>
+        <button onClick={handleNext} className="px-10 py-4 bg-white text-black font-black uppercase italic rounded-2xl hover:bg-red-600 hover:text-white transition-all">Chọn Combo <ArrowRight className="inline ml-2" size={16}/></button>
       </div>
     </div>
   );

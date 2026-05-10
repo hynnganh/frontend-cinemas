@@ -68,13 +68,13 @@ export default function TopMenu() {
         
         {/* --- Link tiện ích --- */}
         <div className="flex items-center gap-6">
-          <Link href="/news" className="flex items-center gap-2 text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest group transition-all">
-            <Bell size={14} className="text-red-600 group-hover:animate-bounce" />
-            <span>Tin mới</span>
+          <Link href="/ticket" className="flex items-center gap-2 text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest group transition-all">
+            <Ticket size={14} className="text-red-600 group-hover:animate-bounce" />
+            <span>Vé của tôi</span>
           </Link>
 
           <Link href="/discounts" className="flex items-center gap-2 text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest group transition-all">
-            <Ticket size={14} className="text-red-600 group-hover:scale-110 transition-transform" />
+            <CreditCard size={14} className="text-red-600 group-hover:scale-110 transition-transform" />
             <span>Mã giảm giá</span>
           </Link>
         </div>
@@ -148,14 +148,14 @@ export default function TopMenu() {
                   <div className="p-2 bg-zinc-900 rounded-lg group-hover/item:bg-red-600 group-hover/item:text-white transition-all text-red-600">
                     <Settings size={14} />
                   </div>
-                  <span className="text-[10px] font-bold text-zinc-400 group-hover/item:text-white uppercase tracking-wider">Cài đặt</span>
+                  <span className="text-[10px] font-bold text-zinc-400 group-hover/item:text-white uppercase tracking-wider">Tài khoản</span>
                 </Link>
 
-                <Link href="/my-tickets" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 group/item transition-all">
+                <Link href="/orders" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 group/item transition-all">
                   <div className="p-2 bg-zinc-900 rounded-lg group-hover/item:bg-red-600 group-hover/item:text-white transition-all text-red-600">
                     <CreditCard size={14} />
                   </div>
-                  <span className="text-[10px] font-bold text-zinc-400 group-hover/item:text-white uppercase tracking-wider">Giao dịch</span>
+                  <span className="text-[10px] font-bold text-zinc-400 group-hover/item:text-white uppercase tracking-wider">Đơn hàng</span>
                 </Link>
 
                 {(isAdmin || isSuperAdmin) && (

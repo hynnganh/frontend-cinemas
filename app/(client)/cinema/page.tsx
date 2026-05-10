@@ -1,7 +1,6 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Loader2, Clock, ChevronRight, Star } from 'lucide-react';
-// 1. Import useRouter để điều hướng
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Search, Loader2, Clock, ChevronRight, Star, Calendar as CalendarIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { apiRequest, getImageUrl } from '@/app/lib/api';
 
@@ -36,7 +35,6 @@ const MovieShowtimeItem = ({ movie, onSelect }: any) => (
               {f.times.map((st: any) => (
                 <button 
                   key={st.id} 
-                  // 2. Gọi hàm onSelect khi nhấn vào giờ
                   onClick={() => onSelect(st.id)} 
                   className="px-4 py-2 rounded-xl bg-zinc-800 border border-white/5 text-[10px] font-black text-zinc-300 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-90"
                 >
@@ -52,8 +50,8 @@ const MovieShowtimeItem = ({ movie, onSelect }: any) => (
 );
 
 export default function Cinema() {
-  // 3. Khởi tạo router
   const router = useRouter();
+  const dateInputRef = useRef<HTMLInputElement>(null); // Ref để mở trình chọn ngày
   const [isMounted, setIsMounted] = useState(false);
   const [cinemas, setCinemas] = useState<any[]>([]);
   const [movies, setMovies] = useState<any[]>([]);
@@ -68,10 +66,7 @@ export default function Cinema() {
     setSelectedDate(new Date().toISOString().split('T')[0]);
   }, []);
 
-  // 4. Hàm xử lý nhảy trang
   const handleBooking = (showtimeId: number) => {
-    // Chuyển hướng sang trang booking kèm ID suất chiếu
-    // Đường dẫn này tùy thuộc vào cấu trúc folder của bạn (ví dụ: app/booking/[id]/page.tsx)
     router.push(`/booking/${showtimeId}`);
   };
 
@@ -127,6 +122,7 @@ export default function Cinema() {
     fetchShowtimes();
   }, [selectedId, selectedDate]);
 
+  // Danh sách 7 ngày nhanh
   const dateTabs = useMemo(() => {
     const VI_DAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
     return [...Array(7)].map((_, i) => {
@@ -173,7 +169,8 @@ export default function Cinema() {
 
         {/* Main Content */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+            {/* 7 ngày mặc định */}
             {dateTabs.map(d => (
               <button 
                 key={d.id} 
@@ -186,7 +183,38 @@ export default function Cinema() {
                 <span className="text-lg font-black italic">{d.dateNum}</span>
               </button>
             ))}
+
+            {/* Nút chọn ngày khác */}
+            <div className="relative shrink-0">
+              <input 
+                type="date" 
+                ref={dateInputRef}
+                value={selectedDate}
+                min={new Date().toISOString().split('T')[0]} // Không cho chọn ngày quá khứ
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer -z-10" // Ẩn nhưng vẫn click được qua nút giả
+              />
+              <button 
+                onClick={() => dateInputRef.current?.showPicker()}
+                className={`min-w-[65px] h-full py-4 flex flex-col items-center justify-center rounded-2xl border transition-all ${
+                  !dateTabs.some(d => d.id === selectedDate) 
+                    ? 'bg-red-600 text-white border-red-600' 
+                    : 'bg-zinc-900/40 text-zinc-400 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <CalendarIcon size={18} className="mb-1" />
+                <span className="text-[7px] font-black uppercase tracking-tighter">Ngày khác</span>
+              </button>
+            </div>
           </div>
+
+          {/* Hiển thị ngày đang chọn (nếu không nằm trong 7 ngày đầu) */}
+          {!dateTabs.some(d => d.id === selectedDate) && (
+             <div className="flex items-center gap-2 px-6 py-2 bg-red-600/10 border border-red-600/20 rounded-full w-fit animate-in fade-in slide-in-from-left-4">
+                <span className="text-[10px] font-black text-red-500 uppercase italic">Đang xem ngày:</span>
+                <span className="text-[10px] font-black text-white uppercase italic">{new Date(selectedDate).toLocaleDateString('vi-VN')}</span>
+             </div>
+          )}
 
           <div className="bg-zinc-900/10 rounded-[2.5rem] border border-white/5 p-2 min-h-[400px]">
             {fetchingShowtimes ? (
@@ -194,16 +222,11 @@ export default function Cinema() {
             ) : movies.length > 0 ? (
               <div className="grid grid-cols-1 gap-2">
                 {movies.map((m) => (
-                  <MovieShowtimeItem 
-                    key={m.id} 
-                    movie={m} 
-                    // 5. Truyền hàm xử lý nhảy trang vào item
-                    onSelect={handleBooking} 
-                  />
+                  <MovieShowtimeItem key={m.id} movie={m} onSelect={handleBooking} />
                 ))}
               </div>
             ) : (
-              <div className="h-[400px] flex items-center justify-center opacity-10 font-black uppercase text-[10px] italic tracking-widest">Không có suất chiếu</div>
+              <div className="h-[400px] flex items-center justify-center opacity-10 font-black uppercase text-[10px] italic tracking-widest">Không có suất chiếu cho ngày này</div>
             )}
           </div>
         </div>
@@ -212,6 +235,11 @@ export default function Cinema() {
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Reset giao diện chọn ngày để trông đồng bộ hơn */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1);
+          cursor: pointer;
+        }
       `}</style>
     </div>
   );

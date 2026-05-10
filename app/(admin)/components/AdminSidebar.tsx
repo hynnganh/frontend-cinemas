@@ -6,7 +6,8 @@ import {
   Calendar, 
   Users, 
   Ticket, 
-  LogOut 
+  LogOut, 
+  ShoppingBag
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -21,7 +22,8 @@ export default function AdminSidebar() {
     { name: 'Tổng quan', icon: LayoutDashboard, href: '/admin' },
     { name: 'Phòng chiếu', icon: Monitor, href: '/admin/rooms' }, 
     { name: 'Lịch chiếu', icon: Calendar, href: '/admin/showtimes' },
-    { name: 'Quản lý Vé', icon: Ticket, href: '/admin/tickets' }, 
+    { name: 'Quản lý Đơn hàng', icon: Ticket, href: '/admin/orders' }, 
+    { name: 'Quản lý Combo', icon: ShoppingBag, href: '/admin/combos' },
     { name: 'Khách hàng', icon: Users, href: '/admin/users' },
   ];
 

@@ -2,202 +2,175 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, Mail, Loader2, RefreshCw, 
-  Fingerprint, User, ShieldCheck, Phone, Calendar
+  Search, Loader2, RefreshCw, 
+  User, Calendar, ChevronRight, Mail, Ticket
 } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api'; 
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function TrangQuanLyKhachHang() {
-  const [danhSachUser, setDanhSachUser] = useState<any[]>([]);
+  const [danhSachKhach, setDanhSachKhach] = useState<any[]>([]);
   const [dangTai, setDangTai] = useState(true);
   const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState("");
 
-  // 1. Lấy dữ liệu từ API
-  const layDuLieuUser = async () => {
+  const layDuLieu = async () => {
     try {
       setDangTai(true);
-      const res = await apiRequest('/api/v1/users');
+      const res = await apiRequest('/api/v1/tickets'); 
       const ketQua = await res.json();
       
-      if (res.ok) {
-        // FIX: Theo JSON bạn gửi, dữ liệu nằm trong ketQua.data.content
-        const data = ketQua.data?.content || [];
-        setDanhSachUser(data);
-      } else {
-        toast.error("Không có quyền truy cập dữ liệu!");
+      if (res.ok && Array.isArray(ketQua.data)) {
+        const mapKhachHang = new Map();
+        ketQua.data.forEach((ticket: any) => {
+          const u = ticket.user;
+          if (u?.userId) {
+            if (!mapKhachHang.has(u.userId)) {
+              mapKhachHang.set(u.userId, { 
+                ...u, 
+                count: 0, 
+                total: 0, 
+                first: ticket.createdAt || new Date().toISOString() 
+              });
+            }
+            const cur = mapKhachHang.get(u.userId);
+            cur.count += 1;
+            cur.total += Number(ticket.price) || 0;
+          }
+        });
+        setDanhSachKhach(Array.from(mapKhachHang.values()));
       }
     } catch (err) {
-      console.error("Lỗi hệ thống:", err);
-      toast.error("Lỗi kết nối máy chủ!");
+      toast.error("Lỗi đồng bộ dữ liệu!");
     } finally {
       setDangTai(false);
     }
   };
 
-  useEffect(() => {
-    layDuLieuUser();
-  }, []);
+  useEffect(() => { layDuLieu(); }, []);
 
-  // 2. Hàm render hàng dữ liệu (Fix logic Role từ String Array)
-  const renderHangDuLieu = () => {
-    const cacHang = [];
-    
-    for (let i = 0; i < danhSachUser.length; i++) {
-      const u = danhSachUser[i];
-      if (!u) continue;
-
-      // FIX: Check role dựa trên mảng String ["ROLE_USER", ...]
-      let laKhachHang = false;
-      if (u.roles && Array.isArray(u.roles)) {
-        for (let j = 0; j < u.roles.length; j++) {
-          if (u.roles[j] === 'ROLE_USER') {
-            laKhachHang = true;
-            break; 
-          }
-        }
-      }
-
-      // Chỉ hiện những người có quyền USER
-      if (!laKhachHang) continue;
-
-      // Logic tìm kiếm
-      const hoTen = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
-      const email = (u.email || '').toLowerCase();
-      const sdt = (u.mobileNumber || '');
-      const tuKhoa = tuKhoaTimKiem.toLowerCase();
-
-      const khopTimKiem = hoTen.includes(tuKhoa) || email.includes(tuKhoa) || sdt.includes(tuKhoa);
-
-      if (khopTimKiem) {
-        cacHang.push(
-          <tr key={u.userId} className="hover:bg-white/[0.01] transition-all group border-b border-white/5">
-            <td className="p-8">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center font-black text-red-600 text-2xl italic shadow-md group-hover:border-red-600/50 transition-all overflow-hidden">
-                  {u.avatar ? (
-                    <img src={u.avatar} className="w-full h-full object-cover" alt="Avatar" />
-                  ) : (
-                    u.firstName?.charAt(0).toUpperCase() || 'U'
-                  )}
-                </div>
-                <div>
-                  <p className="font-black uppercase italic text-sm text-white tracking-tight group-hover:text-red-500 transition-colors">
-                    {u.firstName} {u.lastName}
-                  </p>
-                  <p className="text-[10px] text-zinc-600 font-bold mt-1 flex items-center gap-1 uppercase tracking-tighter">
-                     <Fingerprint size={10} className="text-red-600" /> ID: {u.userId}
-                  </p>
-                </div>
-              </div>
-            </td>
-
-            <td className="p-8">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Mail size={12} className="text-red-600" />
-                  <p className="text-[13px] text-zinc-400 font-bold">{u.email}</p>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-zinc-500 ml-5 italic">
-                  <Phone size={10} /> {u.mobileNumber || 'Chưa cập nhật'}
-                </div>
-              </div>
-            </td>
-
-            <td className="p-8">
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-black text-zinc-300 uppercase italic tracking-widest">
-                   {u.gender === 'MALE' ? 'Nam' : u.gender === 'FEMALE' ? 'Nữ' : 'Khác'}
-                </span>
-                <span className="text-[9px] text-zinc-600 font-bold flex items-center gap-1">
-                   <Calendar size={10} /> 
-                   {u.dateOfBirth ? new Date(u.dateOfBirth).toLocaleDateString('vi-VN') : '---'}
-                </span>
-              </div>
-            </td>
-
-            <td className="p-8 text-right">
-               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600/5 border border-red-600/20 rounded-xl">
-                  <ShieldCheck size={12} className="text-red-600" />
-                  <span className="text-[10px] font-[1000] text-red-600 uppercase tracking-widest italic">USER</span>
-               </div>
-            </td>
-          </tr>
-        );
-      }
-    }
-
-    if (cacHang.length === 0 && !dangTai) {
-      return (
-        <tr>
-          <td colSpan={4} className="p-32 text-center opacity-20 italic font-black uppercase tracking-[0.5em] text-zinc-500 text-xs">
-            Không tìm thấy khách hàng nào
-          </td>
-        </tr>
-      );
-    }
-
-    return cacHang;
-  };
+  const filtered = danhSachKhach.filter(k => 
+    `${k.firstName} ${k.lastName} ${k.email}`.toLowerCase().includes(tuKhoaTimKiem.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-3 font-sans">
+    <div className="min-h-screen bg-[#000000] text-zinc-400 p-8 font-sans selection:bg-red-500/30">
       <Toaster position="top-right" />
 
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 px-5">
-        <div className="flex items-center gap-4">
-          <div className="p-4 bg-red-600/10 rounded-3xl border border-red-600/20">
-            <User className="text-red-600" size={32} />
+      <div className="max-w-6xl mx-auto">
+        {/* --- HEADER THEO STYLE A&K --- */}
+        <header className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
+          <div className="flex items-center gap-4">
+             <div className="w-1.5 h-10 bg-red-600 rounded-full" />
+             <div>
+                <h1 className="text-3xl font-[1000] text-white tracking-tighter italic uppercase leading-none">
+                  KHÁCH HÀNG <span className="text-red-600 font-black">HỆ THỐNG</span>
+                </h1>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-700 mt-1">A&K Cinema Management</p>
+             </div>
           </div>
-          <div>
-            <h1 className="text-4xl font-[1000] italic uppercase tracking-tighter leading-none">
-              QUẢN LÝ <span className="text-red-600">KHÁCH HÀNG</span>
-            </h1>
-            <p className="text-zinc-500 font-black uppercase text-[9px] tracking-[0.4em] mt-2 italic">A&K • Membership Database</p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-80">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-800" size={16} />
-            <input 
-              type="text" 
-              placeholder="Tìm theo tên, email, sdt..." 
-              className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold outline-none focus:border-red-600/50 transition-all"
-              onChange={(e) => setTuKhoaTimKiem(e.target.value)}
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-red-600 transition-colors" size={16} />
+              <input 
+                type="text" 
+                placeholder="Tìm tên, mã khách, email..." 
+                className="bg-[#0f0f0f] border border-white/5 rounded-2xl py-3 pl-12 pr-6 text-xs font-bold outline-none focus:border-red-600/30 transition-all w-72 placeholder:text-zinc-800"
+                onChange={(e) => setTuKhoaTimKiem(e.target.value)}
+              />
+            </div>
+            <button onClick={layDuLieu} className="p-3 bg-[#0f0f0f] border border-white/5 rounded-2xl hover:bg-zinc-900 transition-all active:scale-95">
+              <RefreshCw size={18} className={dangTai ? "animate-spin text-red-600" : "text-zinc-600"} />
+            </button>
           </div>
-          <button onClick={layDuLieuUser} className="p-4 bg-zinc-900 border border-white/5 rounded-2xl hover:bg-white hover:text-black transition-all">
-            <RefreshCw size={18} className={dangTai ? "animate-spin" : ""} />
-          </button>
-        </div>
-      </div>
+        </header>
 
-      {/* TABLE DATA */}
-      <div className="bg-zinc-900/30 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl mx-5">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-white/[0.02] border-b border-white/5">
-              <tr>
-                <th className="p-8 text-[10px] font-black uppercase text-zinc-600 tracking-widest">Hồ sơ</th>
-                <th className="p-8 text-[10px] font-black uppercase text-zinc-600 tracking-widest">Thông tin liên hệ</th>
-                <th className="p-8 text-[10px] font-black uppercase text-zinc-600 tracking-widest">Định danh</th>
-                <th className="p-8 text-[10px] font-black uppercase text-zinc-600 tracking-widest text-right">Cấp bậc</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {dangTai ? (
-                <tr>
-                  <td colSpan={4} className="p-32 text-center">
-                    <Loader2 className="animate-spin text-red-600 mx-auto" size={40} />
-                  </td>
-                </tr>
-              ) : (
-                renderHangDuLieu()
-              )}
-            </tbody>
-          </table>
+        {/* --- LIST LAYOUT (STYLE PHÒNG CHIẾU) --- */}
+        <div className="space-y-3">
+          {/* Header Row */}
+          <div className="px-8 py-2 flex items-center text-[10px] font-black uppercase tracking-widest text-zinc-800">
+            <div className="w-16">ID</div>
+            <div className="flex-1">Thông tin thành viên</div>
+            <div className="w-32 hidden md:block text-center">Gia nhập</div>
+            <div className="w-24 text-center">Số vé</div>
+            <div className="w-32 text-right">Tổng chi</div>
+            <div className="w-12"></div>
+          </div>
+
+          {dangTai ? (
+            <div className="py-40 text-center">
+              <Loader2 className="animate-spin mx-auto text-red-600 mb-4" size={40} />
+              <p className="text-[10px] font-black text-zinc-800 uppercase tracking-widest italic">Đang bóc tách dữ liệu...</p>
+            </div>
+          ) : (
+            filtered.map((khach) => (
+              <div 
+                key={khach.userId} 
+                className="group flex items-center px-8 py-5 bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] hover:bg-[#0f0f0f] hover:border-red-600/20 transition-all duration-300 cursor-pointer"
+              >
+                {/* ID - Mono Style */}
+                <div className="w-16 text-[11px] font-black text-zinc-800 group-hover:text-red-600/40 transition-colors tracking-tighter italic">
+                  #{khach.userId}
+                </div>
+
+                {/* Member Info */}
+                <div className="flex-1 flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-[1.2rem] bg-black border border-white/5 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-red-600/30 transition-all shadow-2xl">
+                    {khach.avatar ? (
+                      <img src={khach.avatar} className="w-full h-full object-cover" />
+                    ) : (
+                      <User size={20} className="text-zinc-800 group-hover:text-red-600 transition-colors" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-base font-[1000] text-zinc-200 uppercase italic tracking-tighter leading-none group-hover:text-white transition-colors">
+                      {khach.firstName} {khach.lastName}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                      <Mail size={10} className="text-red-600" />
+                      <p className="text-[10px] text-zinc-500 font-bold tracking-tight truncate">{khach.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Joined Date */}
+                <div className="w-32 hidden md:flex items-center justify-center gap-2 text-[11px] font-black text-zinc-700 uppercase italic">
+                  {new Date(khach.first).toLocaleDateString('vi-VN')}
+                </div>
+
+                {/* Ticket Count - Badge Red Style */}
+                <div className="w-24 text-center">
+                   <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600/5 border border-red-600/10 rounded-full">
+                      <Ticket size={10} className="text-red-600" />
+                      <span className="text-[11px] font-black text-red-600 italic">
+                        {khach.count}
+                      </span>
+                   </div>
+                </div>
+
+                {/* Total Spent */}
+                <div className="w-32 text-right">
+                  <p className="text-lg font-[1000] text-white italic tracking-tighter">
+                    {(Number(khach.total) || 0).toLocaleString()}
+                    <span className="text-[10px] ml-1 text-red-600 not-italic uppercase font-black">đ</span>
+                  </p>
+                </div>
+
+                {/* Action Arrow */}
+                <div className="w-12 flex justify-end">
+                   <div className="w-10 h-10 rounded-2xl bg-[#080808] border border-white/5 flex items-center justify-center text-zinc-800 group-hover:text-white group-hover:bg-red-600 group-hover:border-red-600 transition-all shadow-xl group-hover:translate-x-1">
+                      <ChevronRight size={18} />
+                   </div>
+                </div>
+              </div>
+            ))
+          )}
+
+          {!dangTai && filtered.length === 0 && (
+            <div className="py-40 text-center border border-dashed border-white/5 rounded-[3rem]">
+              <p className="text-[12px] font-black uppercase tracking-[0.5em] text-zinc-800 italic">No Member Records Found</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

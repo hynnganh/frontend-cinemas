@@ -23,6 +23,7 @@
     "postcss": "8.5.1",
     "postgres": "^3.4.6",
     "prop-types": "^15.8.1",
+    "qrcode.react": "^4.2.0",
     "react": "latest",
     "react-dom": "latest",
     "react-hot-toast": "^2.6.0",

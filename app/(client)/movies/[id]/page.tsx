@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect, use } from 'react';
 import { 
-  Play, Star, Heart, Share2, 
-  ChevronRight, Award, 
-  Clock, Calendar, Globe, Film, Ticket
+  Play, Star, Heart, Share2, Award, 
+  Calendar, Globe, Film, Ticket, Loader2 
 } from 'lucide-react';
 import Link from 'next/link';
 import { apiRequest } from "@/app/lib/api";
+import toast, { Toaster } from 'react-hot-toast';
+import ReviewModal from '../ReviewModal';
 
 export default function MovieDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -15,6 +16,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   const [movie, setMovie] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   useEffect(() => {
     const fetchMovieDetail = async () => {
@@ -24,107 +26,87 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
           const resData = await response.json();
           setMovie(resData.data || resData); 
         }
-      } catch (error) { console.error("Lỗi:", error); } 
-      finally { setLoading(false); }
+      } catch (error) { 
+        toast.error("Không thể tải thông tin phim");
+      } finally { setLoading(false); }
     };
     if (movieId) fetchMovieDetail();
   }, [movieId]);
 
+  const handleWatchTrailer = () => {
+    if (movie?.trailerUrl) window.open(movie.trailerUrl, '_blank', 'noopener,noreferrer');
+    else toast.error("Trailer chưa cập nhật!");
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+      <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
     </div>
   );
 
   if (!movie) return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center gap-4">
-      <h2 className="text-lg font-black uppercase italic tracking-tighter">Không tìm thấy phim</h2>
-      <Link href="/" className="text-[10px] text-zinc-500 font-black uppercase tracking-widest border-b border-zinc-800 pb-1">Quay lại trang chủ</Link>
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center gap-4 uppercase font-black italic">
+      <h2>Không tìm thấy phim</h2>
+      <Link href="/" className="text-[10px] border-b border-zinc-800 text-zinc-500">Về trang chủ</Link>
     </div>
   );
 
-  const displayTitle = movie.title || "Đang cập nhật";
-  const displayPoster = movie.posterUrl || "https://placehold.co/400x600?text=No+Poster";
-  const displayRating = movie.rating ? movie.rating.toFixed(1) : "NEW";
-  const displayDuration = movie.duration ? `${movie.duration} PHÚT` : "N/A";
-  const displayGenre = movie.genre?.name || "HÀNH ĐỘNG";
-const getLocalImagePath = (fileName: string) => {
-
-    if (!fileName) return "https://placehold.co/400x600?text=No+Poster";
-
-    if (fileName.startsWith("http")) return fileName; 
-
-    
-
-    return `/images/${fileName}`; 
-
-  };
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-300 font-sans selection:bg-red-600/30">
+    <div className="min-h-screen bg-[#050505] text-zinc-300 font-sans">
+      <Toaster position="top-center" />
+      <ReviewModal 
+        isOpen={isReviewOpen} 
+        onClose={() => setIsReviewOpen(false)} 
+        movieTitle={movie.title} 
+        movieId={movieId}
+      />
       
-      {/* --- PHẦN ĐẦU TRANG (THU GỌN LẠI) --- */}
-      <section className="relative h-[50vh] md:h-[55vh] w-full overflow-hidden">
+      {/* --- HERO SECTION --- */}
+      <section className="relative h-[65vh] w-full overflow-hidden">
         <div className="absolute inset-0">
-        <img 
-            src={displayPoster} 
-            className="w-full h-full object-cover opacity-10 blur-3xl scale-110" 
-            alt="bg"
-            onError={(e) => e.currentTarget.src = "https://placehold.co/400x600?text=Error"} 
-          />          
-          <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent" />
+          <img src={movie.posterUrl} className="w-full h-full object-cover opacity-20 blur-3xl scale-110" alt="bg" />          
+          <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/60 to-transparent" />
         </div>
 
-        <div className="absolute inset-0 flex items-center pt-10">
-          <div className="max-w-5xl mx-auto px-6 w-full flex flex-col md:flex-row gap-8 items-center md:items-end pb-8">
-            
-            {/* Poster nhỏ nhắn, tinh tế */}
-            <div className="w-36 md:w-48 aspect-[2/3] rounded-[1.5rem] overflow-hidden shadow-2xl border border-white/5 shrink-0 animate-in fade-in zoom-in duration-700">
-              <img src={displayPoster} className="w-full h-full object-cover" alt={displayTitle} />
+        <div className="absolute inset-0 flex items-center pt-20">
+          <div className="max-w-6xl mx-auto px-6 w-full flex flex-col md:flex-row gap-10 items-center md:items-end pb-10">
+            <div className="w-44 md:w-60 aspect-[2/3] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 shrink-0">
+              <img src={movie.posterUrl} className="w-full h-full object-cover" alt="poster" />
             </div>
 
-            <div className="flex-1 space-y-4 text-center md:text-left">
-              <div className="flex flex-wrap justify-center md:justify-start gap-2 items-center">
-                <span className="bg-red-600 text-white font-black px-2 py-1 rounded-md text-[8px] uppercase tracking-widest">
+            <div className="flex-1 space-y-6 text-center md:text-left">
+              <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                <span className="bg-red-600 text-white font-[1000] px-3 py-1.5 rounded-xl text-[9px] uppercase tracking-widest italic">
                   {movie.status === "SHOWING" ? "ĐANG CHIẾU" : "SẮP CHIẾU"}
                 </span>
-                <span className="bg-white/5 px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/10 text-zinc-500">
-                   {displayDuration}
+                <span className="bg-white/5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border border-white/10 text-zinc-400">
+                  {movie.duration} PHÚT
                 </span>
               </div>
 
-              {/* Tiêu đề nhỏ lại một chút để thanh thoát */}
-              <div className="space-y-1">
-                <h1 className="text-3xl md:text-5xl font-[1000] italic tracking-tighter uppercase leading-none text-white drop-shadow-lg">
-                  {displayTitle}
-                </h1>
-                <div className="flex items-center justify-center md:justify-start gap-3">
-                   <div className="flex items-center gap-1 text-yellow-500">
-                      <Star size={14} fill="currentColor" />
-                      <span className="text-lg font-black italic">{displayRating}</span>
+              <div className="space-y-2">
+                <h1 className="text-4xl md:text-7xl font-[1000] italic tracking-tighter uppercase leading-[0.9] text-white drop-shadow-2xl">{movie.title}</h1>
+                <div className="flex items-center justify-center md:justify-start gap-4">
+                   <div className="flex items-center gap-2 text-yellow-500">
+                      <Star size={18} fill="currentColor" />
+                      <span className="text-2xl font-[1000] italic">{movie.rating?.toFixed(1) || "NEW"}</span>
                    </div>
-                   <div className="w-1 h-1 bg-zinc-800 rounded-full" />
-                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 italic">{displayGenre}</p>
+                   <div className="w-1.5 h-1.5 bg-zinc-800 rounded-full" />
+                   <p className="text-[10px] font-black uppercase text-zinc-500 italic">{movie.genre?.name}</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap justify-center md:justify-start gap-3 pt-2">
-                {movie.status === "SHOWING" ? (
-                  <Link 
-                    href={`${movieId}/booking/`} 
-                    className="flex items-center gap-2 px-6 py-3.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all shadow-xl shadow-red-600/20 active:scale-95 group"
-                  >
-                    <Ticket size={14} /> ĐẶT VÉ NGAY
+              <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-4">
+                {movie.status === "SHOWING" && (
+                  <Link href={`${movieId}/booking/`} className="flex items-center gap-3 px-8 py-4 bg-red-600 text-white rounded-[1.5rem] text-[11px] font-[1000] uppercase tracking-widest hover:bg-white hover:text-black transition-all active:scale-95">
+                    <Ticket size={16} /> ĐẶT VÉ NGAY
                   </Link>
-                ) : (
-                  <div className="px-6 py-3.5 bg-zinc-900 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-600">
-                    CHƯA MỞ BÁN VÉ
-                  </div>
                 )}
-                <button className="p-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all">
-                  <Play size={16} fill="currentColor" />
+                <button onClick={handleWatchTrailer} className="flex items-center gap-3 px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[1.5rem] text-[11px] font-[1000] uppercase text-white transition-all">
+                  <Play size={16} fill="currentColor" /> XEM TRAILER
                 </button>
-                <button onClick={() => setIsLiked(!isLiked)} className={`p-3.5 rounded-xl border transition-all ${isLiked ? 'bg-red-600/20 border-red-600 text-red-600' : 'bg-white/5 border-white/10'}`}>
-                  <Heart size={16} fill={isLiked ? "currentColor" : "none"} />
+                <button onClick={() => setIsLiked(!isLiked)} className={`p-4 rounded-[1.5rem] border transition-all ${isLiked ? 'bg-red-600 border-red-600' : 'bg-white/5 border-white/10'}`}>
+                  <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
                 </button>
               </div>
             </div>
@@ -132,61 +114,30 @@ const getLocalImagePath = (fileName: string) => {
         </div>
       </section>
 
-      {/* --- NỘI DUNG CHI TIẾT (TO RÕ HƠN) --- */}
-      <main className="max-w-5xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-10">
-        
-        {/* Cột trái: Tóm tắt to rõ */}
-        <div className="lg:col-span-8 space-y-10">
-          <div className="space-y-5">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-red-600 italic flex items-center gap-3">
-              <span className="w-6 h-[2px] bg-red-600" /> NỘI DUNG PHIM
-            </h3>
-            {/* Tăng size nội dung bên trong */}
-            <p className="text-zinc-400 text-base md:text-lg leading-relaxed font-medium italic bg-zinc-900/10 p-6 rounded-[2rem] border border-white/5">
-              {movie.description || "Chưa có mô tả chi tiết cho bộ phim này."}
-            </p>
+      {/* --- CONTENT --- */}
+      <main className="max-w-6xl mx-auto px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="lg:col-span-8 space-y-12">
+          <div className="space-y-6">
+            <h3 className="text-[12px] font-[1000] uppercase tracking-[0.4em] text-red-600 italic flex items-center gap-4"><span className="w-10 h-[3px] bg-red-600 rounded-full" /> NỘI DUNG PHIM</h3>
+            <p className="text-zinc-400 text-lg md:text-xl leading-[1.8] font-medium italic bg-zinc-900/10 p-8 rounded-[3rem] border border-white/5">{movie.description}</p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-zinc-900/20 rounded-[2rem] border border-white/5">
-            <InfoBox icon={<Film size={12}/>} label="ĐẠO DIỄN" value={movie.director} />
-            <InfoBox icon={<Award size={12}/>} label="QUỐC GIA" value={movie.country} />
-            <InfoBox icon={<Globe size={12}/>} label="NĂM" value={movie.releaseDate ? new Date(movie.releaseDate).getFullYear().toString() : "N/A"} />
-            <InfoBox icon={<Calendar size={12}/>} label="THỂ LOẠI" value={movie.genre?.name} />
-          </div>
-          
-          <div className="space-y-4">
-            <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-600 italic">DÀN DIỄN VIÊN</h3>
-            <p className="text-sm font-bold text-zinc-300 leading-snug uppercase tracking-tight italic">
-              {movie.cast || "ĐANG CẬP NHẬT..."}
-            </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 bg-zinc-900/20 rounded-[3rem] border border-white/5">
+            <InfoBox icon={<Film size={16}/>} label="ĐẠO DIỄN" value={movie.director} />
+            <InfoBox icon={<Award size={16}/>} label="QUỐC GIA" value={movie.country} />
+            <InfoBox icon={<Globe size={16}/>} label="NĂM" value={new Date(movie.releaseDate).getFullYear().toString()} />
+            <InfoBox icon={<Calendar size={16}/>} label="PHÂN LOẠI" value={movie.genre?.name} />
           </div>
         </div>
 
-        {/* Cột phải: Sidebar gọn gàng */}
-        <div className="lg:col-span-4 space-y-6">
-           <div className="p-7 bg-zinc-900/30 border border-white/5 rounded-[2.5rem] space-y-6">
-              <div className="space-y-3 text-center border-b border-white/5 pb-6">
-                <p className="text-[8px] font-black uppercase tracking-[0.4em] text-red-600">A&K CINEMA</p>
-                <p className="text-[10px] text-zinc-500 font-medium italic leading-relaxed">Trải nghiệm điện ảnh đỉnh cao với âm thanh sống động.</p>
+        <div className="lg:col-span-4 space-y-8">
+           <div className="p-8 bg-zinc-950 border border-white/5 rounded-[3.5rem] space-y-8 sticky top-10 shadow-2xl">
+              <div className="space-y-4 text-center border-b border-white/5 pb-8">
+                <p className="text-[9px] font-[1000] uppercase tracking-[0.5em] text-red-600">A&K CINEMA PRO</p>
+                <p className="text-xs text-zinc-500 font-bold italic">Trải nghiệm âm thanh Dolby Atmos đỉnh cao.</p>
               </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-[10px]">
-                  <span className="font-black uppercase text-zinc-600">ĐỊNH DẠNG</span>
-                  <span className="font-black text-white bg-white/5 px-2 py-0.5 rounded tracking-tighter">2D / IMAX</span>
-                </div>
-                <div className="flex justify-between items-center text-[10px]">
-                  <span className="font-black uppercase text-zinc-600">NGÔN NGỮ</span>
-                  <span className="font-black text-white">PHỤ ĐỀ VN</span>
-                </div>
-                <div className="flex justify-between items-center text-[10px]">
-                  <span className="font-black uppercase text-zinc-600">CHIA SẺ</span>
-                  <Share2 size={12} className="text-zinc-500 cursor-pointer hover:text-red-600 transition-colors" />
-                </div>
-              </div>
-
-              <button className="w-full py-3 bg-white text-black rounded-xl text-[9px] font-[1000] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">
-                ĐÁNH GIÁ NGAY
+              <button onClick={() => setIsReviewOpen(true)} className="w-full py-5 bg-white text-black rounded-[1.5rem] text-[10px] font-[1000] uppercase tracking-[0.3em] hover:bg-red-600 hover:text-white transition-all shadow-xl active:scale-95">
+                GỬI ĐÁNH GIÁ CỦA BẠN
               </button>
            </div>
         </div>
@@ -197,10 +148,10 @@ const getLocalImagePath = (fileName: string) => {
 
 function InfoBox({ icon, label, value }: { icon: any, label: string, value: string }) {
   return (
-    <div className="space-y-1">
-      <div className="text-red-600 mb-1">{icon}</div>
-      <p className="text-[7px] font-black uppercase text-zinc-600 tracking-wider">{label}</p>
-      <p className="text-[11px] font-bold text-white uppercase truncate italic">{value || "N/A"}</p>
+    <div className="space-y-2">
+      <div className="text-red-600">{icon}</div>
+      <p className="text-[8px] font-black uppercase text-zinc-600 tracking-[0.2em]">{label}</p>
+      <p className="text-sm font-black text-white uppercase truncate italic">{value || "N/A"}</p>
     </div>
   );
 }

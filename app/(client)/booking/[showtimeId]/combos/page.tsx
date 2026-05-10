@@ -1,14 +1,15 @@
 "use client";
 import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Plus, Minus, ShoppingBasket, Loader2, Sparkles, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, Plus, Minus, ShoppingBasket, Loader2, Utensils, AlertCircle } from 'lucide-react';
 import { apiRequest, getImageUrl } from "@/app/lib/api"; 
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function ComboPage({ params }: { params: Promise<{ showtimeId: string }> }) {
   const { showtimeId } = use(params);
   const router = useRouter();
-  const [combos, setCombos] = useState([]);
+  
+  const [combos, setCombos] = useState<any[]>([]);
   const [selectedCombos, setSelectedCombos] = useState<any[]>([]);
   const [bookingData, setBookingData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -16,28 +17,29 @@ export default function ComboPage({ params }: { params: Promise<{ showtimeId: st
   useEffect(() => {
     const saved = sessionStorage.getItem('booking_data');
     if (!saved) return router.push(`/booking/${showtimeId}`);
-    setBookingData(JSON.parse(saved));
-    fetchCombos();
-  }, []);
+    
+    const parsedData = JSON.parse(saved);
+    setBookingData(parsedData);
 
-  const fetchCombos = async () => {
-    try {
-      const res = await apiRequest('/api/v1/combos');
-      if (res.ok) setCombos((await res.json()).data);
-    } catch (error) {
-      toast.error("Không thể tải danh sách combo");
-    } finally {
+    if (parsedData.cinemaItemId) {
+      fetchCombos(parsedData.cinemaItemId);
+    } else {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleNext = () => {
-    sessionStorage.setItem('booking_data', JSON.stringify({
-      ...bookingData,
-      selectedCombos,
-      comboPrice: selectedCombos.reduce((sum, c) => sum + (c.price * c.quantity), 0)
-    }));
-    router.push(`/booking/payment`);
+  const fetchCombos = async (id: number) => {
+    try {
+      const res = await apiRequest(`/api/v1/admin/cinema-combos/${id}/combos`);
+      if (res.ok) {
+        const result = await res.json();
+        setCombos(result.data || []);
+      }
+    } catch (e) { 
+      toast.error("Lỗi tải menu bắp nước"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const updateQuantity = (combo: any, delta: number) => {
@@ -48,9 +50,22 @@ export default function ComboPage({ params }: { params: Promise<{ showtimeId: st
         if (newQty <= 0) return prev.filter(i => i.id !== combo.id);
         return prev.map(i => i.id === combo.id ? { ...i, quantity: newQty } : i);
       }
-      if (delta > 0) return [...prev, { ...combo, quantity: 1 }];
-      return prev;
+      return delta > 0 ? [...prev, { ...combo, quantity: 1 }] : prev;
     });
+  };
+
+  const handleNext = () => {
+    const comboPrice = selectedCombos.reduce((sum, c) => sum + (c.price * c.quantity), 0);
+    const saved = sessionStorage.getItem('booking_data');
+    const currentData = saved ? JSON.parse(saved) : {};
+
+    sessionStorage.setItem('booking_data', JSON.stringify({
+      ...currentData,
+      selectedCombos,
+      comboPrice
+    }));
+    
+    router.push(`/booking/payment`);
   };
 
   const totalComboPrice = selectedCombos.reduce((sum, c) => sum + (c.price * c.quantity), 0);
@@ -58,149 +73,116 @@ export default function ComboPage({ params }: { params: Promise<{ showtimeId: st
 
   if (loading) return (
     <div className="h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-red-600" size={40} />
-      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 italic">Đang chuẩn bị menu...</p>
+      <Loader2 className="animate-spin text-red-600" size={32} />
+      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 italic">Đang tải menu bắp nước...</span>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white pb-32 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans pb-40 selection:bg-red-600/30">
       <Toaster position="top-center" />
       
-      {/* Decor Background */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-red-600/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
-
-      <div className="max-w-3xl mx-auto px-6 pt-12">
-        {/* Back Button */}
-        <button 
-          onClick={() => router.back()} 
-          className="group mb-8 text-zinc-500 hover:text-white transition-colors uppercase text-[10px] font-black italic flex items-center gap-2"
-        >
-          <div className="p-2 bg-zinc-900 rounded-lg group-hover:bg-red-600 transition-colors">
-            <ChevronLeft size={14} className="group-hover:text-white" />
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-40 bg-[#050505]/80 backdrop-blur-xl border-b border-white/[0.05]">
+        <div className="max-w-2xl mx-auto px-6 h-20 flex items-center justify-between">
+          <button onClick={() => router.back()} className="p-3 -ml-3 hover:bg-white/5 rounded-2xl transition-all group active:scale-90 border border-transparent hover:border-white/10">
+            <ChevronLeft size={20} className="text-zinc-400 group-hover:text-white" />
+          </button>
+          <div className="flex flex-col items-center">
+            <h1 className="text-[10px] font-black uppercase tracking-[0.5em] text-red-600 mb-1">Canteen Menu</h1>
+            <span className="text-[13px] font-black uppercase italic tracking-tight">Combo Bắp & Nước</span>
           </div>
-          Trở lại chọn ghế
-        </button>
-
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-12">
-          <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-900/20">
-            <UtensilsCrossed size={24} className="text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Sparkles size={12} className="text-red-600" />
-              <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">Concession Stand</span>
-            </div>
-            <h1 className="text-4xl font-[1000] italic uppercase tracking-tighter leading-none">
-              Bắp <span className="text-red-600">&</span> Nước
-            </h1>
-          </div>
-        </div>
-
-        {/* Combo List */}
-        <div className="grid grid-cols-1 gap-6">
-          {combos.map((c: any) => {
-            const qty = selectedCombos.find(i => i.id === c.id)?.quantity || 0;
-            return (
-              <div 
-                key={c.id} 
-                className={`group relative p-5 bg-zinc-900/20 border transition-all duration-500 rounded-[2.5rem] flex items-center gap-6 ${
-                  qty > 0 ? 'border-red-600/50 bg-zinc-900/40 shadow-[0_0_30px_-10px_rgba(220,38,38,0.2)]' : 'border-white/5 hover:border-white/10'
-                }`}
-              >
-                {/* Image */}
-                <div className="relative w-28 h-28 shrink-0 overflow-hidden rounded-3xl border border-white/5 bg-black">
-                  <img 
-                    src={getImageUrl(c.imageUrl)} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                    alt={c.name} 
-                  />
-                  {qty > 0 && (
-                    <div className="absolute inset-0 bg-red-600/20 flex items-center justify-center backdrop-blur-[2px]">
-                       <div className="bg-white text-black text-xs font-black px-3 py-1 rounded-full uppercase italic tracking-widest animate-bounce">
-                          Đã chọn
-                       </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-black italic uppercase text-lg leading-tight mb-1 group-hover:text-red-500 transition-colors">
-                    {c.name}
-                  </h3>
-                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wide leading-relaxed mb-3 line-clamp-2 italic">
-                    {c.description}
-                  </p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-[1000] italic text-white leading-none">
-                      {c.price.toLocaleString()}
-                    </span>
-                    <span className="text-[10px] font-black text-red-600 uppercase">vnđ</span>
-                  </div>
-                </div>
-
-                {/* Stepper */}
-                <div className="flex items-center gap-1 bg-black/50 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 shadow-inner">
-                  <button 
-                    onClick={() => updateQuantity(c, -1)} 
-                    className={`p-3 rounded-xl transition-all ${
-                      qty > 0 ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'text-zinc-700 cursor-not-allowed'
-                    }`}
-                  >
-                    <Minus size={14} strokeWidth={3} />
-                  </button>
-                  
-                  <div className="w-10 flex flex-col items-center">
-                    <span className={`font-[1000] text-xl italic leading-none transition-colors ${qty > 0 ? 'text-red-600' : 'text-zinc-700'}`}>
-                      {qty}
-                    </span>
-                  </div>
-
-                  <button 
-                    onClick={() => updateQuantity(c, 1)} 
-                    className="p-3 bg-white text-black rounded-xl hover:bg-red-600 hover:text-white transition-all active:scale-90"
-                  >
-                    <Plus size={14} strokeWidth={3} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          <div className="w-10" />
         </div>
       </div>
 
-      {/* Floating Checkout Bar */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-3xl px-6 z-50">
-        <div className="p-5 bg-zinc-950/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] flex flex-row justify-between items-center shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-          <div className="pl-4">
-            <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-1">Tổng tiền dự kiến</p>
-            <div className="flex items-baseline gap-1">
-               <div className="text-3xl font-[1000] italic text-white uppercase tracking-tighter leading-none">
-                {finalTotal.toLocaleString()}
+      <div className="max-w-2xl mx-auto px-4 pt-10 space-y-5">
+        {combos.length > 0 ? combos.map((c: any) => {
+          const qty = selectedCombos.find(i => i.id === c.id)?.quantity || 0;
+          return (
+            <div 
+              key={c.id} 
+              className={`group p-4 bg-zinc-900/20 border rounded-[2.5rem] flex flex-row items-center gap-5 transition-all duration-500 hover:bg-zinc-900/40 ${
+                qty > 0 ? 'border-red-600/40 bg-zinc-900/60 shadow-[0_0_30px_rgba(220,38,38,0.05)]' : 'border-white/5'
+              }`}
+            >
+              {/* Product Image */}
+              <div className="relative w-24 h-24 shrink-0 overflow-hidden rounded-[1.8rem] bg-zinc-800 border border-white/10">
+                <img 
+                  src={getImageUrl(c.imageUrl)} 
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                  alt={c.name} 
+                />
+                {qty > 0 && <div className="absolute inset-0 bg-red-600/10 backdrop-blur-[1px]" />}
               </div>
-              <span className="text-xs font-black text-red-600 uppercase italic">đ</span>
+
+              {/* Product Info */}
+              <div className="flex-1 min-w-0 py-1">
+                <h3 className="font-black text-[15px] uppercase tracking-tight text-white mb-1 truncate">{c.name}</h3>
+                <p className="text-zinc-500 text-[11px] leading-relaxed line-clamp-2 italic font-medium mb-2">{c.description}</p>
+                <div className="text-lg font-[1000] text-red-500 tracking-tighter">
+                  {c.price.toLocaleString()}<span className="text-[10px] ml-1 opacity-70">Đ</span>
+                </div>
+              </div>
+
+              {/* Modern Horizontal Stepper */}
+              <div className="flex items-center bg-black/40 border border-white/5 rounded-2xl p-1 gap-1 shrink-0">
+                <button 
+                  onClick={() => updateQuantity(c, -1)} 
+                  disabled={qty === 0}
+                  className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all active:scale-90 ${
+                    qty > 0 
+                      ? 'bg-zinc-800 text-white hover:bg-zinc-700' 
+                      : 'text-zinc-800 opacity-20 cursor-not-allowed'
+                  }`}
+                >
+                  <Minus size={14} strokeWidth={3} />
+                </button>
+
+                <div className="w-8 text-center">
+                  <span className={`text-[13px] font-black italic tracking-tighter ${qty > 0 ? 'text-red-500' : 'text-zinc-700'}`}>
+                    {qty.toString().padStart(2, '0')}
+                  </span>
+                </div>
+
+                <button 
+                  onClick={() => updateQuantity(c, 1)} 
+                  className="w-9 h-9 flex items-center justify-center bg-white text-black rounded-xl hover:bg-red-600 hover:text-white transition-all active:scale-90 shadow-lg shadow-black/20"
+                >
+                  <Plus size={14} strokeWidth={3} />
+                </button>
+              </div>
+            </div>
+          );
+        }) : (
+          <div className="flex flex-col items-center justify-center py-40 opacity-20 border border-dashed border-white/10 rounded-[3rem]">
+            <Utensils size={40} strokeWidth={1} className="mb-4" />
+            <p className="text-[10px] uppercase font-black tracking-[0.4em] italic text-zinc-400">Đang cập nhật thực đơn</p>
+          </div>
+        )}
+      </div>
+
+      {/* Payment Footer Bar */}
+      <div className="fixed bottom-10 left-0 right-0 px-6 z-50">
+        <div className="max-w-md mx-auto p-5 bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.9)] flex items-center justify-between">
+          <div className="pl-3 border-l-2 border-red-600">
+            <div className="text-[9px] text-zinc-500 uppercase font-black tracking-[0.2em] mb-1">Tổng cộng</div>
+            <div className="text-2xl font-[1000] text-white italic tracking-tighter leading-none">
+              {finalTotal.toLocaleString()}<span className="text-[10px] ml-1 text-red-600 font-black">VND</span>
             </div>
           </div>
 
           <button 
             onClick={handleNext} 
-            className="group px-10 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-[1000] italic uppercase tracking-[0.1em] transition-all active:scale-95 flex items-center gap-3 shadow-xl shadow-red-900/20"
+            className="group h-14 px-8 bg-red-600 hover:bg-red-500 text-white rounded-[1.5rem] font-black italic uppercase text-[12px] tracking-[0.1em] transition-all active:scale-95 flex items-center gap-3 shadow-[0_10px_40px_rgba(220,38,38,0.3)]"
           >
-            Thanh toán 
-            <div className="bg-white/20 p-1.5 rounded-lg group-hover:rotate-12 transition-transform">
-              <ShoppingBasket size={18} />
+            Thanh toán
+            <div className="bg-black/20 p-2 rounded-xl group-hover:translate-x-1 transition-transform">
+              <ShoppingBasket size={18} strokeWidth={2.5} />
             </div>
           </button>
         </div>
       </div>
-
-      <style jsx global>{`
-        body { background-color: #050505; }
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-      `}</style>
     </div>
   );
 }

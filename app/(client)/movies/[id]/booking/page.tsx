@@ -1,9 +1,9 @@
 "use client";
-import React, { useState, useEffect, use, useRef } from 'react';
-import { Calendar, MapPin, ChevronLeft, Loader2, Info } from 'lucide-react';
+import React, { useState, useEffect, use } from 'react';
+import { ChevronLeft, Loader2, Calendar, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { apiRequest, getImageUrl } from "../../../../lib/api"; 
+import { apiRequest } from "../../../../lib/api"; 
 
 export default function MovieBookingPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -14,19 +14,13 @@ export default function MovieBookingPage({ params }: { params: Promise<{ id: str
   const [showtimes, setShowtimes] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   
-  // Quản lý Tháng và Ngày được chọn
   const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  // Khởi tạo ngày chọn là hôm nay
   const [selectedDate, setSelectedDate] = useState<string>(today.toISOString().split('T')[0]);
+  const [showPicker, setShowPicker] = useState(false);
 
-  useEffect(() => {
-    fetchMovieDetail();
-  }, [movieId]);
-
-  useEffect(() => {
-    if (selectedDate) fetchShowtimes();
-  }, [selectedDate, movieId]);
+  useEffect(() => { fetchMovieDetail(); }, [movieId]);
+  useEffect(() => { if (selectedDate) fetchShowtimes(); }, [selectedDate, movieId]);
 
   const fetchMovieDetail = async () => {
     const res = await apiRequest(`/api/v1/movies/${movieId}`);
@@ -42,40 +36,6 @@ export default function MovieBookingPage({ params }: { params: Promise<{ id: str
     setLoading(false);
   };
 
-  // Tạo danh sách 3 tháng tới để chọn
-  const getMonths = () => {
-    const months = [];
-    for (let i = 0; i < 4; i++) {
-      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      months.push({
-        label: `Tháng ${d.getMonth() + 1}`,
-        month: d.getMonth(),
-        year: d.getFullYear()
-      });
-    }
-    return months;
-  };
-
-  // Tạo danh sách ngày dựa trên tháng được chọn
-  const getDaysInMonth = () => {
-    const days = [];
-    const weekdays = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-    const numDays = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-    
-    for (let i = 1; i <= numDays; i++) {
-      const d = new Date(selectedYear, selectedMonth, i);
-      // Chỉ hiện những ngày từ hôm nay trở đi nếu là tháng hiện tại
-      if (selectedMonth === today.getMonth() && i < today.getDate()) continue;
-
-      days.push({
-        full: d.toISOString().split('T')[0],
-        date: i,
-        name: i === today.getDate() && selectedMonth === today.getMonth() ? "Nay" : weekdays[d.getDay()]
-      });
-    }
-    return days;
-  };
-
   const groupedShowtimes = showtimes.reduce((acc: any, st: any) => {
     const name = st.cinemaItem?.name || "Rạp A&K Cinema"; 
     if (!acc[name]) acc[name] = [];
@@ -83,102 +43,142 @@ export default function MovieBookingPage({ params }: { params: Promise<{ id: str
     return acc;
   }, {});
 
-  return (
-    <div className="min-h-screen bg-[#080808] text-white font-sans pb-20">
+  // --- LOGIC: HIỆN TUẦN THEO NGÀY ĐANG CHỌN ---
+  const getWeeklyDays = () => {
+    const days = [];
+    const weekdays = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    
+    // Lấy mốc từ ngày đang được chọn
+    const baseDate = new Date(selectedDate);
+    
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
       
-      {/* STICKY HEADER & BỘ CHỌN */}
-      <div className="sticky top-0 z-[100] bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-white/5 shadow-2xl">
-        <div className="max-w-6xl mx-auto px-6 pt-6 pb-4 space-y-6">
-          <div className="flex items-center gap-4">
-            <Link href={`/movies/${movieId}`} className="p-2 hover:bg-white/5 rounded-full transition-all">
-              <ChevronLeft size={20} />
+      // Kiểm tra xem có phải là "Hôm nay" thực tế không
+      const isRealToday = dateStr === today.toISOString().split('T')[0];
+
+      days.push({
+        full: dateStr,
+        date: d.getDate(),
+        name: isRealToday ? "Nay" : weekdays[d.getDay()]
+      });
+    }
+    return days;
+  };
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-white font-sans pb-20 selection:bg-red-600">
+      
+      {/* HEADER SIÊU MẢNH */}
+      <div className="sticky top-0 z-[100] bg-[#050505]/95 backdrop-blur-md border-b border-white/5">
+        <div className="max-w-4xl mx-auto px-4 py-3">
+          
+          <div className="flex items-center justify-between mb-6">
+            <Link href={`/movies/${movieId}`} className="flex items-center gap-2 group">
+              <ChevronLeft size={16} className="text-zinc-500 group-hover:text-red-600 transition-colors" />
+              <h1 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 truncate max-w-[120px]">
+                {movie?.title || "Đang tải..."}
+              </h1>
             </Link>
-            <h1 className="text-xl font-[1000] italic uppercase tracking-tighter text-white truncate max-w-xs md:max-w-none">
-              {movie?.title}
-            </h1>
-          </div>
 
-          {/* 1. CHỌN THÁNG (Style CGV Minimalist) */}
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide border-b border-white/5 pb-2">
-            {getMonths().map((m) => (
-              <button
-                key={`${m.month}-${m.year}`}
-                onClick={() => {
-                  setSelectedMonth(m.month);
-                  setSelectedYear(m.year);
-                  // Tự động chọn ngày đầu tiên khả dụng của tháng đó
-                  const firstDay = m.month === today.getMonth() ? today.getDate() : 1;
-                  const newDate = new Date(m.year, m.month, firstDay).toISOString().split('T')[0];
-                  setSelectedDate(newDate);
-                }}
-                className={`shrink-0 text-[11px] font-[1000] uppercase tracking-[0.2em] px-4 py-2 rounded-full transition-all ${
-                  selectedMonth === m.month 
-                  ? 'bg-red-600 text-white' 
-                  : 'text-zinc-600 hover:text-zinc-300'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-
-          {/* 2. CHỌN NGÀY (Ẩn thanh cuộn) */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-x pt-2">
-            {getDaysInMonth().map((d) => (
+            {/* CHỌN THÁNG/NĂM - DROP DOWN TẠI CHỖ */}
+            <div className="relative">
               <button 
-                key={d.full} 
-                onClick={() => setSelectedDate(d.full)}
-                className={`snap-start min-w-[55px] h-[75px] rounded-2xl flex flex-col items-center justify-center transition-all duration-300 border ${
-                  selectedDate === d.full 
-                    ? 'bg-white border-white text-black scale-105 shadow-xl shadow-white/5' 
-                    : 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-white/10 hover:text-zinc-300'
-                }`}
+                onClick={() => setShowPicker(!showPicker)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/50 rounded-full border border-white/10 hover:border-red-600/50 transition-all"
               >
-                <span className={`text-[8px] font-black uppercase mb-1 ${selectedDate === d.full ? 'text-zinc-400' : 'text-zinc-600'}`}>{d.name}</span>
-                <span className="text-xl font-[1000] leading-none">{d.date}</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-red-600 italic">
+                  {new Date(selectedDate).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+                </span>
+                <ChevronDown size={10} className={`text-zinc-600 transition-transform ${showPicker ? 'rotate-180' : ''}`} />
               </button>
-            ))}
+
+              {showPicker && (
+                <>
+                  <div className="fixed inset-0" onClick={() => setShowPicker(false)} />
+                  <div className="absolute right-0 mt-2 z-20 bg-[#0f0f0f] border border-white/10 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+                    <p className="text-[8px] font-bold text-zinc-600 uppercase mb-2 ml-1">Chọn lịch vạn niên</p>
+                    <input 
+                      type="date" 
+                      value={selectedDate}
+                      onChange={(e) => {
+                        setSelectedDate(e.target.value);
+                        setShowPicker(false);
+                      }}
+                      className="bg-zinc-900 text-white text-[11px] font-black uppercase p-2 rounded-lg outline-none color-scheme-dark border border-white/5"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* WEEKLY STRIP - TỰ ĐỘNG CHẠY THEO NGÀY CHỌN */}
+          <div className="flex justify-between items-center px-2">
+            {getWeeklyDays().map((d) => {
+              const isActive = selectedDate === d.full;
+              return (
+                <button 
+                  key={d.full} 
+                  onClick={() => setSelectedDate(d.full)}
+                  className="flex flex-col items-center group relative py-2"
+                >
+                  <span className={`text-[7px] font-black uppercase tracking-tighter mb-1 transition-colors ${isActive ? 'text-red-600' : 'text-zinc-600 group-hover:text-zinc-400'}`}>
+                    {d.name}
+                  </span>
+                  <span className={`text-[14px] font-[1000] italic transition-all ${isActive ? 'text-white scale-110 shadow-sm' : 'text-zinc-600 group-hover:text-zinc-300'}`}>
+                    {d.date}
+                  </span>
+                  {isActive && (
+                    <div className="absolute -bottom-1 w-1 h-1 bg-red-600 rounded-full shadow-[0_0_8px_#dc2626]" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 mt-12 space-y-10">
+      {/* DANH SÁCH SUẤT CHIẾU */}
+      <div className="max-w-4xl mx-auto px-6 mt-10 space-y-10">
         {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-red-600" size={30} /></div>
+          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-red-600/30" size={20} /></div>
         ) : Object.keys(groupedShowtimes).length > 0 ? (
           Object.entries(groupedShowtimes).map(([cinemaName, times]: any) => (
-            <div key={cinemaName} className="group animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-1 h-8 bg-red-600 rounded-full" />
-                <div>
-                  <h4 className="text-lg font-black italic uppercase tracking-tight text-white">{cinemaName}</h4>
-                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Tiêu chuẩn quốc tế</p>
-                </div>
+            <div key={cinemaName} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-[1px] w-6 bg-red-600" />
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 italic">{cinemaName}</h4>
               </div>
-              
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                 {times.map((st: any) => (
                   <button 
                     key={st.id}
                     onClick={() => router.push(`/booking/${st.id}`)}
-                    className="relative h-14 bg-zinc-900/40 border border-white/5 rounded-xl flex items-center justify-center transition-all hover:bg-white hover:text-black hover:border-white active:scale-95 group/time"
+                    className="h-9 bg-zinc-900/40 border border-white/5 rounded-lg flex items-center justify-center transition-all hover:bg-white hover:text-black text-[11px] font-[1000] italic active:scale-95"
                   >
-                    <span className="text-sm font-[1000] italic uppercase">{st.startTime.split('T')[1].substring(0, 5)}</span>
-                    <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse opacity-50 group-hover:opacity-100" />
+                    {st.startTime.split('T')[1].substring(0, 5)}
                   </button>
                 ))}
               </div>
-              <div className="h-[1px] w-full bg-white/5 mt-10" />
             </div>
           ))
         ) : (
-          <div className="py-32 text-center border border-dashed border-white/5 rounded-[3rem]">
-            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-700 italic">Không có suất chiếu cho ngày đã chọn</p>
+          <div className="py-32 text-center">
+            <p className="text-[9px] font-black uppercase tracking-[0.5em] text-zinc-800 italic leading-loose">
+              Không có suất chiếu <br/> cho ngày này
+            </p>
           </div>
         )}
       </div>
 
       <style jsx global>{`
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1);
+          cursor: pointer;
+        }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
