@@ -59,7 +59,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     { label: "Quản lý đơn hàng", icon: <MessageSquare size={20} />, href: "/super-admin/order" },
     { label: "Người dùng", icon: <Users size={20} />, href: "/super-admin/user" },
     { label: "Giá vé & Ghế", icon: <Ticket size={20} />, href: "/super-admin/seat-price" },
-    { label: "Combo", icon: <Box size={20} />, href: "/super-admin/food-combos" },
+    { label: "Combo", icon: <Box size={20} />, href: "/super-admin/food-combo" },
     { label: "Thống kê", icon: <BarChart3 size={20} />, href: "/super-admin/analytic" },
   ];
 

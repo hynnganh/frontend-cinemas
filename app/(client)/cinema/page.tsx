@@ -83,15 +83,29 @@ export default function Cinema() {
     fetchCinemas();
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     if (!selectedId || !selectedDate) return;
+    
     const fetchShowtimes = async () => {
       setFetchingShowtimes(true);
       try {
         const res = await apiRequest(`/api/v1/showtimes/cinema-item/${selectedId}`);
         const result = await res.json();
+        
         if (result?.data) {
-          const filtered = result.data.filter((item: any) => item.startTime.startsWith(selectedDate));
+          const now = new Date(); // Lấy thời gian hiện tại
+
+          const filtered = result.data.filter((item: any) => {
+            const startTime = new Date(item.startTime);
+            // RÀNG BUỘC: 
+            // 1. Phải đúng ngày đang chọn
+            // 2. startTime phải LỚN HƠN thời gian hiện tại
+            const isSameDate = item.startTime.startsWith(selectedDate);
+            const isFuture = startTime > now;
+            
+            return isSameDate && isFuture;
+          });
+
           const grouped = filtered.reduce((acc: any, curr: any) => {
             const m = curr.movie;
             if (!m) return acc;
@@ -115,13 +129,22 @@ export default function Cinema() {
             });
             return acc;
           }, {});
-          setMovies(Object.values(grouped).map((m: any) => ({ ...m, formats: Object.entries(m.formats).map(([type, times]) => ({ type, times })) })));
-        } else setMovies([]);
-      } catch (e) { setMovies([]); } finally { setFetchingShowtimes(false); }
+
+          setMovies(Object.values(grouped).map((m: any) => ({ 
+            ...m, 
+            formats: Object.entries(m.formats).map(([type, times]) => ({ type, times })) 
+          })));
+        } else {
+          setMovies([]);
+        }
+      } catch (e) { 
+        setMovies([]); 
+      } finally { 
+        setFetchingShowtimes(false); 
+      }
     };
     fetchShowtimes();
   }, [selectedId, selectedDate]);
-
   // Danh sách 7 ngày nhanh
   const dateTabs = useMemo(() => {
     const VI_DAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
