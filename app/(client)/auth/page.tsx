@@ -90,21 +90,42 @@ export default function AuthPage() {
       const resData = await response.json();
 
       if (response.ok) {
-        if (view === 'login') {
-          const rawUser = resData.data;       
-          if (rawUser?.token) localStorage.setItem("token", rawUser.token);
-          const userInfo = {
-            firstName: rawUser?.firstName || "Member",
-            lastName: rawUser?.lastName || ""
-          };
-          localStorage.setItem("user_info", JSON.stringify(userInfo));
-          
-          toast.success("Chào mừng bạn trở lại!");
-          
-          setTimeout(() => {
-            window.location.href = "/";
-          }, 800);
-        } else {
+if (view === 'login') {
+  const rawUser = resData.data;
+  const token = rawUser?.token;
+  const roles: string[] = rawUser?.roles || [];
+
+  if (!token) {
+    toast.error("Không nhận được token!");
+    return;
+  }
+
+  const primaryRole = roles[0] || "USER";
+
+  localStorage.setItem("user_info", JSON.stringify({
+    firstName: rawUser?.firstName,
+    lastName: rawUser?.lastName
+  }));
+  localStorage.setItem("roles", JSON.stringify(roles));
+
+  if (primaryRole === "ROLE_SUPER_ADMIN" || primaryRole === "SUPER_ADMIN") {
+    localStorage.setItem("super_admin_token", token);
+  } else if (primaryRole === "ROLE_ADMIN" || primaryRole === "ADMIN") {
+    localStorage.setItem("admin_token", token);
+  } else {
+    localStorage.setItem("user_token", token);
+  }
+
+  window.dispatchEvent(new Event("auth-changed"));
+
+  toast.success(`Chào mừng ${rawUser?.lastName || ''} đã trở lại!`);
+
+  setTimeout(() => {
+    if (primaryRole.includes("SUPER_ADMIN")) window.location.href = "/super-admin";
+    else if (primaryRole.includes("ADMIN")) window.location.href = "/admin";
+    else window.location.href = "/";
+  }, 800);
+} else {
           toast.success("Đăng ký thành công! Mời bạn đăng nhập.");
           setView('login');
         }

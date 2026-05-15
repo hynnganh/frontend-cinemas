@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   User as UserIcon, Phone, Mail, Loader2, Calendar, 
-  UserCircle, Save, Edit3, CheckCircle2, AlertCircle,
-  ShieldCheck, ArrowLeft, Camera
+  UserCircle, Save, Edit3, CheckCircle2, ArrowLeft 
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api'; 
 import Link from 'next/link';
@@ -27,7 +26,7 @@ export default function ProfilePage() {
       const res = await apiRequest('/api/v1/users/me');
       if (res.ok) {
         const result = await res.json();
-        const rawData = result.data; // Chỉ lấy phần data chứa thông tin người dùng
+        const rawData = result.data; 
         setUserData(rawData);
         setFormData({
           firstName: rawData.firstName || '',
@@ -54,117 +53,101 @@ export default function ProfilePage() {
         method: 'PUT',
         body: JSON.stringify(formData) 
       });
-
       if (res.ok) {
-        showToast("Cập nhật thông tin thành công!");
+        showToast("Cập nhật thành công!");
         setIsEditing(false);
         fetchProfile();
-      } else {
-        showToast("Cập nhật thất bại", "error");
-      }
+      } else { showToast("Thất bại", "error"); }
     } catch (err) { showToast("Lỗi kết nối", "error"); } 
     finally { setUpdating(false); }
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <Loader2 className="animate-spin text-red-600" size={32} />
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <Loader2 className="animate-spin text-red-600" size={28} />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white no-scrollbar selection:bg-red-600/30 pb-10 overflow-y-auto">
-      
-      {/* Background Decor */}
-      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[120px] -z-10" />
+    <div className="min-h-screen bg-[#050505] text-zinc-100 pb-12 overflow-x-hidden">
+      {/* Nền đỏ nhẹ nhàng hơn */}
+      <div className="fixed top-0 right-0 w-[400px] h-[400px] bg-red-600/5 rounded-full blur-[110px] -z-10" />
 
-      {/* Top Navigation */}
-      <nav className="p-6 md:px-12 flex justify-between items-center sticky top-0 z-50 backdrop-blur-md border-b border-white/5">
-        <Link href="/" className="flex items-center gap-2 text-zinc-500 hover:text-white transition-all group">
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform"/>
+      {/* Nav - Cân bằng */}
+      <nav className="px-6 py-4 flex justify-between items-center sticky top-0 z-50 backdrop-blur-xl border-b border-white/10 bg-black/60">
+        <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-white transition-all">
+          <ArrowLeft size={16} />
           <span className="text-[10px] font-black uppercase tracking-widest">Trang chủ</span>
         </Link>
-        <div className="flex gap-4">
+        
+        <div>
            {!isEditing ? (
-             <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-xl font-black uppercase text-[9px] hover:bg-red-600 hover:text-white transition-all active:scale-95">
-               <Edit3 size={12}/> Chỉnh sửa
+             <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-red-700 transition-all shadow-[0_0_15px_rgba(220,38,38,0.3)]">
+               <Edit3 size={14}/> Chỉnh sửa
              </button>
            ) : (
-             <div className="flex gap-3">
-               <button onClick={() => setIsEditing(false)} className="text-[9px] font-black uppercase text-zinc-500 hover:text-white">Hủy</button>
-               <button onClick={handleUpdate} disabled={updating} className="flex items-center gap-2 bg-red-600 text-white px-6 py-2.5 rounded-xl font-black uppercase text-[9px] hover:bg-red-500 shadow-lg shadow-red-600/20 active:scale-95 transition-all">
-                 {updating ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Lưu thay đổi
+             <div className="flex items-center gap-4">
+               <button onClick={() => setIsEditing(false)} className="text-[10px] font-black uppercase text-zinc-500 hover:text-zinc-200">Hủy</button>
+               <button onClick={handleUpdate} disabled={updating} className="flex items-center gap-2 bg-white text-black px-5 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-zinc-200 transition-all shadow-lg">
+                 {updating ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>} Lưu lại
                </button>
              </div>
            )}
         </div>
       </nav>
 
-      <main className="max-w-[1100px] mx-auto mt-12 px-6">
-        <div className="flex flex-col lg:flex-row gap-10 items-stretch">
+      <main className="max-w-5xl mx-auto mt-10 px-6">
+        <div className="flex flex-col gap-8">
           
-          {/* CỘT TRÁI: AVATAR & HỌ TÊN (Gọn gàng) */}
-          <section className="w-full lg:w-[320px]">
-            <div className="bg-[#0a0a0a] border border-white/5 rounded-[3rem] p-10 flex flex-col items-center text-center h-full shadow-2xl">
-              <div className="relative mb-8 group">
-                <div className="w-40 h-40 rounded-[3.5rem] bg-zinc-900 border border-white/10 p-1.5 shadow-2xl">
-                  <div className="w-full h-full rounded-[3.2rem] bg-black flex items-center justify-center overflow-hidden">
-                    {userData?.avatar ? 
-                      <img src={userData.avatar} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="avatar" /> : 
-                      <UserIcon size={50} className="text-zinc-800" />
-                    }
-                  </div>
-                </div>
-                <button className="absolute -bottom-1 -right-1 bg-red-600 p-3 rounded-2xl border-4 border-[#0a0a0a] hover:scale-110 transition-all shadow-xl">
-                  <Camera size={16} />
-                </button>
-              </div>
-
-              <h1 className="text-3xl font-[1000] italic uppercase tracking-tighter leading-tight mb-4">
+          {/* Header - To vừa đủ để nổi bật */}
+          <header className="space-y-2">
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-[1000] italic uppercase tracking-tighter leading-none text-white">
                 {userData?.firstName} <span className="text-red-600">{userData?.lastName}</span>
               </h1>
-              
-              <div className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-2xl border border-white/5">
-                 <ShieldCheck size={14} className="text-red-600" />
-                 <span className="text-[9px] font-black uppercase text-zinc-400 tracking-[0.2em]">Hội viên</span>
-              </div>
+              <div className="h-[2px] w-12 bg-red-600 rounded-full mt-1" />
             </div>
-          </section>
+            <div className="flex items-center gap-2 text-zinc-500">
+              <span className="text-[9px] font-black uppercase tracking-widest">Mã người dùng:</span>
+              <span className="text-[9px] font-mono font-bold text-zinc-300 italic">#{userData?.userId || '000000'}</span>
+            </div>
+          </header>
 
-          {/* CỘT PHẢI: FORM CHỈ HIỆN THÔNG TIN CẦN THIẾT */}
-          <section className="flex-1 bg-[#0a0a0a] border border-white/5 rounded-[3.5rem] p-8 md:p-12 shadow-3xl">
+          {/* MAIN FORM - To hơn một chút để dễ đọc */}
+          <section className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative">
             <div className="mb-10">
-               <h2 className="text-xl font-[1000] italic uppercase tracking-tighter">Thông tin <span className="text-zinc-600">Cá nhân</span></h2>
-               <div className="h-1 w-10 bg-red-600 mt-2 rounded-full" />
+               <h2 className="text-sm font-black italic uppercase tracking-widest flex items-center gap-4">
+                Thông tin cá nhân
+                <div className="h-[1px] flex-1 bg-gradient-to-r from-red-600/40 to-transparent" />
+               </h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
               {!isEditing ? (
                 <>
                   <ViewField label="Họ & Tên đệm" value={userData?.firstName} icon={UserIcon} />
                   <ViewField label="Tên người dùng" value={userData?.lastName} icon={UserIcon} />
-                  <ViewField label="Địa chỉ Email" value={userData?.email} icon={Mail} isLocked />
+                  <ViewField label="Email đăng ký" value={userData?.email} icon={Mail} isLocked />
                   <ViewField label="Số điện thoại" value={userData?.mobileNumber} icon={Phone} />
-                  <ViewField label="Ngày sinh" value={userData?.dateOfBirth ? new Date(userData.dateOfBirth).toLocaleDateString('vi-VN') : "Chưa cập nhật"} icon={Calendar} />
+                  <ViewField label="Ngày sinh" value={userData?.dateOfBirth ? new Date(userData.dateOfBirth).toLocaleDateString('vi-VN') : "---"} icon={Calendar} />
                   <ViewField label="Giới tính" value={userData?.gender === 'MALE' ? 'Nam' : userData?.gender === 'FEMALE' ? 'Nữ' : 'Khác'} icon={UserCircle} />
                 </>
               ) : (
                 <>
                   <EditField label="Họ & Tên đệm" name="firstName" value={formData.firstName} onChange={handleChange} icon={UserIcon} />
-                  <EditField label="Tên của bạn" name="lastName" value={formData.lastName} onChange={handleChange} icon={UserIcon} />
-                  <div className="opacity-20 pointer-events-none">
-                    <ViewField label="Email" value={userData?.email} icon={Mail} isLocked />
-                  </div>
+                  <EditField label="Tên" name="lastName" value={formData.lastName} onChange={handleChange} icon={UserIcon} />
+                  <div className="opacity-50"><ViewField label="Email" value={userData?.email} icon={Mail} isLocked /></div>
                   <EditField label="Số điện thoại" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange} icon={Phone} />
                   <EditField label="Ngày sinh" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} icon={Calendar} type="date" />
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-red-600/50 ml-1">Giới tính</label>
-                    <div className="relative group">
-                      <UserCircle size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-600 transition-colors" />
-                      <select name="gender" value={formData.gender} onChange={handleChange} className="w-full bg-white/[0.03] border border-white/5 p-5 pl-14 rounded-[1.8rem] text-sm text-white outline-none focus:border-red-600 transition-all appearance-none cursor-pointer">
-                        <option value="MALE" className="bg-[#0a0a0a]">Nam</option>
-                        <option value="FEMALE" className="bg-[#0a0a0a]">Nữ</option>
-                        <option value="OTHER" className="bg-[#0a0a0a]">Khác</option>
+                  
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-red-600 ml-1">Giới tính</label>
+                    <div className="relative">
+                      <UserCircle size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-red-600 z-10" />
+                      <select name="gender" value={formData.gender} onChange={handleChange} className="w-full bg-black border border-white/20 p-3.5 pl-12 rounded-2xl text-[13px] font-bold text-white outline-none focus:border-red-600 transition-all appearance-none cursor-pointer">
+                        <option value="MALE">Nam</option>
+                        <option value="FEMALE">Nữ</option>
+                        <option value="OTHER">Khác</option>
                       </select>
                     </div>
                   </div>
@@ -172,36 +155,30 @@ export default function ProfilePage() {
               )}
             </div>
           </section>
-
         </div>
       </main>
 
-      {/* Thông báo */}
+      {/* Toast */}
       {toast && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-5 duration-500">
-          <div className={`flex items-center gap-4 px-8 py-4 rounded-2xl border shadow-2xl backdrop-blur-2xl ${toast.type === 'success' ? 'bg-zinc-900/90 border-green-500/20 text-green-400' : 'bg-zinc-900/90 border-red-500/20 text-red-400'}`}>
-            {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-            <p className="text-[11px] font-black uppercase tracking-tight text-white">{toast.msg}</p>
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-4">
+          <div className={`flex items-center gap-3 px-6 py-3 rounded-2xl border-2 shadow-2xl bg-zinc-900 ${toast.type === 'success' ? 'border-green-500 text-green-500' : 'border-red-500 text-red-500'}`}>
+            <CheckCircle2 size={18} />
+            <p className="text-[11px] font-black uppercase tracking-widest">{toast.msg}</p>
           </div>
         </div>
       )}
-
-      <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </div>
   );
 }
 
 function ViewField({ label, value, icon: Icon, isLocked = false }: any) {
   return (
-    <div className="group space-y-1">
-      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-700 group-hover:text-red-600 transition-colors ml-1">{label}</label>
-      <div className="flex items-center gap-5 p-5 bg-white/[0.02] border border-white/5 rounded-[1.8rem] transition-all group-hover:bg-white/[0.04] group-hover:border-white/10">
-        <Icon size={18} className="text-zinc-700 group-hover:text-red-600 transition-colors shrink-0" />
-        <span className={`text-sm font-bold tracking-tight truncate ${isLocked ? 'text-zinc-600 italic' : 'text-zinc-200'}`}>
-          {value || "N/A"}
+    <div className="space-y-2">
+      <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500 ml-1">{label}</label>
+      <div className="flex items-center gap-4 p-4 bg-black border border-white/10 rounded-2xl shadow-inner transition-all hover:border-red-600/30">
+        <Icon size={18} className="text-red-600 shrink-0" />
+        <span className={`text-[13px] font-bold truncate ${isLocked ? 'text-zinc-500 italic' : 'text-zinc-100'}`}>
+          {value || "---"}
         </span>
       </div>
     </div>
@@ -210,13 +187,13 @@ function ViewField({ label, value, icon: Icon, isLocked = false }: any) {
 
 function EditField({ label, name, value, onChange, icon: Icon, type = "text" }: any) {
   return (
-    <div className="space-y-1 animate-in fade-in zoom-in-95 duration-500">
-      <label className="text-[10px] font-black uppercase tracking-widest text-red-600 ml-1">{label}</label>
-      <div className="relative group">
-        <Icon size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-600 transition-all" />
+    <div className="space-y-2">
+      <label className="text-[9px] font-black uppercase tracking-widest text-red-600 ml-1">{label}</label>
+      <div className="relative">
+        <Icon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-red-600 z-10" />
         <input 
           type={type} name={name} value={value} onChange={onChange} 
-          className="w-full bg-white/[0.05] border border-white/10 p-5 pl-14 rounded-[1.8rem] text-sm text-white outline-none focus:border-red-600 transition-all [color-scheme:dark]" 
+          className="w-full bg-black border border-white/20 p-3.5 pl-12 rounded-2xl text-[13px] font-bold text-white outline-none focus:border-red-600 transition-all [color-scheme:dark]" 
         />
       </div>
     </div>

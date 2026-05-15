@@ -1,11 +1,18 @@
 export const BASE_URL = "http://localhost:8080";
 
-export async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+import { getTokenByRole, RoleType } from "./auth";
+
+export async function apiRequest(
+  endpoint: string,
+  options: RequestInit = {},
+  role?: RoleType
+) {
+  const token = getTokenByRole(role);
+
   const isFormData = options.body instanceof FormData;
 
   const headers: Record<string, string> = {
-    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -13,10 +20,14 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  const safeEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const fullUrl = `${BASE_URL}${safeEndpoint}`;
+  const safeEndpoint = endpoint.startsWith("/")
+    ? endpoint
+    : `/${endpoint}`;
 
-  return fetch(fullUrl, { ...options, headers });
+  return fetch(`${BASE_URL}${safeEndpoint}`, {
+    ...options,
+    headers,
+  });
 }
 
 /**
