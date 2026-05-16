@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { X, Loader2, Save, PlusCircle } from 'lucide-react';
-import { apiRequest } from '@/app/lib/api';
+import { apiSuperAdminRequest } from '@/app/lib/api';
 import toast from 'react-hot-toast';
 
 interface AddModalProps {
@@ -51,7 +51,7 @@ export default function AddCinemaItemModal({ isOpen, onClose, cinemaId, onSucces
       
       const method = isEdit ? 'PUT' : 'POST';
 
-      const res = await apiRequest(url, {
+      const res = await apiSuperAdminRequest(url, {
         method: method,
         body: JSON.stringify({ ...formData, cinemaId }) 
       });

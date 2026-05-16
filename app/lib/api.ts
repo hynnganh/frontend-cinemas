@@ -50,6 +50,30 @@ export async function apiAdminRequest(
   });
 }
 
+export async function apiSuperAdminRequest(
+  endpoint: string,
+  options: RequestInit = {}
+) {
+  let token = getTokenByRole("SUPER_ADMIN" as RoleType); 
+
+  if (!token && typeof window !== "undefined") {
+    token = localStorage.getItem("token_super_admin") || localStorage.getItem("token");
+  }
+
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string>), // Cho phép ghi đè/bổ sung header thủ công từ UI
+  };
+
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  return fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+}
 /**
  * FIX: Hàm lấy ảnh chuẩn cho cả Cloudinary và Local Storage
  */

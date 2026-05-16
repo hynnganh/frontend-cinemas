@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   MapPin, Search, ChevronRight, Hash, CreditCard, 
-  Ticket, Loader2, RefreshCcw 
+  Ticket, Loader2, RefreshCcw, ShieldAlert, ArrowLeft
 } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api';
 
@@ -13,16 +13,35 @@ export default function SuperAdminHCMPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiRequest('/api/v1/orders', { method: 'GET' });
+      // 1. Lấy token từ localStorage (hoặc cookie tùy dự án của bạn)
+      const token = localStorage.getItem('admin_token'); 
+      
+      // Khởi tạo headers có kèm Authorization Bot
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await apiRequest('/api/v1/orders', { 
+        method: 'GET',
+        headers: headers
+      });
+
       if (response.ok) {
+        setIsAuthorized(true);
         const result = await response.json();
-        // Sắp xếp ID mới nhất lên đầu
         const sorted = (result.data || []).sort((a: any, b: any) => b.id - a.id);
         setOrders(sorted);
+      } else if (response.status === 401 || response.status === 403) {
+        // Trả về lỗi phân quyền từ Spring Boot
+        setIsAuthorized(false);
       }
     } catch (error) {
       console.error("Lỗi kết nối mạng:", error);
@@ -31,13 +50,34 @@ export default function SuperAdminHCMPage() {
     }
   }, []);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { 
+    fetchOrders(); 
+  }, [fetchOrders]);
 
   const filteredOrders = orders.filter(order => 
-    order.id.toString().includes(searchTerm) ||
+    order.id?.toString().includes(searchTerm) ||
     order.paymentMethod?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     order.status?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // MÀN HÌNH CHẶN QUYỀN TRUY CẬP (Nếu không phải SUPER_ADMIN)
+  if (isAuthorized === false) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-center">
+        <ShieldAlert className="text-red-600 animate-pulse mb-6" size={64} />
+        <h1 className="text-2xl font-[1000] uppercase italic text-red-600 tracking-tighter">TRUY CẬP BỊ TỪ CHỐI</h1>
+        <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mt-2 max-w-sm">
+          Tài khoản của bạn không có vai trò [SUPER_ADMIN]. Vui lòng đăng nhập lại bằng tài khoản cấp cao.
+        </p>
+        <button 
+          onClick={() => router.push('/admin/login')}
+          className="mt-8 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-black font-black uppercase tracking-wider text-[10px] px-6 py-3 rounded-xl transition-all"
+        >
+          <ArrowLeft size={14} /> Đi đến Đăng nhập
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-6 md:p-10 font-sans tracking-tight">
@@ -53,7 +93,7 @@ export default function SuperAdminHCMPage() {
               Khu vực <span className="text-red-600">Hồ Chí Minh</span>
             </h1>
             <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">
-              Hệ thống quản lý giao dịch thực tế
+              Hệ thống quản lý giao dịch thực tế • Quyền SUPER_ADMIN
             </p>
           </div>
         </div>
@@ -72,7 +112,7 @@ export default function SuperAdminHCMPage() {
         <input 
           type="text" 
           placeholder="TÌM KIẾM MÃ ĐƠN, TRẠNG THÁI, PHƯƠNG THỨC..." 
-          className="w-full bg-zinc-900/30 border border-white/5 rounded-2xl py-4 pl-14 text-[11px] font-bold outline-none focus:border-red-600/50 placeholder:text-zinc-700"
+          className="w-full bg-zinc-900/30 border border-white/5 rounded-2xl py-4 pl-14 text-[11px] font-bold outline-none focus:border-red-600/50 placeholder:text-zinc-700 text-white"
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
@@ -110,7 +150,7 @@ export default function SuperAdminHCMPage() {
                       <div>
                         <p className="text-xs font-black italic tracking-tight text-white">#{order.id}</p>
                         <p className="text-[8px] font-bold text-zinc-600 uppercase mt-1">
-                          {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '---'}
                         </p>
                       </div>
                     </div>
@@ -131,7 +171,7 @@ export default function SuperAdminHCMPage() {
                       {order.totalAmount?.toLocaleString('vi-VN')}đ
                     </p>
                     <span className={`text-[8px] font-black uppercase italic ${order.status === 'SUCCESS' ? 'text-emerald-500' : 'text-red-600'}`}>
-                      • {order.status === 'SUCCESS' ? 'THÀNH CÔNG' : order.status}
+                      • {order.status === 'SUCCESS' ? 'THÀNH CÔNG' : order.status || 'CHƯA RÕ'}
                     </span>
                   </td>
                   <td className="p-6 text-right">

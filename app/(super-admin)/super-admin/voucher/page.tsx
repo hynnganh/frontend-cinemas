@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Trash2, Edit3, Ticket, Calendar, Film, MapPin, Info, AlertCircle, Lock } from 'lucide-react';
-import { apiRequest } from '@/app/lib/api';
+import { apiSuperAdminRequest } from '@/app/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 import VoucherModal from './VoucherModal';
 
@@ -18,7 +18,7 @@ export default function AdminVoucherManager() {
   const fetchVouchers = async () => {
     setLoading(true);
     try {
-      const res = await apiRequest('/api/v1/vouchers');
+      const res = await apiSuperAdminRequest('/api/v1/vouchers');
       const json = await res.json();
       if (res.ok) setVouchers(json.data || []);
     } catch (e) {
@@ -43,7 +43,7 @@ export default function AdminVoucherManager() {
     try {
       const method = selectedVoucher ? 'PUT' : 'POST';
       const url = selectedVoucher ? `/api/v1/vouchers/${selectedVoucher.id}` : '/api/v1/vouchers';
-      const res = await apiRequest(url, { method, body: JSON.stringify(data) });
+      const res = await apiSuperAdminRequest(url, { method, body: JSON.stringify(data) });
       
       if (res.ok) {
         toast.success(selectedVoucher ? "Đã cập nhật!" : "Đã tạo mã mới!");
@@ -68,7 +68,7 @@ export default function AdminVoucherManager() {
 
     setIsSubmitting(true);
     try {
-      const res = await apiRequest(`/api/v1/vouchers/${selectedVoucher.id}`, { method: 'DELETE' });
+      const res = await apiSuperAdminRequest(`/api/v1/vouchers/${selectedVoucher.id}`, { method: 'DELETE' });
       const result = await res.json();
       if (res.ok) {
         toast.success("Đã xóa vĩnh viễn");

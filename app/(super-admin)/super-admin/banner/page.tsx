@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Zap, Search } from "lucide-react";
-import { apiRequest, BASE_URL, getImageUrl } from "@/app/lib/api";
+import { Plus, Trash2, Zap, Search, AlertTriangle, X } from "lucide-react";
+import { apiSuperAdminRequest, BASE_URL } from "@/app/lib/api"; 
 import toast, { Toaster } from "react-hot-toast";
 import FormBanner from "./FormBanner";
 
@@ -15,6 +15,11 @@ export default function BannerManager() {
   const [dangSua, setDangSua] = useState(false);
   const [idHienTai, setIdHienTai] = useState<number | null>(null);
 
+  // State cho Modal xóa
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [idCanXoa, setIdCanXoa] = useState<number | null>(null);
+  const [dangXoa, setDangXoa] = useState(false);
+
   const emptyForm = {
     title: "",
     linkUrl: "",
@@ -26,13 +31,19 @@ export default function BannerManager() {
 
   const [duLieuForm, setDuLieuForm] = useState(emptyForm);
 
+  const xuLyAnhBanner = (path: string | null | undefined) => {
+    if (!path) return "https://placehold.co/1920x800?text=No+Banner+Image";
+    if (path.startsWith("http") || path.startsWith("blob:")) return path;
+    const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+    return `${BASE_URL}/uploads/banners/${cleanPath}`; 
+  };
+
   // ================= FETCH =================
   const fetchBanners = async () => {
     setLoading(true);
     try {
-      const res = await apiRequest("/api/v1/banners");
+      const res = await apiSuperAdminRequest("/api/v1/banners");
       if (!res.ok) throw new Error();
-
       const json = await res.json();
       setBanners(json.data || []);
     } catch {
@@ -49,57 +60,57 @@ export default function BannerManager() {
   // ================= SAVE =================
   const handleLuu = async (formData: FormData) => {
     const method = dangSua ? "PUT" : "POST";
-    const url = dangSua
-      ? `/api/v1/banners/${idHienTai}`
-      : "/api/v1/banners";
-
+    const url = dangSua ? `/api/v1/banners/${idHienTai}` : "/api/v1/banners";
     const t = toast.loading("Đang xử lý...");
 
     try {
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(`${BASE_URL}${url}`, {
+      const res = await apiSuperAdminRequest(url, {
         method,
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
         body: formData,
       });
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        if (res.status === 403) throw new Error("Bạn không có quyền thực hiện!");
+        throw new Error();
+      }
 
       toast.success("Thành công!", { id: t });
-
       setShowForm(false);
       setDangSua(false);
       setIdHienTai(null);
       setDuLieuForm(emptyForm);
-
       fetchBanners();
-    } catch {
-      toast.error("Lưu banner thất bại", { id: t });
+    } catch (err: any) {
+      toast.error(err.message || "Lưu banner thất bại", { id: t });
     }
   };
 
-  // ================= DELETE =================
-  const deleteBanner = async (id: number) => {
-    if (!confirm("Bạn chắc chắn muốn xóa banner này?")) return;
+  // ================= DELETE PROCESS =================
+  const yeuCauXoa = (id: number) => {
+    setIdCanXoa(id);
+    setIsDeleteModalOpen(true);
+  };
 
-    const t = toast.loading("Đang xóa...");
+  const handleXacNhanXoa = async () => {
+    if (!idCanXoa) return;
+    setDangXoa(true);
+    const t = toast.loading("Đang tiến hành xóa...");
 
     try {
-      const res = await apiRequest(`/api/v1/banners/${id}`, {
+      const res = await apiSuperAdminRequest(`/api/v1/banners/${idCanXoa}`, {
         method: "DELETE",
       });
 
       if (!res.ok) throw new Error();
 
-      toast.success("Đã xóa", { id: t });
-
-      // Optimistic update
-      setBanners((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Đã gỡ bỏ banner thành công", { id: t });
+      setBanners((prev) => prev.filter((b) => b.id !== idCanXoa));
+      setIsDeleteModalOpen(false);
+      setIdCanXoa(null);
     } catch {
-      toast.error("Xóa thất bại", { id: t });
+      toast.error("Xóa banner thất bại", { id: t });
+    } finally {
+      setDangXoa(false);
     }
   };
 
@@ -108,7 +119,6 @@ export default function BannerManager() {
     setDangSua(true);
     setIdHienTai(b.id);
 
-    // chỉ lấy field cần thiết
     setDuLieuForm({
       title: b.title || "",
       linkUrl: b.linkUrl || "",
@@ -121,15 +131,24 @@ export default function BannerManager() {
     setShowForm(true);
   };
 
-  // ================= SEARCH =================
   const filteredBanners = banners.filter((b) =>
     b.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // ================= UI =================
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-10 font-sans">
-      <Toaster position="top-right" />
+    <div className="min-h-screen bg-[#020202] text-zinc-400 p-6 md:p-12 font-sans antialiased select-none">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: '#060608',
+            color: '#fff',
+            border: '1px solid #18181b',
+            borderRadius: '0.75rem',
+            fontSize: '13px'
+          },
+        }} 
+      />
 
       {showForm && (
         <FormBanner
@@ -142,12 +161,18 @@ export default function BannerManager() {
         />
       )}
 
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
         {/* HEADER */}
-        <div className="flex justify-between items-center mb-10 pb-10 border-b border-white/5">
-          <h1 className="text-4xl font-black uppercase italic">
-            Quản lý <span className="text-red-600">Banners</span>
-          </h1>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-900 pb-6 gap-4">
+          <div className="space-y-0.5">
+            <h1 className="text-xl font-black uppercase tracking-tight text-white">
+              Quản lý Banners
+            </h1>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+              Media Component // SuperAdmin Interface
+            </p>
+          </div>
 
           <button
             onClick={() => {
@@ -155,70 +180,66 @@ export default function BannerManager() {
               setDuLieuForm(emptyForm);
               setShowForm(true);
             }}
-            className="bg-white text-black px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all"
+            className="bg-white text-black px-5 py-2.5 rounded-lg font-bold text-[11px] uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all active:scale-[0.98] shadow-sm flex items-center gap-2"
           >
-            <Plus size={14} className="inline mr-2" />
+            <Plus size={14} />
             Thêm mới
           </button>
         </div>
 
-        {/* SEARCH */}
-        <div className="mb-8 relative max-w-md">
-          <Search
-            size={16}
-            className="absolute left-3 top-3 text-zinc-500"
-          />
+        {/* SEARCH BAR */}
+        <div className="relative max-w-md group">
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" />
           <input
-            placeholder="Tìm banner..."
+            placeholder="Tìm kiếm tiêu đề banner..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-zinc-900 pl-10 pr-4 py-3 rounded-xl outline-none text-sm"
+            className="w-full bg-zinc-950 border border-zinc-900 pl-10 pr-4 py-2 rounded-lg outline-none text-xs font-semibold text-white focus:border-red-600/40 transition-all placeholder:text-zinc-700"
           />
         </div>
 
-        {/* LIST */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* BANNER GRID LIST */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
-            <div className="col-span-full flex justify-center py-20">
-              <Zap className="animate-spin text-red-600" size={40} />
+            <div className="col-span-full flex flex-col justify-center items-center py-24 gap-3">
+              <Zap className="animate-spin text-red-600 opacity-80" size={28} />
+              <p className="text-[10px] font-bold uppercase text-zinc-600 tracking-widest animate-pulse">Đang nạp dữ liệu media...</p>
             </div>
           ) : filteredBanners.length === 0 ? (
-            <p className="col-span-full text-center text-zinc-500">
-              Không có banner
-            </p>
+            <div className="col-span-full text-center py-16 bg-[#060608] border border-zinc-900 rounded-xl text-xs font-medium text-zinc-600">
+              Hệ thống chưa ghi nhận dữ liệu banner nào phù hợp.
+            </div>
           ) : (
             filteredBanners.map((b) => (
               <div
                 key={b.id}
-                className="bg-zinc-950 border border-white/5 p-4 rounded-[2rem] hover:border-red-600/30 transition-all flex flex-col"
+                className="bg-[#060608] border border-zinc-900 p-4 rounded-xl hover:border-red-600/20 transition-all flex flex-col group overflow-hidden shadow-md"
               >
-                <img
-                  src={getImageUrl(b.imageUrl)}
-                  className="aspect-video rounded-xl object-cover mb-4 opacity-80"
-                  alt={b.title}
-                />
+                <div className="aspect-video rounded-lg overflow-hidden mb-4 bg-zinc-950 border border-zinc-900/40">
+                  <img
+                    src={xuLyAnhBanner(b.imageUrl)}
+                    className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-[1.02] transition-all duration-500"
+                    alt={b.title}
+                  />
+                </div>
 
-                <h3 className="font-black italic uppercase text-lg mb-2">
+                <h3 className="font-bold uppercase text-zinc-200 text-sm mb-1 truncate group-hover:text-white transition-colors tracking-tight">
                   {b.title}
                 </h3>
-
-                <p className="text-[10px] text-zinc-500 mb-4 truncate">
-                  {b.linkUrl}
-                </p>
+                <p className="text-[11px] text-zinc-600 font-medium mb-5 truncate">{b.linkUrl || "Không có đường dẫn liên kết"}</p>
 
                 <div className="flex gap-2 mt-auto">
                   <button
                     onClick={() => handleEdit(b)}
-                    className="flex-1 bg-zinc-900 py-3 rounded-xl text-[9px] font-black uppercase hover:bg-white hover:text-black transition"
+                    className="flex-1 bg-zinc-950 border border-zinc-900 py-2.5 rounded-lg text-[10px] font-bold uppercase text-zinc-400 hover:border-zinc-700 hover:text-white transition active:scale-[0.97]"
                   >
-                    Sửa
+                    Chỉnh sửa
                   </button>
-
                   <button
-                    onClick={() => deleteBanner(b.id)}
-                    className="bg-zinc-900 px-4 py-3 rounded-xl hover:bg-red-600 transition"
+                    onClick={() => yeuCauXoa(b.id)}
+                    className="bg-zinc-950 border border-zinc-900 px-3.5 rounded-lg text-zinc-500 hover:border-red-600/30 hover:bg-red-600/5 hover:text-red-500 transition active:scale-[0.97]"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>
@@ -226,6 +247,43 @@ export default function BannerManager() {
           )}
         </div>
       </div>
+
+      {/* ================= CUSTOM CONFIRM DELETE MODAL ================= */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 backdrop-blur-md bg-black/60 animate-in fade-in duration-200">
+          <div className="absolute inset-0" onClick={() => !dangXoa && setIsDeleteModalOpen(false)}></div>
+          
+          <div className="relative bg-[#0f0f0f] border border-zinc-900 w-full max-w-[380px] rounded-xl shadow-2xl overflow-hidden p-6 text-center space-y-5">
+            <div className="mx-auto w-12 h-12 bg-red-600/10 border border-red-600/20 rounded-full flex items-center justify-center text-red-500">
+              <AlertTriangle size={20} />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-base font-bold uppercase text-white tracking-tight"> Xác nhận gỡ bỏ</h2>
+              <p className="text-xs text-zinc-500 font-medium px-2 leading-relaxed">
+                Hành động này sẽ xóa vĩnh viễn banner khỏi hệ thống hiển thị. Bạn có chắc chắn muốn tiếp tục?
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                disabled={dangXoa}
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="flex-1 bg-zinc-950 border border-zinc-900 py-3 rounded-lg text-[10px] font-bold uppercase text-zinc-500 hover:text-zinc-300 transition disabled:opacity-40"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                disabled={dangXoa}
+                onClick={handleXacNhanXoa}
+                className="flex-1 bg-red-600 text-white py-3 rounded-lg text-[10px] font-bold uppercase hover:bg-red-700 transition disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {dangXoa ? "Đang xóa..." : "Đồng ý xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { X, Save, Loader2, Tag, DollarSign, Activity, AlertCircle, LayoutGrid } from 'lucide-react';
-import { apiRequest } from '@/app/lib/api'; 
+import { apiSuperAdminRequest } from '@/app/lib/api'; 
 import toast from 'react-hot-toast';
 
 export default function VoucherModal({ isOpen, onClose, onSubmit, initialData, isSubmitting }: any) {
@@ -27,7 +27,7 @@ export default function VoucherModal({ isOpen, onClose, onSubmit, initialData, i
       const fetchData = async () => {
         setLoadingData(true);
         try {
-          const promoRes = await apiRequest('/api/v1/promotions');
+          const promoRes = await apiSuperAdminRequest('/api/v1/promotions');
           if (promoRes.ok) {
             const result = await promoRes.json();
             setPromotions(result.data || []);

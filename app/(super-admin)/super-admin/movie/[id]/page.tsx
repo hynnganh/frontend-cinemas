@@ -6,7 +6,7 @@ import {
   Clock, User, Tag, Loader2, Calendar, Hash
 } from 'lucide-react';
 import Link from 'next/link';
-import { apiRequest } from '@/app/lib/api';
+import { apiSuperAdminRequest } from '@/app/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Hàm helper để định dạng ngày Việt Nam
@@ -25,7 +25,7 @@ export default function CompactAdminMovieDetail() {
     const fetchDetail = async () => {
       try {
         // Gọi API lấy chi tiết phim
-        const res = await apiRequest(`/api/v1/movies/${id}`);
+        const res = await apiSuperAdminRequest(`/api/v1/movies/${id}`);
         const resData = await res.json();
         
         // Theo JSON của bà: Dữ liệu nằm trong resData.data

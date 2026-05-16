@@ -1,12 +1,11 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiRequest } from '@/app/lib/api';
+import { apiSuperAdminRequest } from '@/app/lib/api';
 import { 
-  Loader2, Film, MapPin, ChevronRight, 
-  X, Building2, Filter, CheckCircle2, 
-  AlertCircle, CalendarDays, Calendar as CalendarIcon,
-  ArrowUpRight
+  Loader2, Film, ChevronRight, 
+  X, Building2, ShieldCheck, 
+  Calendar as CalendarIcon, ArrowUpRight
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -36,11 +35,14 @@ export default function CinemaManagementPage() {
   const fetchShowtimes = async () => {
     try {
       setLoading(true);
-      const res = await apiRequest('/api/v1/showtimes');
+      const res = await apiSuperAdminRequest('/api/v1/showtimes');
       const responseData = await res.json();
       setShowtimes(responseData.data || []);
-    } catch (err) { toast.error("Lỗi đồng bộ dữ liệu!"); } 
-    finally { setLoading(false); }
+    } catch (err) { 
+      toast.error("Lỗi đồng bộ dữ liệu hệ thống!"); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const filteredShowtimes = useMemo(() => {
@@ -69,82 +71,107 @@ export default function CinemaManagementPage() {
   }, [filteredShowtimes]);
 
   if (loading) return (
-    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-red-600" size={40} />
-      <p className="text-zinc-600 font-black text-[10px] uppercase tracking-[0.3em]">Đang đồng bộ...</p>
+    <div className="min-h-screen bg-[#020202] flex flex-col items-center justify-center gap-3">
+      <Loader2 className="animate-spin text-red-600 opacity-80" size={32} />
+      <p className="text-zinc-600 font-bold text-[10px] uppercase tracking-widest animate-pulse">Đang đồng bộ trục thời gian...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-6 font-sans">
-      <Toaster position="top-right" />
+    <div className="min-h-screen bg-[#020202] text-zinc-400 p-6 md:p-12 font-sans antialiased select-none">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: '#060608',
+            color: '#fff',
+            border: '1px solid #18181b',
+            borderRadius: '0.75rem',
+            fontSize: '13px'
+          },
+        }} 
+      />
       
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* HEADER */}
-        <header className="space-y-8 border-b border-white/5 pb-10">
+      <div className="max-w-7xl mx-auto space-y-10">
+        {/* HEADER BLOCK */}
+        <header className="space-y-6 border-b border-zinc-900 pb-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div>
-              <div className="flex items-center gap-2 text-red-600 font-black text-[9px] uppercase tracking-[0.4em] mb-3">
-                <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse" />
-                Hệ thống quản trị
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-red-600 font-bold text-[10px] uppercase tracking-widest">
+                <ShieldCheck size={14} />
+                <span>Phân hệ quản trị cao cấp</span>
               </div>
-              <h1 className="text-5xl font-[1000] italic uppercase tracking-tighter leading-none">
-                Cinema <span className="text-zinc-800">Admin</span>
+              <h1 className="text-2xl font-black uppercase tracking-tight text-white">
+                Tổng lịch chiếu phim
               </h1>
             </div>
 
-            <div className="flex bg-zinc-900/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md">
-              {['ALL', 'UPCOMING', 'PAST'].map((s) => (
-                <button key={s} onClick={() => setFilterStatus(s as any)}
-                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${filterStatus === s ? 'bg-red-600 text-white shadow-xl shadow-red-600/20' : 'text-zinc-500 hover:text-white'}`}>
+            {/* STATUS FILTER */}
+            <div className="flex bg-[#060608] p-1 rounded-lg border border-zinc-900 shadow-md">
+              {(['ALL', 'UPCOMING', 'PAST'] as const).map((s) => (
+                <button 
+                  key={s} 
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-5 py-2 rounded-md text-[10px] font-bold uppercase transition-all duration-150 ${
+                    filterStatus === s 
+                      ? 'bg-zinc-900 text-white border border-zinc-800' 
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
                   {s === 'ALL' ? 'Tất cả' : s === 'UPCOMING' ? 'Sắp chiếu' : 'Lịch sử'}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* MONTH SELECTOR */}
-          <div className="flex flex-col md:flex-row items-center gap-6 bg-white/[0.02] p-4 rounded-[2rem] border border-white/5">
-             <div className="flex items-center gap-3 px-4 border-r border-white/10 shrink-0">
-                <CalendarIcon size={18} className="text-red-600" />
-                <div className="flex bg-black p-1 rounded-xl border border-white/5">
-                   {['WEEK', 'MONTH', 'ALL'].map((v) => (
-                      <button key={v} onClick={() => setTimeView(v as any)}
-                        className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${timeView === v ? 'bg-white text-black' : 'text-zinc-600 hover:text-zinc-400'}`}>
+          {/* TIME FILTER & MONTH SELECTOR */}
+          <div className="flex flex-col md:flex-row items-center gap-4 bg-[#060608]/50 p-3 rounded-xl border border-zinc-900">
+             <div className="flex items-center gap-3 px-3 border-r border-zinc-900 shrink-0">
+                <CalendarIcon size={16} className="text-zinc-500" />
+                <div className="flex bg-[#020202] p-1 rounded-md border border-zinc-900">
+                   {(['WEEK', 'MONTH', 'ALL'] as const).map((v) => (
+                      <button 
+                        key={v} 
+                        onClick={() => setTimeView(v)}
+                        className={`px-3 py-1 rounded text-[9px] font-bold uppercase transition-all ${
+                          timeView === v ? 'bg-zinc-800 text-white' : 'text-zinc-600 hover:text-zinc-400'
+                        }`}
+                      >
                         {v === 'WEEK' ? 'Tuần' : v === 'MONTH' ? 'Tháng' : 'Tất cả'}
                       </button>
                    ))}
                 </div>
              </div>
 
-             <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+             {/* 12 MONTH BUTTONS */}
+             <div className="flex-1 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-1">
                 {Array.from({ length: 12 }, (_, i) => (
                   <button
                     key={i}
                     onClick={() => { setSelectedMonth(i); setTimeView('MONTH'); }}
-                    className={`min-w-[45px] h-[45px] rounded-2xl flex flex-col items-center justify-center transition-all border ${
+                    className={`min-w-[42px] h-[42px] rounded-lg flex flex-col items-center justify-center transition-all border ${
                       selectedMonth === i && timeView === 'MONTH'
-                      ? 'bg-red-600 border-red-600 text-white shadow-lg scale-110 z-10' 
-                      : 'border-white/5 bg-zinc-900/30 text-zinc-500 hover:border-zinc-700'
+                        ? 'bg-red-600 border-transparent text-white shadow-md font-black' 
+                        : 'border-zinc-900 bg-zinc-950/40 text-zinc-500 hover:border-zinc-700'
                     }`}
                   >
-                    <span className="text-[8px] font-black uppercase leading-none mb-1 opacity-60">Thg</span>
-                    <span className="text-sm font-black italic leading-none">{i + 1}</span>
+                    <span className="text-[7px] font-bold uppercase opacity-50 leading-none mb-0.5">Thg</span>
+                    <span className="text-xs font-bold leading-none">{i + 1}</span>
                   </button>
                 ))}
              </div>
           </div>
         </header>
 
-        {/* LIST HIỂN THỊ */}
-        <div className="space-y-16 pb-20">
+        {/* CINEMA GROUPS LIST */}
+        <div className="space-y-12">
           {Object.keys(cinemaMap).map((cinemaName) => (
-            <div key={cinemaName} className="group animate-in fade-in slide-in-from-left-4">
-              <div className="flex items-center gap-4 mb-8">
-                <h2 className="text-3xl font-[1000] uppercase italic tracking-tighter text-white/90">
+            <div key={cinemaName} className="space-y-6">
+              <div className="flex items-center gap-4">
+                <h2 className="text-base font-black uppercase tracking-tight text-zinc-200">
                   {cinemaName}
                 </h2>
-                <div className="h-[1px] flex-1 bg-gradient-to-r from-zinc-800 to-transparent" />
+                <div className="h-[1px] flex-1 bg-zinc-900" />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -152,30 +179,32 @@ export default function CinemaManagementPage() {
                   <div 
                     key={branch.info.id}
                     onClick={() => { setSelectedBranch(branch); setIsModalOpen(true); }}
-                    className="group/card bg-zinc-900/20 border border-white/5 rounded-[2.5rem] p-8 hover:border-red-600/40 transition-all cursor-pointer relative"
+                    className="group/card bg-[#060608] border border-zinc-900 rounded-xl p-6 hover:border-zinc-800 transition-all cursor-pointer flex flex-col justify-between"
                   >
-                    <div className="flex justify-between items-start mb-8">
-                       <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center group-hover/card:bg-red-600 transition-all">
-                          <Building2 size={24} className="text-zinc-600 group-hover/card:text-white" />
-                       </div>
-                       <div className="text-right">
-                          <span className="block text-2xl font-[1000] italic text-white/20 leading-none tracking-tighter">
-                             {String(branch.shows.length).padStart(2, '0')}
-                          </span>
-                          <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Suất</span>
-                       </div>
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                         <div className="w-11 h-11 bg-zinc-950 border border-zinc-900 rounded-lg flex items-center justify-center text-zinc-500 group-hover/card:bg-zinc-900 group-hover/card:text-white transition-all">
+                            <Building2 size={18} />
+                         </div>
+                         <div className="text-right">
+                            <span className="block text-2xl font-black text-zinc-800 group-hover/card:text-red-600/30 transition-colors leading-none tracking-tight">
+                               {String(branch.shows.length).padStart(2, '0')}
+                            </span>
+                            <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">Suất chiếu</span>
+                         </div>
+                      </div>
+                      
+                      <h3 className="text-sm font-bold uppercase text-zinc-200 group-hover/card:text-white transition-colors mb-1 truncate">
+                        {branch.info.name}
+                      </h3>
+                      <p className="text-[10px] text-zinc-500 border-l border-zinc-800 pl-2.5 truncate mb-6">
+                        {branch.info.address}
+                      </p>
                     </div>
-                    
-                    <h3 className="text-xl font-black uppercase mb-2 group-hover/card:text-red-500 transition-colors">
-                      {branch.info.name}
-                    </h3>
-                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide truncate mb-6 border-l-2 border-zinc-800 pl-3">
-                      {branch.info.address}
-                    </p>
 
-                    <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest group-hover/card:text-white transition-colors flex items-center gap-2">
-                          CHI TIẾT <ChevronRight size={14} />
+                    <div className="pt-4 border-t border-zinc-900/60 flex items-center justify-between">
+                       <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wide group-hover/card:text-zinc-400 transition-colors flex items-center gap-1">
+                         Xem chi tiết danh sách <ChevronRight size={12} />
                        </span>
                     </div>
                   </div>
@@ -183,53 +212,70 @@ export default function CinemaManagementPage() {
               </div>
             </div>
           ))}
+
+          {Object.keys(cinemaMap).length === 0 && (
+            <div className="py-24 text-center border border-zinc-900 border-dashed bg-zinc-950/20 rounded-xl">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Không tìm thấy suất chiếu nào trong giai đoạn này</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* MODAL CHI TIẾT */}
+      {/* DETAILED MODAL */}
       {isModalOpen && selectedBranch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setIsModalOpen(false)} />
-          <div className="relative bg-[#0a0a0a] border border-white/10 w-full max-w-4xl max-h-[85vh] rounded-[3.5rem] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-zinc-900/20">
-              <div>
-                <h2 className="text-3xl font-[1000] italic uppercase tracking-tighter">{selectedBranch.info.name}</h2>
-                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mt-1 italic">Chọn một suất chiếu để quản lý chi tiết</p>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+          <div className="relative bg-[#060608] border border-zinc-900 w-full max-w-3xl max-h-[80vh] rounded-xl overflow-hidden flex flex-col shadow-2xl transition-all">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-zinc-900 flex justify-between items-center bg-zinc-950/40">
+              <div className="space-y-0.5">
+                <h2 className="text-base font-black uppercase tracking-tight text-white">{selectedBranch.info.name}</h2>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Điều hành và cấu hình chi tiết phân bổ ghế</p>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-red-600 rounded-full transition-all">
-                <X size={20}/>
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="w-8 h-8 flex items-center justify-center bg-zinc-900 border border-zinc-800 hover:text-white rounded-md transition-all"
+              >
+                <X size={16}/>
               </button>
             </div>
             
-            <div className="p-8 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-3 flex-1 [scrollbar-width:thin] border-zinc-900">
               {selectedBranch.shows.sort((a: any, b: any) => dayjs(a.startTime).unix() - dayjs(b.startTime).unix()).map((show: any) => (
                 <div 
                   key={show.id} 
-                  // Link điều hướng tại đây
                   onClick={() => router.push(`/super-admin/showtime/${show.id}`)}
-                  className="group/item flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-[2rem] hover:bg-red-600/5 hover:border-red-600/30 transition-all cursor-pointer"
+                  className="group/item flex items-center justify-between p-4 bg-zinc-950/50 border border-zinc-900/60 rounded-lg hover:bg-zinc-900/40 hover:border-zinc-800 transition-all cursor-pointer"
                 >
-                    <div className="flex items-center gap-6">
-                      <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center group-hover/item:bg-red-600 border border-white/5 transition-all">
-                        <Film size={20} className="text-zinc-600 group-hover/item:text-white" />
-                      </div>
-                      <div>
-                         <span className="px-2 py-0.5 bg-zinc-800 text-[8px] font-black text-zinc-400 rounded uppercase mb-2 block w-fit">Phòng {show.room?.name}</span>
-                         <h4 className="text-lg font-black uppercase leading-tight tracking-tight group-hover/item:text-red-500 transition-colors">{show.movie?.title}</h4>
-                      </div>
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-center text-zinc-500 group-hover/item:text-white group-hover/item:bg-red-600 group-hover/item:border-transparent shrink-0 transition-all">
+                      <Film size={16} />
                     </div>
-                    
-                    <div className="flex items-center gap-8 text-right">
-                       <div>
-                          <span className="text-3xl font-[1000] italic text-white tracking-tighter leading-none block group-hover/item:text-white transition-colors">
-                             {dayjs(show.startTime).format('HH:mm')}
-                          </span>
-                          <span className="text-[10px] text-zinc-600 font-bold uppercase">{dayjs(show.startTime).format('DD/MM/YYYY')}</span>
-                       </div>
-                       <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover/item:bg-white group-hover/item:text-black transition-all">
-                          <ArrowUpRight size={18} />
-                       </div>
+                    <div className="min-w-0 space-y-0.5">
+                       <span className="inline-block px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 text-[8px] font-bold text-zinc-500 rounded uppercase">
+                         Phòng {show.room?.name}
+                       </span>
+                       <h4 className="text-sm font-bold uppercase text-zinc-200 group-hover/item:text-white transition-colors truncate tracking-tight">
+                         {show.movie?.title}
+                       </h4>
                     </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-6 shrink-0 text-right">
+                     <div>
+                        <span className="text-xl font-black text-white tracking-tight leading-none block">
+                           {dayjs(show.startTime).format('HH:mm')}
+                        </span>
+                        <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider">
+                          {dayjs(show.startTime).format('DD/MM/YYYY')}
+                        </span>
+                     </div>
+                     <div className="w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 group-hover/item:bg-white group-hover/item:text-black group-hover/item:border-transparent transition-all">
+                        <ArrowUpRight size={14} />
+                     </div>
+                  </div>
                 </div>
               ))}
             </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Pencil, Upload, AlertCircle } from 'lucide-react';
-import { BASE_URL } from '@/app/lib/api';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { X, Save, Plus, Pencil, Upload } from "lucide-react";
+import { BASE_URL } from "@/app/lib/api"; // Chỉ lấy BASE_URL
+import toast from "react-hot-toast";
 
 interface FormProps {
   dangSua: boolean;
@@ -18,22 +18,24 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
   const [anhXemTruoc, setAnhXemTruoc] = useState<string | null>(null);
   const [fileAnh, setFileAnh] = useState<File | null>(null);
 
+  // Tự xử lý chuỗi URL cục bộ tại form mà không gọi hàm chung từ API
   useEffect(() => {
     if (duLieu.imageUrl) {
-      // Nếu là link ảnh từ bên thứ 3 hoặc từ server mình
-      const url = duLieu.imageUrl.startsWith('blob') || duLieu.imageUrl.startsWith('http')
-        ? duLieu.imageUrl 
-        : `${BASE_URL}${duLieu.imageUrl.startsWith('/') ? '' : '/'}${duLieu.imageUrl}`;
-      setAnhXemTruoc(url);
+      if (duLieu.imageUrl.startsWith("http") || duLieu.imageUrl.startsWith("blob:")) {
+        setAnhXemTruoc(duLieu.imageUrl);
+      } else {
+        const cleanPath = duLieu.imageUrl.startsWith("/") ? duLieu.imageUrl.slice(1) : duLieu.imageUrl;
+        setAnhXemTruoc(`${BASE_URL}/uploads/banners/${cleanPath}`);
+      }
     } else {
       setAnhXemTruoc(null);
     }
+    setFileAnh(null); 
   }, [duLieu.imageUrl]);
 
   const thayDoiFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Ràng buộc dung lượng: 2MB
       if (file.size > 2 * 1024 * 1024) {
         toast.error("Ảnh quá nặng! Vui lòng chọn ảnh dưới 2MB.");
         return;
@@ -46,7 +48,6 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
   const guiForm = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // --- RÀNG BUỘC LOGIC ---
     if (!dangSua && !fileAnh) {
       toast.error("Vui lòng tải ảnh banner lên!");
       return;
@@ -63,13 +64,13 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
       linkUrl: duLieu.linkUrl.trim(),
       position: duLieu.position || "HOME_TOP",
       status: duLieu.status || "ACTIVE",
-      sortOrder: Math.max(0, duLieu.sortOrder || 0) // Đảm bảo không âm
+      sortOrder: Math.max(0, duLieu.sortOrder || 0)
     };
 
-    data.append('banner', new Blob([JSON.stringify(bannerRequest)], { type: 'application/json' }));
+    data.append("banner", new Blob([JSON.stringify(bannerRequest)], { type: "application/json" }));
     
     if (fileAnh) {
-      data.append('file', fileAnh);
+      data.append("file", fileAnh);
     }
 
     onLuu(data);
@@ -78,8 +79,8 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
       <div className="bg-zinc-950 border border-white/10 w-full max-w-lg rounded-[2.5rem] shadow-2xl relative animate-in fade-in zoom-in duration-300">
-        <button onClick={onDong} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors">
-            <X size={20} />
+        <button type="button" onClick={onDong} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors">
+          <X size={20} />
         </button>
 
         <form onSubmit={guiForm} className="p-8 space-y-6">
@@ -102,7 +103,7 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
                   <>
                     <img src={anhXemTruoc} className="w-full h-full object-cover" alt="Preview" />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <Upload className="text-white" size={24} />
+                      <Upload className="text-white" size={24} />
                     </div>
                   </>
                 ) : (
@@ -117,19 +118,15 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
             </div>
 
             <div className="grid gap-4">
-              {/* Title */}
-              <div className="space-y-1">
-                <input 
-                  required 
-                  maxLength={255}
-                  value={duLieu.title} 
-                  onChange={e => setDuLieu({...duLieu, title: e.target.value})} 
-                  placeholder="Tiêu đề banner..." 
-                  className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50 transition-all" 
-                />
-              </div>
+              <input 
+                required 
+                maxLength={255}
+                value={duLieu.title} 
+                onChange={e => setDuLieu({...duLieu, title: e.target.value})} 
+                placeholder="Tiêu đề banner..." 
+                className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50 transition-all" 
+              />
 
-              {/* Link */}
               <input 
                 required 
                 value={duLieu.linkUrl} 
@@ -139,7 +136,6 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
               />
               
               <div className="grid grid-cols-2 gap-4">
-                {/* Position */}
                 <select 
                   value={duLieu.position} 
                   onChange={e => setDuLieu({...duLieu, position: e.target.value})} 
@@ -149,17 +145,16 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
                   <option value="HOME_SIDE">Vị trí: Bên cạnh</option>
                 </select>
 
-                {/* Sort Order */}
                 <div className="relative">
-                    <input 
+                  <input 
                     type="number" 
                     min="0"
                     value={duLieu.sortOrder} 
                     onChange={e => setDuLieu({...duLieu, sortOrder: parseInt(e.target.value) || 0})} 
                     className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50" 
                     placeholder="Thứ tự..."
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] text-zinc-700 font-bold uppercase pointer-events-none">Ưu tiên</span>
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] text-zinc-700 font-bold uppercase pointer-events-none">Ưu tiên</span>
                 </div>
               </div>
             </div>

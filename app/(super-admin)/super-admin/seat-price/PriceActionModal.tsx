@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Save, Armchair, Calendar, Banknote, Sparkles, AlertCircle } from "lucide-react";
+import { X, Save, Armchair, Calendar, Banknote, ShieldAlert, SlidersHorizontal } from "lucide-react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -29,12 +29,11 @@ export function PriceActionModal({ isOpen, onClose, onSave, initialData }: Modal
     price: 0,
   });
 
-  // Quản lý trạng thái lỗi
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
-      setError(null); // Reset lỗi khi đóng modal
+      setError(null);
       return;
     }
 
@@ -49,7 +48,6 @@ export function PriceActionModal({ isOpen, onClose, onSave, initialData }: Modal
     }
   }, [initialData, isOpen]);
 
-  // Hàm kiểm tra ràng buộc trước khi Save
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -58,7 +56,7 @@ export function PriceActionModal({ isOpen, onClose, onSave, initialData }: Modal
       return;
     }
 
-    if (formData.price > 2000000) { // Ví dụ: Giới hạn giá tối đa 2 triệu
+    if (formData.price > 2000000) {
       setError("Giá vé không được vượt quá 2.000.000 VNĐ");
       return;
     }
@@ -70,114 +68,124 @@ export function PriceActionModal({ isOpen, onClose, onSave, initialData }: Modal
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden relative">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-[#0a0a0a] border border-zinc-900 w-full max-w-md rounded-xl shadow-2xl overflow-hidden relative">
         
-        {/* HEADER */}
-        <div className="px-10 pt-10 pb-6 flex justify-between items-center relative">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 text-red-600 text-[10px] font-black uppercase tracking-[0.3em] mb-1">
-              <Sparkles size={12} />
-              <span>Strict Mode On</span>
+        {/* TIÊU ĐỀ MODAL */}
+        <div className="px-6 pt-6 pb-4 flex justify-between items-center border-b border-zinc-900">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-red-500 text-[10px] font-bold uppercase tracking-wider">
+              <SlidersHorizontal size={10} />
+              <span>Hệ thống cấu hình</span>
             </div>
-            <h2 className="text-2xl font-[1000] uppercase italic tracking-tighter text-white">
-              {initialData?.id ? "Cập nhật" : "Thiết lập"} <span className="text-red-600">Giá</span>
+            <h2 className="text-xl font-black uppercase tracking-tight text-white">
+              {initialData?.id ? "Cập nhật" : "Thiết lập"} cấu hình giá
             </h2>
           </div>
-          <button onClick={onClose} className="p-3 bg-zinc-900 border border-white/5 rounded-2xl hover:bg-red-600 transition-all">
-            <X size={20} />
+          <button 
+            onClick={onClose} 
+            className="p-2 bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 rounded-lg hover:bg-zinc-800 transition-colors"
+          >
+            <X size={16} />
           </button>
         </div>
 
-        {/* FORM */}
-        <form className="px-10 pb-12 space-y-8" onSubmit={handleSubmit}>
+        {/* NỘI DUNG FORM */}
+        <form className="p-6 space-y-6" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-4">
-            {/* SEAT TYPE */}
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <Armchair size={12} /> Loại ghế
+            
+            {/* CHỌN LOẠI GHẾ */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Armchair size={12} className="text-red-500" /> Loại ghế
               </label>
-              <select
-                value={formData.seatType}
-                onChange={(e) => setFormData({ ...formData, seatType: e.target.value })}
-                className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-4 py-4 text-xs font-bold text-white outline-none focus:border-red-600/50 appearance-none"
-              >
-                {SEAT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-              </select>
+              <div className="relative">
+                <select
+                  value={formData.seatType}
+                  onChange={(e) => setFormData({ ...formData, seatType: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-red-600/50 appearance-none pr-8 cursor-pointer"
+                >
+                  {SEAT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500 text-[10px]">▼</div>
+              </div>
             </div>
 
-            {/* DAY OF WEEK */}
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <Calendar size={12} /> Ngày
+            {/* CHỌN NGÀY TRONG TUẦN */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={12} className="text-red-500" /> Ngày áp dụng
               </label>
-              <select
-                value={formData.dayOfWeek}
-                onChange={(e) => setFormData({ ...formData, dayOfWeek: Number(e.target.value) })}
-                className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-4 py-4 text-xs font-bold text-white outline-none focus:border-red-600/50 appearance-none"
-              >
-                {DAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
-              </select>
+              <div className="relative">
+                <select
+                  value={formData.dayOfWeek}
+                  onChange={(e) => setFormData({ ...formData, dayOfWeek: Number(e.target.value) })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5 text-xs font-semibold text-white outline-none focus:border-red-600/50 appearance-none pr-8 cursor-pointer"
+                >
+                  {DAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500 text-[10px]">▼</div>
+              </div>
             </div>
           </div>
 
-          {/* PRICE INPUT + VALIDATION */}
-          <div className="space-y-3">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-              <Banknote size={12} /> Giá vé niêm yết
+          {/* Ô NHẬP GIÁ TIỀN */}
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Banknote size={12} className="text-red-500" /> Giá vé áp dụng
             </label>
-            <div className="relative group">
+            <div className="relative">
               <input
                 type="number"
                 value={formData.price || ""}
                 onChange={(e) => {
                   const val = Number(e.target.value);
                   setFormData({ ...formData, price: val });
-                  if (val > 0) setError(null); // Xóa lỗi ngay khi người dùng nhập đúng
+                  if (val > 0) setError(null);
                 }}
-                className={`w-full bg-zinc-900/80 border-2 rounded-[2rem] px-8 py-6 text-4xl font-[1000] italic outline-none transition-all ${
-                  error ? "border-red-600 animate-shake" : "border-white/5 focus:border-red-600"
-                } ${formData.price > 0 ? "text-red-600" : "text-zinc-600"}`}
+                className={`w-full bg-zinc-950 border-2 rounded-lg px-4 py-3.5 text-2xl font-bold font-mono outline-none transition-all ${
+                  error ? "border-red-600 animate-shake" : "border-zinc-800 focus:border-red-600"
+                } ${formData.price > 0 ? "text-white" : "text-zinc-600"}`}
                 placeholder="0"
                 onFocus={(e) => e.target.select()}
               />
-              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-zinc-700 font-black italic">VND</div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs font-bold">VND</div>
             </div>
             
             {/* THÔNG BÁO LỖI */}
             {error && (
-              <div className="flex items-center gap-2 text-red-500 text-[10px] font-bold uppercase tracking-wider mt-2 ml-4 animate-in slide-in-from-top-1">
-                <AlertCircle size={14} />
+              <div className="flex items-center gap-1.5 text-red-500 text-xs font-medium mt-1.5 animate-in slide-in-from-top-1">
+                <ShieldAlert size={14} />
                 {error}
               </div>
             )}
           </div>
 
-          {/* SUBMIT BUTTON */}
+          {/* NÚT SUBMIT LƯU DỮ LIỆU */}
           <button
             type="submit"
             disabled={formData.price <= 0}
-            className={`w-full py-5 rounded-[2rem] font-[1000] uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 shadow-2xl ${
+            className={`w-full py-3 rounded-lg font-bold uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 shadow-lg ${
               formData.price > 0 
-                ? "bg-white text-black hover:bg-red-600 hover:text-white active:scale-[0.98]" 
-                : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                ? "bg-red-600 text-white hover:bg-red-700 active:scale-[0.98]" 
+                : "bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800"
             }`}
           >
-            <Save size={18} strokeWidth={3} />
-            {initialData?.id ? "Cập nhật ngay" : "Kích hoạt giá"}
+            <Save size={14} strokeWidth={2.5} />
+            {initialData?.id ? "Cập nhật cấu hình" : "Áp dụng giá vé"}
           </button>
         </form>
       </div>
 
       <style jsx>{`
         .animate-shake {
-          animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+          animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
         }
         @keyframes shake {
           10%, 90% { transform: translate3d(-1px, 0, 0); }
           20%, 80% { transform: translate3d(2px, 0, 0); }
-          30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-          40%, 60% { transform: translate3d(4px, 0, 0); }
+          30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
+          40%, 60% { transform: translate3d(3px, 0, 0); }
         }
       `}</style>
     </div>

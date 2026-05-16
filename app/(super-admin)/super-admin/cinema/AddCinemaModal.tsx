@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Zap, ChevronRight, Loader2, Building2, MapPin, Info, Save, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { apiRequest } from '@/app/lib/api';
+import { apiSuperAdminRequest } from '@/app/lib/api';
 
 interface AddCinemaModalProps {
   isOpen: boolean;
@@ -40,7 +40,7 @@ export default function AddCinemaModal({ isOpen, onClose, onSuccess, initialData
       const url = initialData ? `/api/v1/cinemas/${initialData.id}` : '/api/v1/cinemas';
       const method = initialData ? 'PUT' : 'POST';
 
-      const res = await apiRequest(url, {
+      const res = await apiSuperAdminRequest(url, {
         method: method,
         body: JSON.stringify({ 
           name: cinemaName,

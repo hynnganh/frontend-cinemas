@@ -1,13 +1,16 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { apiRequest } from '@/app/lib/api';
+import { apiSuperAdminRequest } from '@/app/lib/api';
 import { 
   Loader2, Calendar, Clock, Film, 
   MapPin, ChevronLeft, Monitor, Ticket,
   Star, Globe, User, Layers, Info
 } from 'lucide-react';
-import moment from 'moment';
+import dayjs from 'dayjs';
+import 'dayjs/locale/vi';
+
+dayjs.locale('vi');
 
 export default function ShowtimeDetailPage() {
   const { id } = useParams();
@@ -19,11 +22,11 @@ export default function ShowtimeDetailPage() {
     const fetchDetail = async () => {
       try {
         setLoading(true);
-        const res = await apiRequest(`/api/v1/showtimes/${id}`);
+        const res = await apiSuperAdminRequest(`/api/v1/showtimes/${id}`);
         const responseData = await res.json();
         setShowtime(responseData.data);
       } catch (err) {
-        console.error("Lỗi lấy chi tiết:", err);
+        console.error("Lỗi lấy chi tiết suất chiếu:", err);
       } finally {
         setLoading(false);
       }
@@ -32,124 +35,131 @@ export default function ShowtimeDetailPage() {
   }, [id]);
 
   if (loading) return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-      <Loader2 className="animate-spin text-red-600" size={32} />
+    <div className="min-h-screen bg-[#020202] flex items-center justify-center">
+      <Loader2 className="animate-spin text-red-600 opacity-80" size={28} />
     </div>
   );
 
-  if (!showtime) return <div className="text-white text-center py-20">Không tìm thấy suất chiếu!</div>;
+  if (!showtime) return <div className="text-zinc-500 text-xs uppercase tracking-widest text-center py-20 bg-[#020202] min-h-screen">Không tìm thấy suất chiếu hệ thống!</div>;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-6 md:p-2 font-sans">
-      <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-[#020202] text-zinc-400 p-6 md:p-12 font-sans antialiased select-none">
+      <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
         
-        {/* Nút quay lại */}
+        {/* TOP NAV BUTTON */}
         <button 
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest"
+          className="flex items-center gap-1.5 text-zinc-500 hover:text-white transition-colors text-[11px] font-bold uppercase tracking-wider"
         >
-          <ChevronLeft size={16} /> Quay lại
+          <ChevronLeft size={14} /> Quay lại
         </button>
 
-        {/* Header Chi tiết */}
-        <div className="flex flex-col lg:flex-row gap-10">
-          {/* Poster phim */}
-          <div className="w-full lg:w-1/3 shrink-0">
-            <div className="aspect-[2/3] rounded-[2.5rem] overflow-hidden border border-white/10 relative shadow-2xl">
+        {/* DETAILS GRID ROW */}
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+          
+          {/* POSTER WRAPPER */}
+          <div className="w-full lg:w-[320px] shrink-0">
+            <div className="aspect-[2/3] rounded-xl overflow-hidden border border-zinc-900 relative shadow-md bg-zinc-950">
               <img 
                 src={showtime.movie?.posterUrl || "/placeholder-movie.jpg"} 
                 alt={showtime.movie?.title}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6">
-                 <span className="px-3 py-1 bg-red-600 rounded-full text-[8px] font-black uppercase italic">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+              <div className="absolute bottom-4 left-4 right-4">
+                 <span className="px-2.5 py-1 bg-red-600 text-white rounded text-[8px] font-black uppercase tracking-wider">
                     {showtime.movie?.status || "Now Showing"}
                  </span>
               </div>
             </div>
           </div>
 
-          {/* Thông tin chính */}
-          <div className="flex-1 space-y-8">
+          {/* MAIN INFO STREAM */}
+          <div className="flex-1 space-y-6">
             <div className="space-y-2">
-              <h1 className="text-5xl font-black italic uppercase tracking-tighter leading-none">
+              <h1 className="text-2xl font-black uppercase tracking-tight text-white leading-tight">
                 {showtime.movie?.title}
               </h1>
-              <p className="text-zinc-500 text-sm italic font-medium leading-relaxed max-w-2xl">
+              <p className="text-zinc-500 text-[13px] font-medium leading-relaxed max-w-2xl">
                 {showtime.movie?.description}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <InfoItem icon={<Clock size={14}/>} label="Thời lượng" value={`${showtime.movie?.duration} Phút`} />
-              <InfoItem icon={<Star size={14}/>} label="Đánh giá" value={`${showtime.movie?.rating}/5`} />
-              <InfoItem icon={<Globe size={14}/>} label="Quốc gia" value={showtime.movie?.country || "N/A"} />
-              <InfoItem icon={<Layers size={14}/>} label="Thể loại" value={showtime.movie?.genre?.name} />
+            {/* QUICK METRICS */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <InfoItem icon={<Clock size={13}/>} label="Thời lượng" value={`${showtime.movie?.duration} Phút`} />
+              <InfoItem icon={<Star size={13}/>} label="Đánh giá" value={`${showtime.movie?.rating} / 5`} />
+              <InfoItem icon={<Globe size={13}/>} label="Quốc gia" value={showtime.movie?.country || "N/A"} />
+              <InfoItem icon={<Layers size={13}/>} label="Thể loại" value={showtime.movie?.genre?.name} />
             </div>
 
-            <div className="p-8 bg-white/[0.02] border border-white/5 rounded-[2.5rem] space-y-6">
-              <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-red-600 italic">Lịch chiếu & Địa điểm</h2>
+            {/* LOCATION AND TIME DETAILS */}
+            <div className="p-6 bg-[#060608] border border-zinc-900 rounded-xl space-y-6">
+              <div className="flex items-center gap-2 text-red-600 font-bold text-[10px] uppercase tracking-widest border-b border-zinc-900 pb-3">
+                <Info size={13} />
+                <span>Cấu hình thời gian & Phân bổ</span>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/5 rounded-2xl"><Calendar size={18} className="text-zinc-400"/></div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-zinc-950 border border-zinc-900 rounded-lg text-zinc-500"><Calendar size={16}/></div>
                     <div>
-                      <p className="text-[8px] font-black text-zinc-600 uppercase">Ngày chiếu</p>
-                      <p className="text-lg font-black italic">{moment(showtime.startTime).format('DD [Tháng] MM, YYYY')}</p>
+                      <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-wider">Ngày khởi chiếu</p>
+                      <p className="text-sm font-black text-zinc-200">{dayjs(showtime.startTime).format('DD [Tháng] MM, YYYY')}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/5 rounded-2xl"><Clock size={18} className="text-zinc-400"/></div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-zinc-950 border border-zinc-900 rounded-lg text-zinc-500"><Clock size={16}/></div>
                     <div>
-                      <p className="text-[8px] font-black text-zinc-600 uppercase">Khung giờ</p>
-                      <p className="text-lg font-black italic text-red-600">
-                        {moment(showtime.startTime).format('HH:mm')} — {moment(showtime.endTime).format('HH:mm')}
+                      <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-wider">Khung giờ vận hành</p>
+                      <p className="text-sm font-black text-red-500">
+                        {dayjs(showtime.startTime).format('HH:mm')} — {dayjs(showtime.endTime).format('HH:mm')}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/5 rounded-2xl"><Monitor size={18} className="text-zinc-400"/></div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-zinc-950 border border-zinc-900 rounded-lg text-zinc-500"><Monitor size={16}/></div>
                     <div>
-                      <p className="text-[8px] font-black text-zinc-600 uppercase">Phòng chiếu</p>
-                      <p className="text-lg font-black italic">{showtime.room?.name} ({showtime.room?.totalSeats} Ghế)</p>
+                      <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-wider">Hệ thống phòng</p>
+                      <p className="text-sm font-black text-zinc-200">Phòng {showtime.room?.name} ({showtime.room?.totalSeats} Ghế)</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/5 rounded-2xl"><MapPin size={18} className="text-zinc-400"/></div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-zinc-950 border border-zinc-900 rounded-lg text-zinc-500"><MapPin size={16}/></div>
                     <div>
-                      <p className="text-[8px] font-black text-zinc-600 uppercase">Cụm rạp</p>
-                      <p className="text-lg font-black italic truncate">{showtime.cinemaItem?.name}</p>
+                      <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-wider">Điểm đặt cụm rạp</p>
+                      <p className="text-sm font-black text-zinc-200 truncate max-w-[280px]">{showtime.cinemaItem?.name}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Nút đi tới quản lý ghế */}
+              {/* ACTION BUTTON TO SEAT MANAGEMENT */}
               <button 
                 onClick={() => router.push(`/super-admin/seat/${showtime.room?.id}`)}
-                className="w-full py-4 bg-red-600 hover:bg-red-700 rounded-2xl font-black uppercase italic tracking-widest flex items-center justify-center gap-2 transition-all shadow-[0_0_30px_rgba(220,38,38,0.2)]"
+                className="w-full py-3.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-white rounded-lg font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-md"
               >
-                <Ticket size={20} /> Quản lý sơ đồ ghế
+                <Ticket size={15} /> Quản lý sơ đồ ghế phòng
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[10px]">
-              <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
-                <span className="text-zinc-600 font-black uppercase block mb-2 tracking-widest flex items-center gap-2">
-                  <User size={12}/> Đạo diễn
+            {/* TALENT ATTRIBUTES */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[#060608] border border-zinc-900 p-4 rounded-xl">
+                <span className="text-zinc-600 font-bold text-[9px] uppercase tracking-widest block mb-1 flex items-center gap-1.5">
+                  <User size={12}/> Đạo diễn sản xuất
                 </span>
-                <span className="font-bold">{showtime.movie?.director}</span>
+                <span className="text-xs font-bold text-zinc-300">{showtime.movie?.director || "Đang cập nhật"}</span>
               </div>
-              <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
-                <span className="text-zinc-600 font-black uppercase block mb-2 tracking-widest flex items-center gap-2">
-                   Diễn viên
+              <div className="bg-[#060608] border border-zinc-900 p-4 rounded-xl">
+                <span className="text-zinc-600 font-bold text-[9px] uppercase tracking-widest block mb-1 flex items-center gap-1.5">
+                  <Film size={12}/> Đội ngũ diễn viên chính
                 </span>
-                <span className="font-bold">{showtime.movie?.cast}</span>
+                <span className="text-xs font-bold text-zinc-300 truncate block">{showtime.movie?.cast || "Đang cập nhật"}</span>
               </div>
             </div>
           </div>
@@ -159,13 +169,13 @@ export default function ShowtimeDetailPage() {
   );
 }
 
-// Component phụ cho gọn
+// SUB-COMPONENT METRICS CARD
 function InfoItem({ icon, label, value }: { icon: any, label: string, value: any }) {
   return (
-    <div className="bg-white/[0.03] p-4 rounded-3xl border border-white/5">
-      <div className="text-zinc-600 mb-1">{icon}</div>
-      <p className="text-[7px] font-black text-zinc-600 uppercase tracking-tighter">{label}</p>
-      <p className="text-[11px] font-black italic uppercase truncate">{value || "N/A"}</p>
+    <div className="bg-[#060608]/40 p-3.5 rounded-lg border border-zinc-900/60 min-w-0">
+      <div className="text-zinc-600 mb-1.5">{icon}</div>
+      <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-wide mb-0.5">{label}</p>
+      <p className="text-xs font-black text-zinc-300 uppercase truncate">{value || "N/A"}</p>
     </div>
   );
 }

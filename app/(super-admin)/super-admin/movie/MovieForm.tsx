@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { ArrowLeft, Save, Loader2, Film, Upload, Star, Clock, Calendar, Users, Globe, Youtube } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import { apiRequest, getImageUrl } from '@/app/lib/api';
+import { apiSuperAdminRequest, getImageUrl } from '@/app/lib/api';
 
 interface MovieFormProps {
   initialData?: any;
@@ -32,7 +32,7 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
   useEffect(() => {
     const fetchGenres = async () => {
       try {
-        const res = await apiRequest('/api/v1/genres');
+        const res = await apiSuperAdminRequest('/api/v1/genres');
         if (res.ok) {
           const data = await res.json();
           setGenres(data.data || data);
@@ -79,7 +79,7 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
       const url = type === 'edit' ? `/api/v1/movies/${initialData?.id}` : `/api/v1/movies`;
       
       // Sử dụng PUT cho edit, POST cho create
-      const response = await apiRequest(url, { 
+      const response = await apiSuperAdminRequest(url, { 
         method: type === 'edit' ? 'PUT' : 'POST', 
         body: formDataPayload 
       });
