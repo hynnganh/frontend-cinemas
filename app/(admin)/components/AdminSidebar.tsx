@@ -29,28 +29,20 @@ export default function AdminSidebar() {
     { name: 'Khách hàng', icon: Users, href: '/admin/users' },
   ];
 
-  // Logic đăng xuất hệ thống (Dọn sạch 3 loại token)
   const handleLogout = () => {
-    // 1. Danh sách các key cần dọn dẹp
-    const keys = [
-      'token', 
-      'token_admin', 
-      'token_super_admin', 
-      'token_user', 
-      'roles'
-    ];
+    const tokenKey = 'token_admin';
 
-    // 2. Xóa sạch LocalStorage
-    keys.forEach(key => localStorage.removeItem(key));
+    localStorage.removeItem(tokenKey);
+    localStorage.removeItem('user_info_admin');
+    Cookies.remove(tokenKey, { path: '/' });
 
-    // 3. Xóa sạch Cookies
-    keys.forEach(key => Cookies.remove(key));
+    window.dispatchEvent(new Event("auth-changed"));
 
-    // 4. Thông báo và điều hướng
-    toast.success("Hệ thống đã được đăng xuất an toàn!");
+    toast.success("Đã đăng xuất phân vùng quản trị!");
     
-    // Ép làm mới toàn bộ để xóa sạch state cũ của React
-    window.location.href = '/login';
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 500);
   };
 
   return (
@@ -84,8 +76,8 @@ export default function AdminSidebar() {
               href={link.href}
               className={`flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all duration-300 group ${
                 isActive 
-                ? 'bg-red-600 text-white shadow-lg shadow-red-600/20 translate-x-1' 
-                : 'text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-200'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/20 translate-x-1' 
+                  : 'text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-200'
               }`}
             >
               <div className="flex items-center gap-3">

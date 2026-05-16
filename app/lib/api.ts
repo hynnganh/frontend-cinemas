@@ -1,6 +1,6 @@
-export const BASE_URL = "http://localhost:8080";
-
 import { getTokenByRole, RoleType } from "./auth";
+
+export const BASE_URL = "http://localhost:8080";
 
 export async function apiRequest(
   endpoint: string,
@@ -9,22 +9,16 @@ export async function apiRequest(
 ) {
   const token = getTokenByRole(role);
 
-  const isFormData = options.body instanceof FormData;
-
   const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string>),
   };
 
-  if (!isFormData && !headers["Content-Type"]) {
+  if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
 
-  const safeEndpoint = endpoint.startsWith("/")
-    ? endpoint
-    : `/${endpoint}`;
-
-  return fetch(`${BASE_URL}${safeEndpoint}`, {
+  return fetch(`${BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });

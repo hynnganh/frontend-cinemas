@@ -1,23 +1,22 @@
 export type RoleType = "USER" | "ADMIN" | "SUPER_ADMIN";
 
+export const TOKEN_MAP = {
+  USER: "token_user",
+  ADMIN: "token_admin",
+  SUPER_ADMIN: "token_super_admin",
+};
+
 export const getTokenByRole = (role?: RoleType) => {
   if (typeof window === "undefined") return null;
 
-  // ưu tiên role truyền vào
-  if (role === "ADMIN")
-    return localStorage.getItem("admin_token");
+  if (role) {
+    return localStorage.getItem(TOKEN_MAP[role]);
+  }
 
-  if (role === "SUPER_ADMIN")
-    return localStorage.getItem("super_admin_token");
-
-  if (role === "USER")
-    return localStorage.getItem("user_token");
-
-  // ✅ AUTO FALLBACK (QUAN TRỌNG)
+  // auto fallback
   return (
-    localStorage.getItem("user_token") ||
-    localStorage.getItem("admin_token") ||
-    localStorage.getItem("super_admin_token") ||
-    localStorage.getItem("token") // giữ backward compatibility
+    localStorage.getItem("token_user") ||
+    localStorage.getItem("token_admin") ||
+    localStorage.getItem("token_super_admin")
   );
 };

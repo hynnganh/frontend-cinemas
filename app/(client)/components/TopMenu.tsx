@@ -36,45 +36,71 @@ export default function TopMenu() {
     }
 
     try {
-      // Truyền role vào apiRequest để đính kèm đúng header Authorization
+      // Truyền role vào apiRequest để đính kèm đúng header Authorization đích danh
       const res = await apiRequest('/api/v1/users/me', { method: "GET" }, role);
 
       if (res.ok) {
         const result = await res.json();
         const rawData = result.data?.user || result.data || result;
-        setUser(rawData);
-        localStorage.setItem("user_info", JSON.stringify(rawData));
+        
+        /* ==========================================================
+          ✅ KIỂM TRA CHẶT CHẼ: Trang chủ/User chỉ hiển thị nếu có role USER
+        ============================================================= */
+        const accountRoles: string[] = rawData?.roles?.map((r: any) => r.roleName || r) || [];
+        
+        if (role === "USER" && !accountRoles.includes("ROLE_USER") && !accountRoles.includes("USER")) {
+          // Nếu đang ở phân vùng user công cộng nhưng tài khoản này không có quyền USER thực sự -> Ẩn menu
+          setUser(null);
+        } else {
+          setUser(rawData);
+          localStorage.setItem(`user_info_${role.toLowerCase()}`, JSON.stringify(rawData));
+        }
       } else {
-        // Token không hợp lệ hoặc hết hạn cho vùng này
+        // Token hết hạn hoặc không hợp lệ cho phân vùng này
         handleClearAuth(role);
       }
     } catch (err) {
       console.error("Lỗi đồng bộ TopMenu:", err);
-      const stored = localStorage.getItem("user_info");
+      const stored = localStorage.getItem(`user_info_${role.toLowerCase()}`);
       if (stored) setUser(JSON.parse(stored));
     } finally {
       setLoading(false);
     }
   }, [getCurrentRole]);
 
-  // 3. Xử lý xóa Auth
+  /* ==========================================================
+    ✅ FIX 1: CHỈ ĐĂNG XUẤT QUYỀN HIỆN TẠI (CÔ LẬP THEO ROLE CỦA TAB)
+  ============================================================= */
   const handleClearAuth = (role: RoleType) => {
-    const tokenKey = role === "SUPER_ADMIN" ? "super_admin_token" : 
-                     role === "ADMIN" ? "admin_token" : "user_token";
+    const tokenKey = role === "SUPER_ADMIN" ? "token_super_admin" : 
+                     role === "ADMIN" ? "token_admin" : "token_user";
     
+    // Chỉ xóa duy nhất token của quyền hiện tại ở tab này
     localStorage.removeItem(tokenKey);
-    localStorage.removeItem("user_info");
-    localStorage.removeItem("roles");
-    Cookies.remove(tokenKey);
+    Cookies.remove(tokenKey, { path: '/' });
+    
+    // Xóa cache user info riêng biệt của quyền đó
+    localStorage.removeItem(`user_info_${role.toLowerCase()}`);
+    
+    // Nếu không còn bất kỳ token nào nữa thì mới xóa roles tổng
+    const hasOtherTokens = ["token_super_admin", "token_admin", "token_user"]
+      .filter(k => k !== tokenKey)
+      .some(k => !!localStorage.getItem(k));
+      
+    if (!hasOtherTokens) {
+      localStorage.removeItem("roles");
+      Cookies.remove("roles", { path: '/' });
+    }
+
     setUser(null);
   };
 
   useEffect(() => {
     fetchLatestProfile();
 
-    // ✅ Lắng nghe khi đăng nhập thành công
+    // Lắng nghe khi đăng nhập thành công
     window.addEventListener("auth-changed", fetchLatestProfile);
-    // ✅ Lắng nghe khi thay đổi ở tab trình duyệt khác
+    // Lắng nghe thay đổi bộ nhớ (Chỉ phản hồi nếu tab khác thay đổi token cùng loại quyền)
     window.addEventListener("storage", fetchLatestProfile);
 
     return () => {
@@ -83,9 +109,22 @@ export default function TopMenu() {
     };
   }, [fetchLatestProfile, pathname]);
 
+  /* ==========================================================
+    ✅ FIX 2: ĐĂNG XUẤT KHÔNG ẢNH HƯỞNG ĐẾN QUYỀN CỦA TAB KHÁC
+  ============================================================= */
   const handleLogout = () => {
-    handleClearAuth(getCurrentRole());
-    window.location.href = "/";
+    const currentRole = getCurrentRole();
+    handleClearAuth(currentRole);
+    
+    // Báo hiệu thay đổi auth
+    window.dispatchEvent(new Event("auth-changed"));
+
+    // Chuyển hướng thông minh dựa vào phân vùng bị log out
+    if (currentRole === "SUPER_ADMIN" || currentRole === "ADMIN") {
+      window.location.href = "/auth"; // Đang ở trang quản trị thì đẩy về trang login
+    } else {
+      window.location.href = "/"; // Đang ở trang user thì reload lại trang chủ sạch dữ liệu
+    }
   };
 
   const isSuperAdmin = user?.roles?.some((r: any) => 
@@ -130,7 +169,7 @@ export default function TopMenu() {
                 <span className={`text-[7px] font-black px-1.5 py-0.5 rounded tracking-widest uppercase border ${
                   isSuperAdmin ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" : 
                   isAdmin ? "bg-red-600/10 text-red-600 border-red-600/20" : 
-                  "text-zinc-500 border-transparent opacity-60"
+                  "bg-white/5 text-zinc-400 border-white/10"
                 }`}>
                   {isSuperAdmin ? "Super Admin" : isAdmin ? "System Admin" : "Hội viên A&K"}
                 </span>

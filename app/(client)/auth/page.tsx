@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from 'react-hot-toast';
+import Cookies from "js-cookie"; // ✅ Đảm bảo import để xử lý cookie cho middleware
 import { apiRequest } from "../../lib/api";
 
 const ForgotPasswordView = ({ onBack }: any) => {
@@ -90,52 +91,72 @@ export default function AuthPage() {
       const resData = await response.json();
 
       if (response.ok) {
-if (view === 'login') {
-  const rawUser = resData.data;
-  const token = rawUser?.token;
-  const roles: string[] = rawUser?.roles || [];
+        if (view === 'login') {
+          const rawUser = resData.data;
+          const token = rawUser?.token;
+          const roles: string[] = rawUser?.roles || [];
 
-  if (!token) {
-    toast.error("Không nhận được token!");
-    return;
-  }
+          if (!token) {
+            toast.error("Không nhận được token từ hệ thống!");
+            return;
+          }
 
-  const primaryRole = roles[0] || "USER";
+          const primaryRole = roles[0] || "USER";
 
-  localStorage.setItem("user_info", JSON.stringify({
-    firstName: rawUser?.firstName,
-    lastName: rawUser?.lastName
-  }));
-  localStorage.setItem("roles", JSON.stringify(roles));
+          // Xác định key đích danh theo chuẩn cấu trúc mới
+          let targetTokenKey = "token_user";
+          let redirectUrl = "/";
 
-  if (primaryRole === "ROLE_SUPER_ADMIN" || primaryRole === "SUPER_ADMIN") {
-    localStorage.setItem("super_admin_token", token);
-  } else if (primaryRole === "ROLE_ADMIN" || primaryRole === "ADMIN") {
-    localStorage.setItem("admin_token", token);
-  } else {
-    localStorage.setItem("user_token", token);
-  }
+          if (primaryRole === "ROLE_SUPER_ADMIN" || primaryRole === "SUPER_ADMIN") {
+            targetTokenKey = "token_super_admin";
+            redirectUrl = "/super-admin";
+          } else if (primaryRole === "ROLE_ADMIN" || primaryRole === "ADMIN") {
+            targetTokenKey = "token_admin";
+            redirectUrl = "/admin";
+          }
 
-  window.dispatchEvent(new Event("auth-changed"));
+          /* ==========================================================
+            ✅ FIX 1: ĐỒNG BỘ LƯU TRỮ VÀO COOKIES CHO MIDDLEWARE ĐỌC
+          ============================================================= */
+          // Cất token vào LocalStorage cho API và TopMenu sử dụng
+          localStorage.setItem(targetTokenKey, token);
+          // Ghi đè vào Cookies để Middleware chặn Route không đá về /login
+          Cookies.set(targetTokenKey, token, { expires: 7, path: '/' });
 
-  toast.success(`Chào mừng ${rawUser?.lastName || ''} đã trở lại!`);
+          // Lưu thông tin người dùng bổ trợ (Tách biệt theo role của phân vùng để tránh ghi đè)
+          const infoKey = primaryRole.includes("SUPER_ADMIN") ? "user_info_super_admin" : 
+                          primaryRole.includes("ADMIN") ? "user_info_admin" : "user_info_user";
 
-  setTimeout(() => {
-    if (primaryRole.includes("SUPER_ADMIN")) window.location.href = "/super-admin";
-    else if (primaryRole.includes("ADMIN")) window.location.href = "/admin";
-    else window.location.href = "/";
-  }, 800);
-} else {
+          localStorage.setItem(infoKey, JSON.stringify({
+            firstName: rawUser?.firstName,
+            lastName: rawUser?.lastName,
+            avatar: rawUser?.avatar,
+            roles: roles
+          }));
+          
+          localStorage.setItem("roles", JSON.stringify(roles));
+
+          /* ==========================================================
+            ✅ FIX 2: PHÁT EVENT VÀ ĐIỀU HƯỚNG SẠCH
+          ============================================================= */
+          window.dispatchEvent(new Event("auth-changed"));
+
+          toast.success(`Chào mừng ${rawUser?.lastName || ''} ${rawUser?.firstName || ''} đã trở lại!`);
+
+          setTimeout(() => {
+            window.location.href = redirectUrl; // Ép reload nhẹ để dọn sạch Router Cache của Next.js
+          }, 800);
+        } else {
           toast.success("Đăng ký thành công! Mời bạn đăng nhập.");
           setView('login');
         }
       } else {
         console.error("Lỗi Auth:", resData);
-        toast.error(resData.message || "Thông tin không chính xác!");
+        toast.error(resData.message || "Thông tin tài khoản không chính xác!");
       }
     } catch (error) {
       console.error("Lỗi kết nối:", error);
-      toast.error("Lỗi kết nối server!");
+      toast.error("Không thể kết nối tới máy chủ!");
     } finally {
       setLoading(false);
     }
@@ -164,21 +185,21 @@ if (view === 'login') {
                       <label className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 ml-1">Họ</label>
                       <div className="relative group">
                         <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" />
-                        <input name="lastName" value={formData.lastName} onChange={handleChange} required type="text" placeholder="Nguyễn" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm" />
+                        <input name="lastName" value={formData.lastName} onChange={handleChange} required type="text" placeholder="Nguyễn" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm focus:text-white" />
                       </div>
                     </div>
                     <div className="space-y-1.5 text-left">
                       <label className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 ml-1">Tên</label>
                       <div className="relative group">
                         <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" />
-                        <input name="firstName" value={formData.firstName} onChange={handleChange} required type="text" placeholder="An" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm" />
+                        <input name="firstName" value={formData.firstName} onChange={handleChange} required type="text" placeholder="An" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm focus:text-white" />
                       </div>
                     </div>
                     <div className="col-span-2 space-y-1.5 text-left">
                       <label className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 ml-1">Số điện thoại</label>
                       <div className="relative group">
                         <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" />
-                        <input name="mobileNumber" value={formData.mobileNumber} onChange={handleChange} required type="tel" placeholder="09xxxxxxxx" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm" />
+                        <input name="mobileNumber" value={formData.mobileNumber} onChange={handleChange} required type="tel" placeholder="09xxxxxxxx" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm focus:text-white" />
                       </div>
                     </div>
                   </div>
@@ -188,7 +209,7 @@ if (view === 'login') {
                   <label className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 ml-1">Email</label>
                   <div className="relative group">
                     <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" />
-                    <input name="email" value={formData.email} onChange={handleChange} required type="email" placeholder="example@gmail.com" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm" />
+                    <input name="email" value={formData.email} onChange={handleChange} required type="email" placeholder="example@gmail.com" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm focus:text-white" />
                   </div>
                 </div>
 
@@ -199,7 +220,7 @@ if (view === 'login') {
                   </div>
                   <div className="relative group">
                     <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" />
-                    <input name="password" value={formData.password} onChange={handleChange} required type={showPass ? "text" : "password"} placeholder="••••••••" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm" />
+                    <input name="password" value={formData.password} onChange={handleChange} required type={showPass ? "text" : "password"} placeholder="••••••••" className="w-full bg-white/5 border border-white/10 p-3.5 pl-12 rounded-2xl outline-none focus:border-red-600 text-sm focus:text-white" />
                     <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
                       {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -223,7 +244,6 @@ if (view === 'login') {
                         <button type="button" onClick={() => setFormData({...formData, gender: "FEMALE"})} className={`relative z-10 flex-1 text-[11px] font-black uppercase ${formData.gender === "FEMALE" ? "text-white" : "text-zinc-500"}`}>Nữ</button>
                       </div>
                     </div>
-                    
                   </div>
                 )}
 
