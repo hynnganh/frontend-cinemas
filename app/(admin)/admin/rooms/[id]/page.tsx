@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { apiRequest } from '@/app/lib/api';
+import { apiAdminRequest } from '@/app/lib/api';
 import { ChevronLeft, Heart, Trash2, Plus, Save, RefreshCcw, AlertTriangle, Lock } from 'lucide-react';
 
 export default function SeatDesignerPage() {
@@ -51,7 +51,7 @@ const taiDuLieu = useCallback(async () => {
     setDangTai(true);
 
     // ===== LOAD SEATS =====
-    const resSeats = await apiRequest(`/api/v1/seats/room/${roomId}`);
+    const resSeats = await apiAdminRequest(`/api/v1/seats/room/${roomId}`);
     const resultSeats = await resSeats.json();
     const seatsData = resultSeats.data || [];
 
@@ -70,7 +70,7 @@ const taiDuLieu = useCallback(async () => {
     }
 
     // ===== CASE 2: phòng chưa có ghế =====
-    const resRoom = await apiRequest(`/api/v1/rooms/${roomId}`);
+    const resRoom = await apiAdminRequest(`/api/v1/rooms/${roomId}`);
 
     if (!resRoom.ok) throw new Error("Không load được room");
 
@@ -101,7 +101,7 @@ const taiDuLieu = useCallback(async () => {
 
   const checkSeatEligibility = async (seatId: any) => {
     try {
-      const res = await apiRequest(`/api/v1/seats/${seatId}/check-tickets`);
+      const res = await apiAdminRequest(`/api/v1/seats/${seatId}/check-tickets`);
       if (res.ok) {
         const result = await res.json();
         return result.data.canDelete; 
@@ -137,7 +137,7 @@ const taiDuLieu = useCallback(async () => {
         closeConfirm();
         const loading = toast.loading("Đang xóa...", whiteToast);
         try {
-          const res = await apiRequest(`/api/v1/seats/${ghe.id}`, { method: 'DELETE' });
+          const res = await apiAdminRequest(`/api/v1/seats/${ghe.id}`, { method: 'DELETE' });
           if (res.ok) {
             setDanhSachGhe(prev => prev.filter(s => s.id !== ghe.id));
             toast.success("Đã xóa!", { id: loading, ...whiteToast });
@@ -162,7 +162,7 @@ const taiDuLieu = useCallback(async () => {
           const idsToDelete = realSeats.filter((_, idx) => checkResults[idx]).map(g => g.id);
 
           if (idsToDelete.length > 0) {
-            await Promise.all(idsToDelete.map(id => apiRequest(`/api/v1/seats/${id}`, { method: 'DELETE' })));
+            await Promise.all(idsToDelete.map(id => apiAdminRequest(`/api/v1/seats/${id}`, { method: 'DELETE' })));
           }
           taiDuLieu();
           toast.success(`Đã dọn dẹp xong!`, { id: loading, ...whiteToast });
@@ -185,7 +185,7 @@ const taiDuLieu = useCallback(async () => {
         const loading = toast.loading("Đang tạo...", whiteToast);
         try {
           const query = `?roomId=${roomId}&rows=${config.rows}&seatsPerRow=${config.cols}`;
-          const res = await apiRequest(`/api/v1/seats/generate${query}`, { method: 'POST' });
+          const res = await apiAdminRequest(`/api/v1/seats/generate${query}`, { method: 'POST' });
           if (res.ok) {
             toast.success("Thành công!", { id: loading, ...whiteToast });
             taiDuLieu();
@@ -215,7 +215,7 @@ const taiDuLieu = useCallback(async () => {
       const promises = danhSachGhe.map(ghe => {
         const isNew = String(ghe.id).startsWith('temp-');
         const body = { seatRow: ghe.seatRow, seatNumber: ghe.seatNumber, seatType: ghe.seatType, price: ghe.price, roomId: Number(roomId) };
-        return apiRequest(isNew ? `/api/v1/seats` : `/api/v1/seats/${ghe.id}`, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(body) });
+        return apiAdminRequest(isNew ? `/api/v1/seats` : `/api/v1/seats/${ghe.id}`, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(body) });
       });
       await Promise.all(promises);
       toast.success("Đã đồng bộ!", { id: loading, ...whiteToast });

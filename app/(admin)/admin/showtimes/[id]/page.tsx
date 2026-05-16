@@ -6,7 +6,7 @@ import {
   Film, Star, Info, Loader2, Edit3, Trash2, Calendar
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { apiRequest } from '@/app/lib/api';
+import { apiAdminRequest } from '@/app/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 import ShowtimeModal from '../ShowtimeModal'; 
 
@@ -26,7 +26,7 @@ export default function ChiTietSuatChieu() {
       setLoading(true);
 
       // 1. Lấy thông tin user để biết đang quản lý rạp nào (Dùng Cookie qua /me)
-      const resUser = await apiRequest('/api/v1/users/me');
+      const resUser = await apiAdminRequest('/api/v1/users/me');
       if (!resUser.ok) throw new Error("Unauthorized");
       
       const userRes = await resUser.json();
@@ -41,9 +41,9 @@ export default function ChiTietSuatChieu() {
 
       // 2. Gọi các API dữ liệu dựa trên id rạp thật
       const [resShow, resRoom, resMovie] = await Promise.all([
-        apiRequest(`/api/v1/showtimes/${id}`),
-        apiRequest(`/api/v1/rooms/cinema-item/${idRapThat}`),
-        apiRequest("/api/v1/movies?status=SHOWING"),
+        apiAdminRequest(`/api/v1/showtimes/${id}`),
+        apiAdminRequest(`/api/v1/rooms/cinema-item/${idRapThat}`),
+        apiAdminRequest("/api/v1/movies?status=SHOWING"),
       ]);
 
       if (resShow.ok) {
@@ -78,7 +78,7 @@ export default function ChiTietSuatChieu() {
     if (!cinemaId) return;
     const toastId = toast.loading("Đang cập nhật hệ thống...");
     try {
-      const res = await apiRequest(`/api/v1/showtimes/${formData.id}`, {
+      const res = await apiAdminRequest(`/api/v1/showtimes/${formData.id}`, {
         method: "PUT",
         body: JSON.stringify({ ...formData, cinemaItemId: cinemaId, price: 75000 }),
       });
@@ -101,7 +101,7 @@ export default function ChiTietSuatChieu() {
     if (!window.confirm("Bạn có chắc chắn muốn xóa suất chiếu này không?")) return;
     const toastId = toast.loading("Đang gỡ bỏ suất chiếu...");
     try {
-      const res = await apiRequest(`/api/v1/showtimes/${id}`, { method: "DELETE" });
+      const res = await apiAdminRequest(`/api/v1/showtimes/${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Đã xóa suất chiếu thành công!", { id: toastId });
         router.push('/admin/showtimes');

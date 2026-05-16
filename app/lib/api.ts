@@ -7,29 +7,39 @@ export async function apiRequest(
   options: RequestInit = {},
   role?: RoleType
 ) {
-  // 1. Kiểm tra xem phía giao diện (options.headers) đã tự truyền Token vào chưa
-  const incomingHeaders = (options.headers as Record<string, string>) || {};
-  
-  // Tìm xem có header Authorization nào được truyền thủ công không (chấp nhận cả viết hoa viết thường)
-  const hasAuthHeader = Object.keys(incomingHeaders).some(
-    key => key.toLowerCase() === 'authorization'
-  );
+  const token = getTokenByRole(role);
 
-  let headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string>),
+  };
 
-  if (hasAuthHeader) {
-    // Nếu giao diện đã truyền Token (như token_admin trong trang chi tiết), giữ nguyên hoàn toàn quyền đó
-    headers = { ...incomingHeaders };
-  } else {
-    // Nếu giao diện KHÔNG truyền, lúc này mới tự động quét fallback từ localStorage
-    const autoToken = localStorage.getItem('token_admin') || localStorage.getItem('token_user') || localStorage.getItem('token');
-    headers = {
-      ...(autoToken ? { Authorization: `Bearer ${autoToken}` } : {}),
-      ...incomingHeaders,
-    };
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
   }
 
-  // 2. Tự động thêm Content-Type nếu dữ liệu gửi lên không phải là FormData
+  return fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+}
+
+export async function apiAdminRequest(
+  endpoint: string,
+  options: RequestInit = {}
+) {
+  let token = getTokenByRole("ADMIN"); // Ép hệ thống lấy token admin trước
+
+  // Dự phòng cứu cánh nếu hàm trên không ra token (do cơ chế lưu trữ phía client)
+  if (!token && typeof window !== "undefined") {
+    token = localStorage.getItem("token_admin") || localStorage.getItem("token");
+  }
+
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string>), // Cho phép ghi đè từ bên ngoài nếu cần
+  };
+
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
@@ -44,14 +54,22 @@ export async function apiRequest(
  * FIX: Hàm lấy ảnh chuẩn cho cả Cloudinary và Local Storage
  */
 export const getImageUrl = (path: string | null | undefined) => {
+  // 1. Nếu không có path, trả về ảnh placeholder
   if (!path) {
     return "https://placehold.co/400x600?text=No+Poster";
   }
 
+  // 2. Nếu path là một URL hoàn chỉnh (ví dụ link từ Cloudinary: https://res.cloudinary.com/...)
+  // Trả về luôn path đó mà không nối thêm BASE_URL
   if (path.startsWith("http")) {
     return path;
   }
 
+  // 3. Nếu path là đường dẫn tương đối (ví dụ lưu trong DB là "poster1.jpg" hoặc "/poster1.jpg")
+  // Tiến hành làm sạch path (xóa dấu / ở đầu)
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+
+  // Trả về URL trỏ đến thư mục tĩnh trên Backend Spring Boot
+  // Lưu ý: Đảm bảo Spring Boot đã cấu hình Resource Handler cho thư mục /uploads/
   return `${BASE_URL}/uploads/movies/${cleanPath}`;
 };

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Monitor, Armchair, Trash2, Building2, AlertTriangle, Settings2, ChevronRight, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { apiRequest } from '@/app/lib/api';
+import { apiAdminRequest } from '@/app/lib/api';
 import FormPhongChieu from './RoomForm';
 
 export default function QuanLyPhongCompact() {
@@ -26,7 +26,7 @@ export default function QuanLyPhongCompact() {
 
   const taiLaiDanhSach = async (targetId: number) => {
     try {
-      const res = await apiRequest(`/api/v1/rooms/cinema-item/${targetId}`);
+      const res = await apiAdminRequest(`/api/v1/rooms/cinema-item/${targetId}`);
       if (res.ok) {
         const ketQua = await safeParse(res);
         setPhongChieu(ketQua.data || []);
@@ -40,7 +40,7 @@ export default function QuanLyPhongCompact() {
     const khoiTao = async () => {
       try {
         setDangTai(true);
-        const resUser = await apiRequest('/api/v1/users/me'); 
+        const resUser = await apiAdminRequest('/api/v1/users/me'); 
         if (!resUser.ok) throw new Error();
         
         const userRes = await safeParse(resUser);
@@ -48,7 +48,7 @@ export default function QuanLyPhongCompact() {
 
         if (idRap) {
           setCinemaId(idRap);
-          const resCinema = await apiRequest(`/api/v1/cinema-items/${idRap}`);
+          const resCinema = await apiAdminRequest(`/api/v1/cinema-items/${idRap}`);
           const dataCinema = await safeParse(resCinema);
           setCinemaName(dataCinema.data?.name || `Cơ sở ${idRap}`);
           await taiLaiDanhSach(idRap);
@@ -72,7 +72,7 @@ export default function QuanLyPhongCompact() {
     const thongBao = toast.loading("Đang xử lý...");
     
     try {
-      const res = await apiRequest(url, { 
+      const res = await apiAdminRequest(url, { 
         method: dangSua ? 'PUT' : 'POST', 
         body: JSON.stringify({ ...duLieuForm, cinemaItemId: cinemaId }) 
       });
@@ -95,7 +95,7 @@ const xacNhanXoa = async () => {
   const thongBao = toast.loading("Đang xóa...");
 
   try {
-    const res = await apiRequest(
+    const res = await apiAdminRequest(
       `/api/v1/rooms/${phongDangChonXoa.id}`,
       { method: "DELETE" }
     );

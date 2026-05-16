@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Edit3, Calendar as CalendarIcon, Loader2, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import ShowtimeModal from "./ShowtimeModal";
-import { apiRequest } from "@/app/lib/api"; 
+import { apiAdminRequest } from "@/app/lib/api"; 
 import toast, { Toaster } from "react-hot-toast";
 
 // Mảng map cố định tránh lỗi Hydration do Locale của hệ thống khác nhau
@@ -62,17 +62,17 @@ export default function AdminShowtimePage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const resUser = await apiRequest('/api/v1/users/me');
+      const resUser = await apiAdminRequest('/api/v1/users/me');
       const userRes = await resUser.json();
       const idRap = userRes.data?.managedCinemaItemId;
       if (!idRap) return;
       
       setCinemaId(idRap);
       const [resCinema, resShow, resRoom, resMovie] = await Promise.all([
-        apiRequest(`/api/v1/cinema-items/${idRap}`),
-        apiRequest(`/api/v1/showtimes/cinema-item/${idRap}`),
-        apiRequest(`/api/v1/rooms/cinema-item/${idRap}`),
-        apiRequest("/api/v1/movies?status=SHOWING"),
+        apiAdminRequest(`/api/v1/cinema-items/${idRap}`),
+        apiAdminRequest(`/api/v1/showtimes/cinema-item/${idRap}`),
+        apiAdminRequest(`/api/v1/rooms/cinema-item/${idRap}`),
+        apiAdminRequest("/api/v1/movies?status=SHOWING"),
       ]);
 
       const [c, s, r, m] = await Promise.all([resCinema.json(), resShow.json(), resRoom.json(), resMovie.json()]);
@@ -98,7 +98,7 @@ export default function AdminShowtimePage() {
     const isUpdate = !!data.id;
     const tid = toast.loading(isUpdate ? "Đang cập nhật..." : "Đang tạo...");
     try {
-      const res = await apiRequest(isUpdate ? `/api/v1/showtimes/${data.id}` : "/api/v1/showtimes", {
+      const res = await apiAdminRequest(isUpdate ? `/api/v1/showtimes/${data.id}` : "/api/v1/showtimes", {
         method: isUpdate ? "PUT" : "POST",
         body: JSON.stringify({ ...data, cinemaItemId: cinemaId, price: 75000 }),
       });

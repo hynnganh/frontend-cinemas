@@ -97,8 +97,7 @@ export default function AdminComboPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#eee] p-6 font-sans antialiased">
-      
+    <div className="min-h-screen bg-[#0a0a0a] text-[#eee] p-6 font-sans antialiased">      
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header Section */}

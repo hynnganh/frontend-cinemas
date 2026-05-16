@@ -5,7 +5,7 @@ import {
   Search, Loader2, RefreshCw, 
   User, Calendar, ChevronRight, Mail, Ticket
 } from 'lucide-react';
-import { apiRequest } from '@/app/lib/api'; 
+import { apiAdminRequest } from '@/app/lib/api'; 
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function TrangQuanLyKhachHang() {
@@ -16,7 +16,7 @@ export default function TrangQuanLyKhachHang() {
   const layDuLieu = async () => {
     try {
       setDangTai(true);
-      const res = await apiRequest('/api/v1/tickets'); 
+      const res = await apiAdminRequest('/api/v1/tickets'); 
       const ketQua = await res.json();
       
       if (res.ok && Array.isArray(ketQua.data)) {
