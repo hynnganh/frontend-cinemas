@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
-  ChevronLeft, Ticket, Coffee, Calendar, CreditCard, 
-  CheckCircle2, XCircle, Loader2, Building2, Clock, Sparkles, AlertTriangle
+  ChevronLeft, Ticket, Coffee, Calendar, 
+  CheckCircle2, Loader2, Building2, Clock, Sparkles, AlertTriangle
 } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
@@ -15,22 +15,43 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   
-  // State cho Modal xác nhận
   const [confirmModal, setConfirmModal] = useState<{show: boolean, status: string, title: string}>({
     show: false,
     status: '',
     title: ''
   });
 
+  // Bắt chước hàm lấy token cô lập an toàn
+  const getAdminToken = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("token_admin") || "";
+    }
+    return "";
+  };
+
   const fetchOrderDetail = async () => {
     try {
       setLoading(true);
-      const res = await apiRequest(`/api/v1/orders/${id}`);
+      const token = getAdminToken();
+      
+      // Bắt chước cấu trúc gọi API đính headers chuẩn
+      const res = await apiRequest(`/api/v1/orders/${id}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
       const result = await res.json();
-      if (result?.data) setOrder(result.data);
+      if (res.ok && result?.data) {
+        setOrder(result.data);
+      } else {
+        toast.error(result.message || "Không thể tải hóa đơn");
+      }
     } catch (err) {
-      toast.error("Không tải được thông tin hóa đơn");
-    } finally {
+      toast.error("Lỗi kết nối máy chủ");
+    } bits: {
       setLoading(false);
     }
   };
@@ -41,15 +62,27 @@ export default function OrderDetailPage() {
     setConfirmModal({ ...confirmModal, show: false });
     setUpdating(true);
     try {
+      const token = getAdminToken();
+
+      // Bắt chước cách truyền headers của trang Combo để trị dứt điểm lỗi 403
       const res = await apiRequest(`/api/v1/orders/${id}/status?status=${confirmModal.status}`, {
-        method: 'PUT'
+        method: 'PUT',
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
+
+      const result = await res.json();
+
       if (res.ok) {
         toast.success("Cập nhật trạng thái thành công");
         fetchOrderDetail();
+      } else {
+        toast.error(result.message || "Không có quyền cập nhật trạng thái");
       }
     } catch (err) {
-      toast.error("Lỗi cập nhật hệ thống");
+      toast.error("Lỗi kết nối mạng");
     } finally {
       setUpdating(false);
     }
@@ -61,34 +94,35 @@ export default function OrderDetailPage() {
     </div>
   );
 
-  const statusLabel = order?.status === 'SUCCESS' ? 'Đã thanh toán' : order?.status === 'CANCELLED' ? 'Đã hủy đơn' : 'Chờ xử lý';
+  const cleanStatus = order?.status ? order.status.trim() : '';
+  const statusLabel = cleanStatus === 'PAID' ? 'Đã thanh toán' : cleanStatus === 'CANCELLED' ? 'Đã hủy đơn' : 'Chờ xử lý';
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] text-zinc-300 p-5 font-sans selection:bg-orange-500/20 relative">
+    <div className="min-h-screen bg-[#0d0d0d] text-zinc-300 p-5 font-sans relative">
       <Toaster position="top-right" />
 
-      {/* --- CUSTOM MODAL XÁC NHẬN --- */}
+      {/* --- MODAL XÁC NHẬN --- */}
       {confirmModal.show && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setConfirmModal({...confirmModal, show: false})} />
-          <div className="relative bg-[#1a1a1a] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-200">
+          <div className="relative bg-[#1a1a1a] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full shadow-2xl text-center space-y-6">
             <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${confirmModal.status === 'SUCCESS' ? 'bg-green-500/10 text-green-400' : 'bg-rose-500/10 text-rose-400'}`}>
               {confirmModal.status === 'SUCCESS' ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}
             </div>
             <div>
               <h3 className="text-white font-black text-lg uppercase italic tracking-tight">{confirmModal.title}</h3>
-              <p className="text-zinc-500 text-xs mt-2 font-medium">Hành động này sẽ thay đổi trạng thái vĩnh viễn của hóa đơn này nha má.</p>
+              <p className="text-zinc-500 text-xs mt-2 font-medium">Hành động này sẽ cập nhật trực tiếp lên hệ thống quản trị.</p>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button 
                 onClick={() => setConfirmModal({...confirmModal, show: false})}
-                className="py-3 px-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[11px] font-black uppercase text-zinc-400 transition-all"
+                className="py-3 px-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[11px] font-black uppercase text-zinc-400"
               >
                 Hủy bỏ
               </button>
               <button 
                 onClick={handleUpdateStatus}
-                className={`py-3 px-4 rounded-2xl text-[11px] font-black uppercase text-white transition-all shadow-lg ${confirmModal.status === 'SUCCESS' ? 'bg-green-600 shadow-green-500/20' : 'bg-rose-600 shadow-rose-500/20'}`}
+                className={`py-3 px-4 rounded-2xl text-[11px] font-black uppercase text-white shadow-lg ${confirmModal.status === 'SUCCESS' ? 'bg-green-600 shadow-green-500/20' : 'bg-rose-600 shadow-rose-500/20'}`}
               >
                 Xác nhận
               </button>
@@ -98,7 +132,6 @@ export default function OrderDetailPage() {
       )}
       
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header điều hướng */}
         <div className="flex justify-between items-center px-2">
           <button onClick={() => router.back()} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 hover:text-orange-400 transition-all">
             <ChevronLeft size={14} /> Quay lại
@@ -107,8 +140,6 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* CỘT TRÁI: DANH SÁCH MÓN */}
           <div className="lg:col-span-7 space-y-4">
             <div className="p-7 bg-gradient-to-br from-orange-500/[0.07] to-pink-500/[0.03] border border-white/5 rounded-[2.5rem]">
               <div className="flex items-center gap-3 mb-2 text-orange-400">
@@ -116,14 +147,14 @@ export default function OrderDetailPage() {
                 <h1 className="text-xl font-black text-white tracking-tight uppercase italic">{order?.cinemaName}</h1>
               </div>
               <div className="flex gap-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
-                <span className="flex items-center gap-1.5"><Clock size={12}/> {new Date(order?.createdAt).toLocaleTimeString('vi-VN')}</span>
-                <span className="flex items-center gap-1.5"><Calendar size={12}/> {new Date(order?.createdAt).toLocaleDateString('vi-VN')}</span>
+                <span className="flex items-center gap-1.5"><Clock size={12}/> {order?.createdAt && new Date(order.createdAt).toLocaleTimeString('vi-VN')}</span>
+                <span className="flex items-center gap-1.5"><Calendar size={12}/> {order?.createdAt && new Date(order.createdAt).toLocaleDateString('vi-VN')}</span>
               </div>
             </div>
 
             <div className="space-y-2">
               {order?.orderDetails?.map((item: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-3xl group">
+                <div key={idx} className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-3xl">
                   <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-2xl ${item.itemType === 'TICKET' ? 'bg-orange-500/10 text-orange-400' : 'bg-pink-500/10 text-pink-400'}`}>
                       {item.itemType === 'TICKET' ? <Ticket size={20}/> : <Coffee size={20}/>}
@@ -139,7 +170,6 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {/* CỘT PHẢI: THANH TOÁN */}
           <div className="lg:col-span-5 space-y-4">
             <div className="p-8 bg-[#121212] border border-white/5 rounded-[3rem] shadow-2xl relative overflow-hidden">
                <div className="absolute -top-10 -right-10 w-24 h-24 bg-orange-500/10 blur-[50px]" />
@@ -148,7 +178,7 @@ export default function OrderDetailPage() {
                   <div className="text-center space-y-1">
                     <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Tổng hóa đơn</span>
                     <h2 className="text-4xl font-[1000] text-white italic tracking-tighter">
-                      {order?.totalAmount.toLocaleString()}đ
+                      {order?.totalAmount?.toLocaleString()}đ
                     </h2>
                   </div>
 
@@ -160,8 +190,8 @@ export default function OrderDetailPage() {
                     <div className="flex justify-between items-center pt-2">
                       <span className="text-zinc-600 font-black">Trạng thái:</span>
                       <span className={`px-3 py-1 rounded-full text-[9px] font-black border ${
-                        order?.status === 'SUCCESS' ? 'text-green-400 border-green-500/20 bg-green-500/5' : 
-                        order?.status === 'CANCELLED' ? 'text-rose-400 border-rose-500/20 bg-rose-500/5' : 
+                        cleanStatus === 'PAID' ? 'text-green-400 border-green-500/20 bg-green-500/5' : 
+                        cleanStatus === 'CANCELLED' ? 'text-rose-400 border-rose-500/20 bg-rose-500/5' : 
                         'text-orange-400 border-orange-500/20 bg-orange-500/5'
                       }`}>
                         {statusLabel}
@@ -169,13 +199,12 @@ export default function OrderDetailPage() {
                     </div>
                   </div>
 
-                  {/* ACTION BUTTONS SỬ DỤNG CUSTOM MODAL */}
-                  {order?.status === 'PENDING' ? (
+                  {cleanStatus === 'PENDING' || !cleanStatus ? (
                     <div className="grid gap-3 pt-2">
                       <button 
                         disabled={updating}
                         onClick={() => setConfirmModal({show: true, status: 'SUCCESS', title: 'Xác nhận thanh toán'})}
-                        className="w-full py-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-[1.4rem] font-black text-[11px] uppercase shadow-lg shadow-orange-500/10 hover:brightness-110 active:scale-[0.97] transition-all flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-[1.4rem] font-black text-[11px] uppercase shadow-lg hover:brightness-110 active:scale-[0.97] transition-all flex items-center justify-center gap-2"
                       >
                         {updating ? <Loader2 size={16} className="animate-spin"/> : <CheckCircle2 size={16}/>}
                         Xác nhận thanh toán
@@ -198,12 +227,7 @@ export default function OrderDetailPage() {
                   )}
                </div>
             </div>
-
-            <div className="flex justify-center py-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-500/20 animate-pulse" />
-            </div>
           </div>
-          
         </div>
       </div>
     </div>

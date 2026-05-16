@@ -6,6 +6,9 @@ import ShowtimeModal from "./ShowtimeModal";
 import { apiRequest } from "@/app/lib/api"; 
 import toast, { Toaster } from "react-hot-toast";
 
+// Mảng map cố định tránh lỗi Hydration do Locale của hệ thống khác nhau
+const VIETNAMESE_DAYS = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+
 export default function AdminShowtimePage() {
   const router = useRouter();
   const [cinemaId, setCinemaId] = useState<number | null>(null);
@@ -38,12 +41,13 @@ export default function AdminShowtimePage() {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const iso = d.toISOString().split('T')[0];
+      
       return {
         full: iso,
-        label: d.toLocaleDateString('vi-VN', { weekday: 'short' }),
+        // SỬA TẠI ĐÂY: Lấy trực tiếp từ mảng tĩnh để đồng bộ Server & Client
+        label: VIETNAMESE_DAYS[d.getDay()], 
         dayNum: d.getDate(),
         isToday: iso === new Date().toISOString().split('T')[0],
-        // Đánh dấu ngày cũ để làm mờ trên thanh tab
         isOld: new Date(iso).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)
       };
     });
@@ -78,12 +82,11 @@ export default function AdminShowtimePage() {
       setMovies(m.data?.content || m.data || []);
     } catch (e) {
       console.error(e);
-    } finally { setLoading(false); }
+    } bits: { setLoading(false); }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // HÀM CHẶN LƯU SUẤT CHIẾU QUÁ KHỨ
   const handleSave = async (data: any) => {
     const now = new Date();
     const showtimeDate = new Date(data.startTime);
@@ -118,7 +121,6 @@ export default function AdminShowtimePage() {
           <h1 className="text-2xl font-[1000] italic uppercase tracking-tighter">
             LỊCH CHIẾU <span className="text-red-600">{cinemaName}</span>
           </h1>
-          {/* Ẩn nút tạo nếu đang ở ngày quá khứ */}
           {!isPastDate && (
             <button onClick={() => { setSelectedItem(null); setIsModalOpen(true); }} className="px-8 py-3 bg-white text-black rounded-2xl font-black text-[11px] uppercase hover:bg-red-600 hover:text-white transition-all shadow-lg active:scale-95">
               + Tạo suất chiếu
@@ -148,7 +150,7 @@ export default function AdminShowtimePage() {
                 onClick={() => setSelectedDate(tab.full)}
                 className={`flex flex-col items-center min-w-[55px] py-2 rounded-2xl transition-all ${
                   selectedDate === tab.full ? "bg-red-600" : "hover:bg-white/5"
-                } ${tab.isOld ? "opacity-30" : ""}`} // Làm mờ ngày cũ
+                } ${tab.isOld ? "opacity-30" : ""}`}
               >
                 <span className="text-[8px] font-black uppercase tracking-tighter opacity-70">{tab.label}</span>
                 <span className="text-sm font-[1000]">{tab.dayNum}</span>
@@ -197,7 +199,6 @@ export default function AdminShowtimePage() {
                     );
                   })}
                 
-                {/* Ẩn nút thêm nếu là ngày cũ */}
                 {!isPastDate && (
                   <button 
                     onClick={() => { setSelectedItem({ roomId: room.id, startTime: selectedDate }); setIsModalOpen(true); }} 
