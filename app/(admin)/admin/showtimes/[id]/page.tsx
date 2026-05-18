@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ArrowLeft, Clock, Monitor, MapPin, 
-  Film, Star, Info, Loader2, Edit3, Trash2, Calendar
+  Star, Loader2, Edit3, Trash2, Calendar, 
+  AlertTriangle, X
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { apiAdminRequest } from '@/app/lib/api';
@@ -17,15 +18,17 @@ export default function ChiTietSuatChieu() {
   const [data, setData] = useState<any>(null);
   const [movies, setMovies] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
-  const [cinemaId, setCinemaId] = useState<number | null>(null); // State lưu ID rạp thật
+  const [cinemaId, setCinemaId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Trạng thái đóng/mở các Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // 1. Lấy thông tin user để biết đang quản lý rạp nào (Dùng Cookie qua /me)
       const resUser = await apiAdminRequest('/api/v1/users/me');
       if (!resUser.ok) throw new Error("Unauthorized");
       
@@ -39,7 +42,6 @@ export default function ChiTietSuatChieu() {
       }
       setCinemaId(idRapThat);
 
-      // 2. Gọi các API dữ liệu dựa trên id rạp thật
       const [resShow, resRoom, resMovie] = await Promise.all([
         apiAdminRequest(`/api/v1/showtimes/${id}`),
         apiAdminRequest(`/api/v1/rooms/cinema-item/${idRapThat}`),
@@ -73,7 +75,7 @@ export default function ChiTietSuatChieu() {
     fetchData();
   }, [fetchData]);
 
-  // Hàm xử lý Lưu sau khi Sửa - Đã fix dùng cinemaId thật
+  // Hàm xử lý Lưu sau khi Sửa
   const handleSaveEdit = async (formData: any) => {
     if (!cinemaId) return;
     const toastId = toast.loading("Đang cập nhật hệ thống...");
@@ -96,9 +98,9 @@ export default function ChiTietSuatChieu() {
     }
   };
 
-  // Hàm xử lý Xóa
-  const handleDelete = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa suất chiếu này không?")) return;
+  // Hàm xử lý Xóa thực tế sau khi nhấn nút xác nhận từ Modal tự dựng
+  const handleConfirmDelete = async () => {
+    setIsDeleteModalOpen(false); // Đóng ngay modal để tránh double click
     const toastId = toast.loading("Đang gỡ bỏ suất chiếu...");
     try {
       const res = await apiAdminRequest(`/api/v1/showtimes/${id}`, { method: "DELETE" });
@@ -108,153 +110,161 @@ export default function ChiTietSuatChieu() {
       } else {
         toast.error("Không thể xóa suất chiếu này!", { id: toastId });
       }
-    } catch (e) { toast.error("Lỗi kết nối máy chủ!", { id: toastId }); }
+    } catch (e) { 
+      toast.error("Lỗi kết nối máy chủ!", { id: toastId }); 
+    }
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-red-600" size={40} />
+    <div className="min-h-screen bg-[#000000] flex flex-col items-center justify-center gap-3">
+      <Loader2 className="animate-spin text-red-600" size={36} />
       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Đang đồng bộ dữ liệu</span>
     </div>
   );
 
   if (!data) return null;
 
-  // Logic tính toán giờ kết thúc
   const startTime = new Date(data.startTime);
   const movieDuration = data.movie.duration || 0;
   const endTime = new Date(startTime.getTime() + movieDuration * 60000);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-400 p-6 font-sans">
+    <div className="min-h-screen bg-[#000000] text-zinc-300 p-6 font-sans antialiased select-none tracking-tight">
       <Toaster position="top-right" />
-      <div className="max-w-4xl mx-auto"> 
+      
+      <div className="max-w-5xl mx-auto space-y-6"> 
         
+        {/* NÚT QUAY LẠI */}
         <button 
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] hover:text-white transition-colors mb-8"
+          className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-zinc-400 hover:text-white transition-colors mb-2"
         >
-          <ArrowLeft size={14} /> Trở về quản lý lịch chiếu
+          <ArrowLeft size={16} className="text-red-600" /> Trở về quản lý lịch chiếu
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           
-          {/* CỘT TRÁI: POSTER & ACTIONS */}
-          <div className="md:col-span-4 space-y-6">
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/5 shadow-2xl group ring-1 ring-white/10">
+          {/* CỘT TRÁI: POSTER & BIỂU TƯỢNG HÀNH ĐỘNG */}
+          <div className="md:col-span-4 space-y-4">
+            <div className="relative overflow-hidden rounded-2xl border border-zinc-900 shadow-xl group">
               <img 
                 src={data.movie.posterUrl} 
                 alt={data.movie.title}
-                className="w-full aspect-[2/3] object-cover group-hover:scale-105 transition-transform duration-700"
+                className="w-full aspect-[2/3] object-cover group-hover:scale-102 transition-transform duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
-              <div className="absolute bottom-6 left-6 right-6">
-                <span className="px-3 py-1 bg-red-600 text-white text-[9px] font-[1000] uppercase italic rounded-lg mb-2 inline-block shadow-lg">
-                  {data.movie.genre?.name || "Premium Movie"}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+              <div className="absolute bottom-5 left-5 right-5 space-y-1.5">
+                <span className="px-2.5 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-wider rounded-md inline-block">
+                  {data.movie.genre?.name || "Premium"}
                 </span>
-                <h1 className="text-2xl font-[1000] uppercase italic text-white tracking-tighter leading-tight drop-shadow-2xl">
+                <h1 className="text-xl font-[1000] uppercase text-white tracking-tighter leading-tight drop-shadow-md">
                   {data.movie.title}
                 </h1>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
+            {/* NHÓM NÚT ĐIỀU KHIỂN TO RÕ */}
+            <div className="flex flex-col gap-2">
                <button 
                  onClick={() => setIsEditModalOpen(true)}
-                 className="flex items-center justify-center gap-3 py-4 bg-white text-black rounded-2xl font-black text-[11px] uppercase hover:bg-red-600 hover:text-white transition-all active:scale-95 shadow-xl"
+                 className="flex items-center justify-center gap-2 py-3 bg-white text-black rounded-xl font-black text-xs uppercase hover:bg-red-600 hover:text-white transition-all active:scale-[0.99]"
                >
-                 <Edit3 size={18} /> Chỉnh sửa lịch
+                 <Edit3 size={16} /> Chỉnh sửa lịch
                </button>
                <button 
-                 onClick={handleDelete}
-                 className="flex items-center justify-center gap-3 py-4 bg-zinc-900 text-zinc-500 rounded-2xl font-black text-[11px] uppercase border border-white/5 hover:bg-red-600 hover:text-white transition-all active:scale-95"
+                 onClick={() => setIsDeleteModalOpen(true)} // MỞ MODAL XÓA THAY VÌ WINDOW.CONFIRM
+                 className="flex items-center justify-center gap-2 py-3 bg-zinc-950 text-zinc-400 rounded-xl font-black text-xs uppercase border border-zinc-900 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-[0.99]"
                >
-                 <Trash2 size={18} /> Gỡ bỏ suất
+                 <Trash2 size={16} /> Gỡ bỏ suất
                </button>
             </div>
           </div>
 
-          {/* CỘT PHẢI: INFO CHI TIẾT */}
-          <div className="md:col-span-8 space-y-6">
+          {/* CỘT PHẢI: CHI TIẾT PHÂN LUỒNG */}
+          <div className="md:col-span-8 space-y-4">
             
-            {/* Box Thời gian */}
-            <div className="flex gap-4 p-8 bg-zinc-900/40 border border-white/5 rounded-[2.5rem] backdrop-blur-xl ring-1 ring-white/5">
-                <div className="flex-1 border-r border-white/10">
-                  <div className="flex items-center gap-2 mb-2 opacity-60 uppercase font-black text-[9px] text-zinc-400 tracking-widest">
-                    <Clock size={12} className="text-red-600"/> Giờ khởi chiếu
+            {/* Khối Trục Thời Gian */}
+            <div className="grid grid-cols-2 gap-px bg-zinc-900 border border-zinc-900 rounded-2xl overflow-hidden shadow-lg">
+              <div className="p-6 bg-zinc-950/60 backdrop-blur-md">
+                <div className="flex items-center gap-1.5 mb-1.5 uppercase font-black text-[9px] text-zinc-500 tracking-wider">
+                  <Clock size={12} className="text-red-600"/> Giờ khởi chiếu
+                </div>
+                <p className="text-4xl font-[1000] italic text-white tracking-tighter">
+                  {startTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+                <p className="text-[11px] font-black text-zinc-400 mt-2 uppercase inline-flex items-center gap-1.5">
+                  <Calendar size={12} className="text-red-600"/> {startTime.toLocaleDateString('vi-VN')}
+                </p>
+              </div>
+              
+              <div className="p-6 bg-zinc-950/60 backdrop-blur-md">
+                <div className="flex items-center gap-1.5 mb-1.5 uppercase font-black text-[9px] text-zinc-500 tracking-wider">
+                  <Clock size={12} className="text-zinc-600" /> Hạ màn dự kiến
+                </div>
+                <p className="text-4xl font-[1000] italic text-zinc-500 tracking-tighter">
+                  {endTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+                <p className="text-[10px] font-black text-red-600 mt-2.5 uppercase tracking-widest">
+                  {movieDuration} PHÚT TRÌNH CHIẾU
+                </p>
+              </div>
+            </div>
+
+            {/* Khối Vị Trí Vận Hành */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-5 bg-zinc-950 border border-zinc-900 rounded-2xl group transition-all">
+                <Monitor size={16} className="text-zinc-600 group-hover:text-red-500 mb-2.5 transition-colors"/>
+                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-wider mb-0.5">Phòng chiếu</p>
+                <h3 className="text-lg font-black uppercase text-zinc-200 group-hover:text-white transition-colors">{data.room.name}</h3>
+                <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase tracking-tight">{data.room.totalSeats} Ghế thiết lập</p>
+              </div>
+
+              <div className="p-5 bg-zinc-950 border border-zinc-900 rounded-2xl group transition-all">
+                <MapPin size={16} className="text-zinc-600 group-hover:text-red-500 mb-2.5 transition-colors"/>
+                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-wider mb-0.5">Cơ sở hiển thị</p>
+                <h3 className="text-lg font-black uppercase text-zinc-200 group-hover:text-white truncate">
+                  {data.cinemaItem.name}
+                </h3>
+                <p className="text-[10px] font-bold text-zinc-500 mt-1 uppercase tracking-tight">{data.cinemaItem.city || "Hệ thống"}</p>
+              </div>
+            </div>
+
+            {/* Khối Tóm Tắt Dữ Liệu Phim */}
+            <div className="p-6 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-4">
+                <div className="grid grid-cols-3 gap-4 border-b border-zinc-900 pb-4">
+                  <div>
+                    <p className="text-[9px] text-zinc-600 font-black uppercase tracking-wider mb-0.5">Đạo diễn</p>
+                    <p className="text-xs text-zinc-300 font-bold truncate">{data.movie.director || "N/A"}</p>
                   </div>
-                  <p className="text-4xl font-[1000] italic uppercase text-white tracking-tighter">
-                    {startTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                  <p className="text-[11px] font-black text-zinc-500 mt-2 uppercase flex items-center gap-2">
-                    <Calendar size={12} className="text-zinc-700"/> {startTime.toLocaleDateString('vi-VN')}
-                  </p>
+                  <div>
+                    <p className="text-[9px] text-zinc-600 font-black uppercase tracking-wider mb-0.5">Quốc gia</p>
+                    <p className="text-xs text-zinc-300 font-bold">{data.movie.country || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-zinc-600 font-black uppercase tracking-wider mb-0.5">Đánh giá</p>
+                    <div className="flex items-center gap-1 text-red-500 mt-0.5">
+                      <Star size={12} fill="currentColor" />
+                      <span className="text-xs font-black text-white">{data.movie.rating}/5</span>
+                    </div>
+                  </div>
                 </div>
                 
-                <div className="flex-1 pl-6">
-                  <div className="flex items-center gap-2 mb-2 opacity-60 uppercase font-black text-[9px] text-zinc-400 tracking-widest">
-                    <Clock size={12} /> Hạ màn dự kiến
-                  </div>
-                  <p className="text-4xl font-[1000] italic uppercase text-zinc-500 tracking-tighter">
-                    {endTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                  <p className="text-[11px] font-black text-red-600/60 mt-2 uppercase tracking-[0.2em]">
-                    {movieDuration} PHÚT TRÌNH CHIẾU
-                  </p>
-                </div>
-            </div>
-
-            {/* Box Vị trí Phòng/Rạp */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-6 bg-[#0a0a0a] border border-white/5 rounded-[2rem] hover:border-red-600/20 transition-all group">
-                <Monitor size={18} className="text-zinc-800 group-hover:text-red-600 mb-3 transition-colors"/>
-                <p className="text-[9px] font-black text-zinc-700 uppercase tracking-widest mb-1">Hall Room</p>
-                <h3 className="text-xl font-[1000] uppercase italic text-zinc-300 group-hover:text-white transition-colors">{data.room.name}</h3>
-                <p className="text-[10px] font-bold text-zinc-600 mt-2 uppercase tracking-tight">{data.room.totalSeats} Ghế thiết lập</p>
-              </div>
-              <div className="p-6 bg-[#0a0a0a] border border-white/5 rounded-[2rem] hover:border-red-600/20 transition-all group">
-                <MapPin size={18} className="text-zinc-800 group-hover:text-red-600 mb-3 transition-colors"/>
-                <p className="text-[9px] font-black text-zinc-700 uppercase tracking-widest mb-1">Cơ sở vận hành</p>
-                <h3 className="text-xl font-[1000] uppercase italic text-zinc-300 group-hover:text-white truncate">
-                  {data.cinemaItem.address || data.cinemaItem.name}
-                </h3>
-                <p className="text-[10px] font-bold text-zinc-600 mt-2 uppercase tracking-tight">{data.cinemaItem.city}</p>
-              </div>
-            </div>
-
-            {/* Box Thông tin phim tóm tắt */}
-            <div className="p-8 bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] shadow-inner">
-               <div className="grid grid-cols-3 gap-6 border-b border-white/5 pb-6 mb-6">
-                 <div>
-                   <p className="text-[9px] text-zinc-700 font-black uppercase mb-1 tracking-widest">Đạo diễn</p>
-                   <p className="text-[12px] text-zinc-300 font-bold italic truncate">{data.movie.director}</p>
-                 </div>
-                 <div>
-                   <p className="text-[9px] text-zinc-700 font-black uppercase mb-1 tracking-widest">Quốc gia</p>
-                   <p className="text-[12px] text-zinc-300 font-bold italic">{data.movie.country}</p>
-                 </div>
-                 <div>
-                   <p className="text-[9px] text-zinc-700 font-black uppercase mb-1 tracking-widest">Đánh giá</p>
-                   <div className="flex items-center gap-1.5 text-yellow-500 mt-0.5">
-                     <Star size={12} fill="currentColor" />
-                     <span className="text-[12px] font-[1000]">{data.movie.rating}/5</span>
+                <div className="space-y-1.5">
+                   <div className="flex items-center gap-2">
+                     <div className="w-1.5 h-1.5 bg-red-600 rounded-full" />
+                     <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Nội dung tóm tắt</span>
                    </div>
-                 </div>
-               </div>
-               
-               <div className="flex items-center gap-3 mb-4">
-                  <div className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Nội dung tóm tắt</span>
-               </div>
-               <p className="text-xs leading-relaxed text-zinc-500 italic font-medium">
-                 "{data.movie.description}"
-               </p>
+                   <p className="text-xs leading-relaxed text-zinc-400 font-medium pl-3 border-l border-zinc-900">
+                     {data.movie.description || "Chưa có nội dung mô tả cụ thể cho phim này."}
+                   </p>
+                </div>
             </div>
 
           </div>
         </div>
       </div>
 
+      {/* --- MODAL SỬA ĐỒNG BỘ --- */}
       <ShowtimeModal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
@@ -263,6 +273,65 @@ export default function ChiTietSuatChieu() {
         movies={movies} 
         rooms={rooms} 
       />
+
+      {/* --- MODAL XÁC NHẬN XÓA TỰ DỰNG (ĐỒNG BỘ UI) --- */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-zinc-950 border border-zinc-900 w-full max-w-md rounded-2xl p-6 relative shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            
+            {/* Nút đóng góc phải */}
+            <button 
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Đầu đề cảnh báo */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-950/50 border border-red-900/50 flex items-center justify-center text-red-500 shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-[1000] uppercase tracking-wide text-white">Xác nhận gỡ suất chiếu</h3>
+                <p className="text-[10px] text-zinc-500 font-black tracking-widest uppercase">Hành động không thể hoàn tác</p>
+              </div>
+            </div>
+
+            {/* Nội dung chi tiết suất chiếu sắp bị xóa */}
+            <div className="p-3.5 bg-zinc-900/40 border border-zinc-900 rounded-xl space-y-1.5 text-xs">
+              <p className="text-zinc-400 font-medium">
+                Bạn đang thực hiện lệnh xóa suất chiếu của bộ phim:
+              </p>
+              <p className="text-white font-black uppercase text-sm truncate">
+                {data.movie.title}
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-zinc-500 pt-1.5 border-t border-zinc-900/80 font-semibold">
+                <div>Phòng: <span className="text-zinc-300 font-bold">{data.room.name}</span></div>
+                <div>Lúc: <span className="text-zinc-300 font-bold">{startTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span></div>
+              </div>
+            </div>
+
+            {/* Nhóm nút tác vụ */}
+            <div className="grid grid-cols-2 gap-2.5 pt-1 text-xs">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="w-full py-3 bg-zinc-900 border border-zinc-800 rounded-xl font-black uppercase text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all"
+              >
+                Hủy yêu cầu
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="w-full py-3 bg-red-600 text-white rounded-xl font-black uppercase hover:bg-red-700 transition-all shadow-lg shadow-red-900/20"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

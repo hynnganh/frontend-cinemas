@@ -1,245 +1,377 @@
 "use client";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Edit3, Calendar as CalendarIcon, Loader2, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
-import { useRouter } from 'next/navigation';
-import ShowtimeModal from "./ShowtimeModal";
-import { apiAdminRequest } from "@/app/lib/api"; 
-import toast from "react-hot-toast";
 
-// Mảng bản đồ ngày cố định tránh lỗi Hydration do Locale của hệ thống khác nhau
-const VIETNAMESE_DAYS = ["Chủ Nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+
+import {
+  Plus,
+  Edit3,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Upload,
+  Calendar as CalendarIcon,
+} from "lucide-react";
+
+import { useRouter } from "next/navigation";
+import ShowtimeModal from "./ShowtimeModal";
+import ImportExcelModal from "./ImportExcelModal"; 
+import { apiAdminRequest } from "@/app/lib/api";
+import toast, { Toaster } from "react-hot-toast";
+
+const VIETNAMESE_DAYS = [
+  "Chủ Nhật",
+  "Thứ 2",
+  "Thứ 3",
+  "Thứ 4",
+  "Thứ 5",
+  "Thứ 6",
+  "Thứ 7",
+];
 
 export default function AdminShowtimePage() {
   const router = useRouter();
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   const [cinemaId, setCinemaId] = useState<number | null>(null);
   const [cinemaName, setCinemaName] = useState("");
   const [loading, setLoading] = useState(true);
+
   const [showtimes, setShowtimes] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [movies, setMovies] = useState<any[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Kiểm tra xem ngày đang chọn có phải là ngày trong quá khứ không
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
+  /* =============================
+        CHECK DATE
+  ============================= */
   const isPastDate = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     const target = new Date(selectedDate);
     target.setHours(0, 0, 0, 0);
+
     return target < today;
   }, [selectedDate]);
 
+  /* =============================
+        WEEK TAB
+  ============================= */
   const weekTabs = useMemo(() => {
     const current = new Date(selectedDate);
-    const dayOfWeek = current.getDay();
-    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
     const monday = new Date(current);
-    monday.setDate(current.getDate() - diffToMonday);
+    monday.setDate(current.getDate() - (current.getDay() || 7) + 1);
 
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      const iso = d.toISOString().split('T')[0];
-      
+
+      const iso = d.toISOString().split("T")[0];
+
       return {
         full: iso,
-        label: VIETNAMESE_DAYS[d.getDay()], 
+        label: VIETNAMESE_DAYS[d.getDay()],
         dayNum: d.getDate(),
-        isToday: iso === new Date().toISOString().split('T')[0],
-        isOld: new Date(iso).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)
+        isOld:
+          new Date(iso).setHours(0, 0, 0, 0) <
+          new Date().setHours(0, 0, 0, 0),
       };
     });
   }, [selectedDate]);
 
-  const changeWeek = (direction: number) => {
+  const changeWeek = (dir: number) => {
     const d = new Date(selectedDate);
-    d.setDate(d.getDate() + (direction * 7));
-    setSelectedDate(d.toISOString().split('T')[0]);
+    d.setDate(d.getDate() + dir * 7);
+    setSelectedDate(d.toISOString().split("T")[0]);
   };
 
+  /* =============================
+        LOAD DATA
+  ============================= */
   const loadData = useCallback(async () => {
     setLoading(true);
+
     try {
-      const resUser = await apiAdminRequest('/api/v1/users/me');
-      const userRes = await resUser.json();
-      const idRap = userRes.data?.managedCinemaItemId;
+      const resUser = await apiAdminRequest("/api/v1/users/me");
+      const user = await resUser.json();
+
+      const idRap = user.data?.managedCinemaItemId;
       if (!idRap) return;
-      
+
       setCinemaId(idRap);
-      const [resCinema, resShow, resRoom, resMovie] = await Promise.all([
+
+      const [c, s, r, m] = await Promise.all([
         apiAdminRequest(`/api/v1/cinema-items/${idRap}`),
         apiAdminRequest(`/api/v1/showtimes/cinema-item/${idRap}`),
         apiAdminRequest(`/api/v1/rooms/cinema-item/${idRap}`),
-        apiAdminRequest("/api/v1/movies?status=SHOWING"),
+        apiAdminRequest(`/api/v1/movies?status=SHOWING`),
       ]);
 
-      const [c, s, r, m] = await Promise.all([resCinema.json(), resShow.json(), resRoom.json(), resMovie.json()]);
-      setCinemaName(c.data?.name || `Cơ sở #${idRap}`);
-      setShowtimes(s.data || []);
-      setRooms(r.data || []);
-      setMovies(m.data?.content || m.data || []);
+      const [cinema, show, room, movie] = await Promise.all([
+        c.json(),
+        s.json(),
+        r.json(),
+        m.json(),
+      ]);
+
+      setCinemaName(cinema.data?.name);
+      setShowtimes(show.data || []);
+      setRooms(room.data || []);
+      setMovies(movie.data?.content || movie.data || []);
     } catch (e) {
       console.error(e);
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
+  /* =============================
+        SAVE SHOWTIME
+  ============================= */
   const handleSave = async (data: any) => {
-    const now = new Date();
-    const showtimeDate = new Date(data.startTime);
+    const tid = toast.loading("Đang xử lý...");
 
-    if (showtimeDate < now) {
-      return toast.error("Không thể thao tác suất chiếu vào thời gian đã qua!");
-    }
-
-    const isUpdate = !!data.id;
-    const tid = toast.loading(isUpdate ? "Đang cập nhật..." : "Đang tạo mới...");
     try {
-      const res = await apiAdminRequest(isUpdate ? `/api/v1/showtimes/${data.id}` : "/api/v1/showtimes", {
-        method: isUpdate ? "PUT" : "POST",
-        body: JSON.stringify({ ...data, cinemaItemId: cinemaId, price: 75000 }),
-      });
-      if (res.ok) {
-        toast.success("Thao tác thành công!", { id: tid });
-        setIsModalOpen(false);
-        loadData();
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Lỗi trùng lịch chiếu!", { id: tid });
-      }
-    } catch (e) { toast.error("Lỗi kết nối máy chủ!", { id: tid }); }
+      const res = await apiAdminRequest(
+        data.id
+          ? `/api/v1/showtimes/${data.id}`
+          : "/api/v1/showtimes",
+        {
+          method: data.id ? "PUT" : "POST",
+          body: JSON.stringify({
+            ...data,
+            cinemaItemId: cinemaId,
+            price: 75000,
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error();
+
+      toast.success("Thành công!", { id: tid });
+      setIsModalOpen(false);
+      loadData();
+    } catch {
+      toast.error("Lỗi xử lý lịch chiếu!", { id: tid });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#060608] text-zinc-400 p-6 font-sans select-none tracking-tight">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#000000] text-zinc-300 p-6 font-sans antialiased select-none tracking-tight">
+      <Toaster position="top-right" />
+
+      <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* TIÊU ĐỀ CHÍNH */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-zinc-900 pb-6">
-          <div>
-            <h1 className="text-3xl font-black text-white uppercase tracking-tight">
-              Lịch chiếu <span className="text-red-600">{cinemaName}</span>
-            </h1>
-            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-wider mt-2">Điều phối lịch chiếu phim nội bộ</p>
+        {/* --- HEADER --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-900 pb-5">
+          <div className="flex items-center gap-3.5">
+            <div className="w-2 h-9 bg-red-600 rounded-full" />
+            <div className="space-y-1">
+              <h1 className="text-2xl font-[1000] text-white tracking-tighter uppercase italic leading-none">
+                Lịch chiếu <span className="text-red-600">{cinemaName || "Chi nhánh"}</span>
+              </h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">A&K Cinema Management</p>
+            </div>
           </div>
-          {!isPastDate && (
-            <button 
-              onClick={() => { setSelectedItem(null); setIsModalOpen(true); }} 
-              className="px-6 py-3 bg-white text-black rounded-xl font-black text-[11px] uppercase hover:bg-red-600 hover:text-white transition-all active:scale-95 shadow-sm"
+
+          <div className="flex items-center gap-3 w-full md:w-auto text-sm">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl font-bold text-zinc-200 hover:bg-zinc-800 transition-all"
             >
-              + Tạo suất chiếu
+              <Upload size={16} /> Import Excel
             </button>
+
+            {!isPastDate && (
+              <button
+                onClick={() => {
+                  setSelectedItem(null);
+                  setIsModalOpen(true);
+                }}
+                className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-6 py-2.5 bg-red-600 rounded-xl font-black text-white hover:bg-red-700 transition-all shadow-lg shadow-red-900/20 uppercase tracking-wide text-xs"
+              >
+                <Plus size={16} /> Tạo suất
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* --- DATEPICKER ẨN --- */}
+        <input
+          type="date"
+          ref={dateInputRef}
+          value={selectedDate}
+          onChange={(e) => {
+            if (e.target.value) setSelectedDate(e.target.value);
+          }}
+          className="absolute opacity-0 pointer-events-none w-0 h-0"
+        />
+
+        {/* --- THANH ĐIỀU HƯỚNG TUẦN + CHỌN NGÀY --- */}
+        <div className="flex items-center justify-between bg-zinc-950 border border-zinc-900 p-2 rounded-xl gap-3">
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => dateInputRef.current?.showPicker()}
+              className="w-10 h-10 flex items-center justify-center bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-md shadow-red-900/20"
+              title="Chọn ngày từ lịch"
+            >
+              <CalendarIcon size={18} />
+            </button>
+
+            <button 
+              onClick={() => changeWeek(-1)}
+              className="w-10 h-10 flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition-colors text-white"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          </div>
+
+          <div className="flex-1 grid grid-cols-7 gap-2">
+            {weekTabs.map((d) => {
+              const active = selectedDate === d.full;
+              return (
+                <button
+                  key={d.full}
+                  onClick={() => setSelectedDate(d.full)}
+                  className={`flex flex-col items-center justify-center py-2 rounded-lg transition-all border ${
+                    active
+                      ? "bg-red-600 border-red-600 text-white font-black shadow-md shadow-red-900/10"
+                      : "bg-zinc-900/30 border-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  <span className={`text-[9px] font-black uppercase tracking-wider ${active ? "text-red-100" : "text-zinc-600"}`}>
+                    {d.label}
+                  </span>
+                  <span className="text-sm font-black mt-1">
+                    {d.dayNum}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button 
+            onClick={() => changeWeek(1)}
+            className="w-10 h-10 flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 transition-colors text-white"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
+        {/* --- DANH SÁCH PHÒNG VÀ SUẤT CHIẾU --- */}
+        <div className="bg-zinc-950 border border-zinc-900 rounded-xl divide-y divide-zinc-900 overflow-hidden">
+          {loading ? (
+            <div className="py-28 text-center flex flex-col items-center gap-3">
+              <Loader2 className="animate-spin text-red-600" size={32} />
+              <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Đang thêm suất chiếu...</p>
+            </div>
+          ) : rooms.length === 0 ? (
+            <div className="py-28 text-center">
+              <p className="text-xs font-bold text-zinc-600 uppercase tracking-wide">Không tìm thấy dữ liệu phòng chiếu</p>
+            </div>
+          ) : (
+            rooms.map((room) => {
+              const currentShowtimes = showtimes.filter(
+                (s) => s.startTime?.startsWith(selectedDate) && s.room?.id === room.id
+              );
+
+              return (
+                <div key={room.id} className={`p-5 flex flex-col md:flex-row items-start md:items-center gap-5 ${isPastDate ? "opacity-50 grayscale" : ""}`}>
+                  <div className="w-full md:w-36 shrink-0">
+                    <span className="inline-block px-4 py-1.5 bg-zinc-900 border border-zinc-800 text-xs font-black uppercase text-white rounded-lg tracking-wide">
+                      {room.name}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 flex flex-wrap items-center gap-2.5 w-full">
+                    {currentShowtimes.map((s) => (
+                      <div
+                        key={s.id}
+                        onClick={() => router.push(`/admin/showtimes/${s.id}`)}
+                        className="group relative inline-flex items-center gap-3 bg-zinc-900 border border-zinc-800 px-3.5 py-2 rounded-lg cursor-pointer hover:border-red-600/40 hover:bg-zinc-900/60 transition-all text-white"
+                      >
+                        <span className="text-xs font-black tracking-tight text-white group-hover:text-red-500 transition-colors">
+                          {s.startTime.split("T")[1].substring(0, 5)}
+                        </span>
+                        
+                        {s.movie && (
+                          <span className="text-[11px] font-bold text-zinc-400 max-w-[120px] truncate">
+                            {s.movie.title || s.movie.name}
+                          </span>
+                        )}
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedItem(s);
+                            setIsModalOpen(true);
+                          }}
+                          className="text-zinc-600 hover:text-white transition-colors pl-1"
+                        >
+                          <Edit3 size={13} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {!isPastDate && (
+                      <button
+                        onClick={() => {
+                          setSelectedItem({
+                            roomId: room.id,
+                            startTime: selectedDate,
+                          });
+                          setIsModalOpen(true);
+                        }}
+                        className="inline-flex items-center justify-center w-9 h-8 border border-dashed border-zinc-800 text-zinc-500 hover:text-red-500 hover:border-red-500/40 rounded-lg transition-all bg-zinc-950"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    )}
+
+                    {currentShowtimes.length === 0 && (
+                      <span className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider italic py-1">
+                        Không có suất chiếu
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
-
-        {/* THANH ĐIỀU HƯỚNG THỜI GIAN VÀ NGÀY THÁNG */}
-        <div className="bg-zinc-950 border border-zinc-900 p-3 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4 shadow-sm">
-          <div className="flex items-center gap-1.5 px-1">
-             <button onClick={() => changeWeek(-1)} className="p-2 hover:bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"><ChevronLeft size={16} /></button>
-             <div className="flex items-center gap-2 bg-[#060608] px-3 py-1.5 rounded-lg border border-zinc-900">
-               <CalendarIcon size={12} className="text-red-600" />
-               <input 
-                 type="date" 
-                 value={selectedDate}
-                 onChange={(e) => setSelectedDate(e.target.value)}
-                 className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer [color-scheme:dark]"
-               />
-             </div>
-             <button onClick={() => changeWeek(1)} className="p-2 hover:bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"><ChevronRight size={16} /></button>
-          </div>
-
-          <div className="flex-1 flex justify-between w-full md:w-auto px-1 overflow-x-auto no-scrollbar gap-1.5">
-            {weekTabs.map(tab => (
-              <button 
-                key={tab.full} 
-                onClick={() => setSelectedDate(tab.full)}
-                className={`flex flex-col items-center min-w-[58px] py-2 rounded-xl transition-all ${
-                  selectedDate === tab.full ? "bg-red-600 text-white" : "text-zinc-400 hover:bg-zinc-900"
-                } ${tab.isOld ? "opacity-30" : ""}`}
-              >
-                <span className="text-[8px] font-black uppercase tracking-tight opacity-70 mb-0.5">{tab.label}</span>
-                <span className="text-xs font-black">{tab.dayNum}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* CẢNH BÁO LỊCH QUÁ KHỨ */}
-        {isPastDate && (
-          <div className="mb-6 flex items-center gap-2.5 p-3.5 bg-amber-500/5 border border-amber-500/10 rounded-xl text-amber-500">
-            <AlertCircle size={14} />
-            <p className="text-[9px] font-black uppercase tracking-wider">Bạn đang xem lịch diễn thuộc quá khứ. Các chức năng thêm mới hoặc sửa đổi sẽ bị khóa.</p>
-          </div>
-        )}
-
-        {/* DANH SÁCH LƯỚI PHÒNG CHIẾU */}
-        {loading ? (
-          <div className="flex flex-col items-center py-40 gap-3 opacity-40">
-            <Loader2 className="animate-spin text-red-600" size={32} />
-            <span className="text-[9px] font-black uppercase tracking-wider">Đang cập nhật lịch chiếu...</span>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {rooms.map(room => (
-              <div key={room.id} className={`bg-zinc-950 border border-zinc-900 rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center gap-4 ${isPastDate ? "opacity-60" : ""}`}>
-                <div className="w-28 shrink-0">
-                  <h3 className="text-sm font-black uppercase tracking-tight text-zinc-500">{room.name}</h3>
-                </div>
-                
-                <div className="flex-1 flex flex-wrap gap-2">
-                  {showtimes
-                    .filter(s => s.startTime?.startsWith(selectedDate) && s.room?.id === room.id)
-                    .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                    .map(s => {
-                      const isPassed = new Date(s.startTime) < new Date();
-                      return (
-                        <div 
-                          key={s.id} 
-                          className={`group flex items-center gap-2.5 bg-[#060608] border border-zinc-900 pl-3 pr-1.5 py-1.5 rounded-lg transition-all ${isPassed ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-zinc-800"}`}
-                          onClick={() => !isPassed && router.push(`/admin/showtimes/${s.id}`)}
-                        >
-                          <span className="text-red-600 font-black text-xs">{s.startTime.split('T')[1].substring(0, 5)}</span>
-                          <p className="text-[9px] font-black uppercase truncate max-w-[110px] text-zinc-400">{s.movie?.title}</p>
-                          {!isPassed && (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); setSelectedItem(s); setIsModalOpen(true); }} 
-                              className="p-1 text-zinc-600 hover:text-red-600"
-                              title="Sửa nhanh"
-                            >
-                              <Edit3 size={11} />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  
-                  {!isPastDate && (
-                    <button 
-                      onClick={() => { setSelectedItem({ roomId: room.id, startTime: selectedDate }); setIsModalOpen(true); }} 
-                      className="w-8 h-8 border border-dashed border-zinc-800 hover:border-red-600/50 rounded-lg flex items-center justify-center text-zinc-700 hover:text-red-600 transition-all"
-                      title="Thêm suất vào phòng"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      <ShowtimeModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSave={handleSave} 
-        editData={selectedItem} 
-        movies={movies} 
-        rooms={rooms} 
+      <ShowtimeModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSave}
+        editData={selectedItem}
+        movies={movies}
+        rooms={rooms}
+      />
+
+      <ImportExcelModal 
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onRefreshData={loadData}
       />
     </div>
   );
