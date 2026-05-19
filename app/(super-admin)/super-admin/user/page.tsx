@@ -76,10 +76,18 @@ export default function SuperAdminUserPage() {
   };
 
   const filteredUsers = users.filter(u => {
+    // 1. Kiểm tra nếu là SUPER_ADMIN thì ẩn hoàn toàn khỏi danh sách nhân sự
+    const isSuperAdmin = u.roles?.includes('ROLE_SUPER_ADMIN') || u.roles?.includes('SUPER_ADMIN');
+    if (isSuperAdmin) return false;
+
+    // 2. Tìm kiếm theo Tên, Họ hoặc Email
     const fullName = `${u.firstName || ''} ${u.lastName || ''} ${u.email || ''}`.toLowerCase();
     const matchSearch = fullName.includes(searchTerm.toLowerCase());
+    
+    // 3. Phân loại theo các Tab chuyển đổi
     if (activeTab === "ALL") return matchSearch;
-    const isAdmin = u.roles?.includes('ROLE_ADMIN');
+    
+    const isAdmin = u.roles?.includes('ROLE_ADMIN') || u.roles?.includes('ADMIN');
     return activeTab === "ADMIN" ? (isAdmin && matchSearch) : (!isAdmin && matchSearch);
   });
 
@@ -183,19 +191,20 @@ export default function SuperAdminUserPage() {
       </div>
 
       <UserRoleModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        selectedUser={selectedUser}
-        selectedRole={selectedRole}
-        setSelectedRole={setSelectedRole}
-        selectedCinema={selectedCinema}
-        setSelectedCinema={setSelectedCinema}
-        cinemaSearch={cinemaSearch}
-        setCinemaSearch={setCinemaSearch}
-        filteredCinemas={filteredCinemas}
-        onConfirm={handleUpdateRole}
-        allUsers={users} 
-      />
+  isOpen={isModalOpen}
+  onClose={() => setIsModalOpen(false)}
+  selectedUser={selectedUser}
+  selectedRole={selectedRole}
+  setSelectedRole={setSelectedRole}
+  selectedCinema={selectedCinema}
+  setSelectedCinema={setSelectedCinema}
+  cinemaSearch={cinemaSearch}
+  setCinemaSearch={setCinemaSearch}
+  filteredCinemas={filteredCinemas}
+  onConfirm={handleUpdateRole}
+  // Thay vì truyền 'users' gốc, hãy truyền danh sách đã lọc bỏ SUPER_ADMIN
+  allUsers={users.filter(u => !u.roles?.includes('ROLE_SUPER_ADMIN') && !u.roles?.includes('SUPER_ADMIN'))} 
+/>
       
       <style jsx>{`
         .custom-scrollbar-mini::-webkit-scrollbar { width: 3px; }

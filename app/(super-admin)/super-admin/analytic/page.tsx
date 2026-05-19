@@ -1,169 +1,267 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { 
-  BarChart3, Calendar, Download, Filter, 
-  ArrowUpRight, ArrowDownRight, TrendingUp,
-  CreditCard, Wallet, CalendarDays, Building2,
-  Trophy, Star, Activity
-} from "lucide-react";
+  BarChart3, LineChart, Users, Film, Ticket, DollarSign, 
+  TrendingUp, Calendar, RefreshCw, Building2, Award, Loader2 
+} from 'lucide-react';
+import { apiRequest } from '@/app/lib/api'; // Đường dẫn tới file call API của bạn
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  Legend, ResponsiveContainer, LineChart as RechartsLineChart, Line 
+} from 'recharts';
 
-export default function StatisticsPage() {
-  const [dateRange, setDateRange] = useState("month");
-  const [loading, setLoading] = useState(false);
+export default function AdminDashboard() {
+  // 1. Khởi tạo State lưu ngày lọc (Mặc định là 30 ngày qua)
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0] + "T00:00";
+  });
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0] + "T23:59";
+  });
 
-  // Dữ liệu giả lập doanh thu theo từng rạp
-  const cinemaRevenueData = [
-    { name: "A&K Thủ Đức", revenue: 125, grow: 12, color: "bg-red-600" },
-    { name: "A&K Quận 9", revenue: 98, grow: -5, color: "bg-orange-500" },
-    { name: "A&K Bình Thạnh", revenue: 156, grow: 20, color: "bg-emerald-500" },
-    { name: "A&K Gò Vấp", revenue: 74, grow: 8, color: "bg-blue-500" },
-    { name: "A&K Tân Bình", revenue: 112, grow: 15, color: "bg-purple-500" },
-  ];
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleFilterChange = (range: string) => {
-    setLoading(true);
-    setDateRange(range);
-    setTimeout(() => setLoading(false), 800);
+  // 2. Hàm Fetch dữ liệu tổng hợp từ API /dashboard
+  const fetchDashboardData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      // Đọc token admin từ localStorage
+      const token = typeof window !== "undefined" ? localStorage.getItem('token_admin') : null;
+      
+      const res = await apiRequest(`/api/v1/reports/dashboard?start=${startDate}&end=${endDate}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        const result = await res.json();
+        setData(result);
+      }
+    } catch (error) {
+      System.out.error("Lỗi tải dữ liệu thống kê:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 p-6 md:p-10 font-sans">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-        <div>
-          <div className="flex items-center gap-2 text-red-600 font-black text-[8px] uppercase tracking-[0.4em] mb-2">
-            <Activity size={14} /> Analytics Dashboard
-          </div>
-          <h1 className="text-4xl font-[1000] uppercase tracking-tighter italic">
-            Doanh Thu <span className="text-zinc-600">Hệ Thống</span>
-          </h1>
-        </div>
+  useEffect(() => {
+    fetchDashboardData();
+  }, [startDate, endDate]);
 
-        <div className="flex items-center gap-3 bg-zinc-900/50 p-1.5 rounded-2xl border border-white/5">
-          {['day', 'week', 'month', 'year'].map((item) => (
-            <button
-              key={item}
-              onClick={() => handleFilterChange(item)}
-              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                dateRange === item 
-                ? "bg-red-600 text-white shadow-lg shadow-red-600/20" 
-                : "text-zinc-500 hover:text-white"
-              }`}
-            >
-              {item === 'day' ? 'Hôm nay' : item === 'week' ? 'Tuần' : item === 'month' ? 'Tháng' : 'Năm'}
-            </button>
-          ))}
-        </div>
-      </div>
+  // Hàm helper định dạng tiền tệ Việt Nam (VND)
+  const formatVND = (value: number) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+  };
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-        {/* BIỂU ĐỒ SO SÁNH DOANH THU CÁC RẠP */}
-        <div className="lg:col-span-2 bg-zinc-900/30 border border-white/5 rounded-[40px] p-8 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-10">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-600 rounded-2xl shadow-lg shadow-red-600/20">
-                <BarChart3 size={20} className="text-white" />
-              </div>
-              <div>
-                <h2 className="text-sm font-black uppercase tracking-widest">Hiệu năng rạp</h2>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-tighter">So sánh doanh thu (Triệu VNĐ)</p>
-              </div>
-            </div>
-            <button className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold uppercase transition-all">
-              <Download size={14} /> Tải báo cáo
-            </button>
-          </div>
-
-          <div className="h-[350px] w-full flex items-end gap-6 md:gap-12 px-4 relative">
-             {cinemaRevenueData.map((data, i) => (
-               <div key={i} className="flex-1 group/bar relative flex flex-col items-center">
-                  <div className="absolute -top-10 opacity-0 group-hover/bar:opacity-100 transition-all duration-300">
-                    <span className="bg-white text-black text-[10px] font-[1000] px-2 py-1 rounded-lg">
-                      {data.revenue}M
-                    </span>
-                  </div>
-                  
-                  <div 
-                    style={{ height: `${(data.revenue / 160) * 100}%` }} 
-                    className={`w-full max-w-[40px] ${data.color} rounded-t-2xl transition-all duration-1000 group-hover/bar:brightness-125 group-hover/bar:shadow-[0_0_30px_rgba(220,38,38,0.3)] relative`}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl"></div>
-                  </div>
-                  
-                  <div className="mt-4 text-center">
-                    <p className="text-[9px] font-black uppercase text-zinc-500 group-hover/bar:text-white transition-colors rotate-45 md:rotate-0 origin-left">
-                      {data.name.replace("A&K ", "")}
-                    </p>
-                  </div>
-               </div>
-             ))}
-          </div>
-        </div>
-
-        {/* TOP CINEMA RANKING */}
-        <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8 flex flex-col">
-           <h2 className="text-sm font-black uppercase tracking-widest mb-8 flex items-center gap-2">
-             <Trophy size={18} className="text-yellow-500" />
-             Bảng xếp hạng
-           </h2>
-           
-           <div className="space-y-5 flex-1">
-              {cinemaRevenueData.sort((a, b) => b.revenue - a.revenue).map((cinema, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.05] transition-all">
-                  <div className="flex items-center gap-4">
-                    <span className={`text-xl font-black italic ${index === 0 ? 'text-yellow-500' : 'text-zinc-700'}`}>
-                      0{index + 1}
-                    </span>
-                    <div>
-                      <p className="text-[10px] font-black uppercase">{cinema.name}</p>
-                      <p className={`text-[8px] font-bold uppercase ${cinema.grow > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {cinema.grow > 0 ? `+${cinema.grow}%` : `${cinema.grow}%`} so với kỳ trước
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-black italic">{cinema.revenue}.0M</p>
-                  </div>
-                </div>
-              ))}
-           </div>
-
-           <div className="mt-8 p-6 bg-red-600/10 border border-red-600/20 rounded-3xl">
-              <div className="flex items-center gap-3 mb-2">
-                <Star size={14} className="text-red-600 fill-red-600" />
-                <p className="text-[10px] font-black text-red-600 uppercase">Insight</p>
-              </div>
-              <p className="text-[11px] leading-relaxed text-zinc-400 italic">
-                Rạp <span className="text-white font-bold">A&K Bình Thạnh</span> đang dẫn đầu doanh thu nhờ lượng khách xem phim "Lật Mặt 7" tăng đột biến.
-              </p>
-           </div>
-        </div>
-      </div>
-
-      {/* FOOTER STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-         <SmallStat label="Tổng doanh thu" value="565.0M" status="up" sub="Vượt chỉ tiêu 5%" />
-         <SmallStat label="Tổng đơn hàng" value="1.248" status="up" sub="Tăng 120 đơn" />
-         <SmallStat label="Tỷ lệ lấp đầy" value="68%" status="down" sub="Giảm nhẹ buổi sáng" />
-         <SmallStat label="Khách hàng mới" value="+452" status="up" sub="Chỉ số tăng trưởng tốt" />
-      </div>
+  if (loading) return (
+    <div className="h-screen bg-[#050505] flex flex-col items-center justify-center gap-3">
+      <Loader2 className="animate-spin text-red-600" size={40} strokeWidth={2.5} />
+      <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest animate-pulse">Đang nạp dữ liệu tối mật...</span>
     </div>
   );
-}
 
-// --- Sub-components ---
-
-function SmallStat({ label, value, status, sub }: any) {
   return (
-    <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-[30px] hover:border-red-600/30 transition-all group">
-        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1 group-hover:text-red-600 transition-colors">{label}</p>
-        <div className="flex items-baseline gap-2 mb-2">
-           <h4 className="text-2xl font-black italic">{value}</h4>
-           <span className={`text-[9px] font-bold ${status === 'up' ? 'text-emerald-500' : 'text-red-500'}`}>
-             {status === 'up' ? '↑' : '↓'}
-           </span>
+    <div className="min-h-screen bg-[#050505] text-zinc-100 p-6 md:p-10 font-sans antialiased">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* HEADER & FILTER CONTROL */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-zinc-900 pb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Award size={14} className="text-red-500" />
+              <span className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Super Admin Workspace</span>
+            </div>
+            <h1 className="text-3xl font-black uppercase italic text-white tracking-tight">
+              Hệ thống <span className="text-red-600">Thống kê & Phân tích</span>
+            </h1>
+          </div>
+
+          {/* Thanh lọc thời gian nhỏ gọn */}
+          <div className="flex flex-wrap items-center gap-3 bg-[#0c0c0e] border border-zinc-900 p-3 rounded-2xl shadow-inner">
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <Calendar size={14} className="text-zinc-600" />
+              <span>Từ:</span>
+              <input 
+                type="datetime-local" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-black border border-zinc-800 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-red-600 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <span>Đến:</span>
+              <input 
+                type="datetime-local" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-black border border-zinc-800 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-red-600 text-xs"
+              />
+            </div>
+            <button 
+              onClick={() => fetchDashboardData(true)}
+              className="p-1.5 bg-zinc-900 hover:bg-zinc-800 rounded-lg transition-colors border border-zinc-800 text-zinc-400 hover:text-white"
+              title="Làm mới dữ liệu"
+            >
+              <RefreshCw size={14} className={refreshing ? "animate-spin text-red-500" : ""} />
+            </button>
+          </div>
         </div>
-        <p className="text-[9px] text-zinc-600 font-bold italic">{sub}</p>
+
+        {/* 1. KHỐI TỔNG QUAN HỆ THỐNG (4 CARDS) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Card: Doanh thu tổng */}
+          <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Tổng Doanh Thu All-Time</span>
+              <p className="text-xl font-black text-white">{formatVND(data?.totalRevenueAllTime || 0)}</p>
+            </div>
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500 border border-emerald-500/20">
+              <DollarSign size={22} />
+            </div>
+          </div>
+
+          {/* Card: Số vé bán ra */}
+          <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Tổng Vé Đã Bán</span>
+              <p className="text-xl font-black text-white">{(data?.totalTicketsSold || 0).toLocaleString()} vé</p>
+            </div>
+            <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 border border-red-500/20">
+              <Ticket size={22} />
+            </div>
+          </div>
+
+          {/* Card: Tổng số Phim đang chiếu */}
+          <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Phim Đang Hoạt Động</span>
+              <p className="text-xl font-black text-white">{data?.totalMovies || 0} phim</p>
+            </div>
+            <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 border border-blue-500/20">
+              <Film size={22} />
+            </div>
+          </div>
+
+          {/* Card: Khách hàng hệ thống */}
+          <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Tổng Số Thành Viên</span>
+              <p className="text-xl font-black text-white">{(data?.totalUsers || 0).toLocaleString()} user</p>
+            </div>
+            <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-500 border border-purple-500/20">
+              <Users size={22} />
+            </div>
+          </div>
+        </div>
+
+        {/* 2. KHỐI BIỂU ĐỒ DOANH THU THEO NGÀY */}
+        <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-6">
+            <LineChart size={18} className="text-red-500" />
+            <h2 className="text-sm font-black uppercase tracking-wider text-white">Biến động doanh thu theo ngày</h2>
+          </div>
+          <div className="h-80 w-full text-xs">
+            {data?.dailyRevenue && data.dailyRevenue.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsLineChart data={data.dailyRevenue}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
+                  <XAxis dataKey="date" stroke="#71717a" tickFormatter={(tick) => new Date(tick).toLocaleDateString('vi-VN')} />
+                  <YAxis stroke="#71717a" />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0c0c0e', borderColor: '#27272a', color: '#fff' }}
+                    formatter={(value: any) => [formatVND(value), "Doanh thu"]}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="totalRevenue" name="Doanh thu (VND)" stroke="#dc2626" strokeWidth={3} activeDot={{ r: 6 }} />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-zinc-600 font-medium">Không có dữ liệu doanh thu trong khoảng thời gian này</div>
+            )}
+          </div>
+        </div>
+
+        {/* 3. KHỐI BÊN DƯỚI CHIA ĐÔI: TOP PHIM & CỤM RẠP */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Biểu đồ cột: Top phim doanh thu cao */}
+          <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-6">
+              <BarChart3 size={18} className="text-orange-500" />
+              <h2 className="text-sm font-black uppercase tracking-wider text-white">Top phim ăn khách nhất</h2>
+            </div>
+            <div className="h-72 w-full text-xs">
+              {data?.topMovies && data.topMovies.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.topMovies}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1f1f23" />
+                    <XAxis dataKey="movieTitle" stroke="#71717a" truncate />
+                    <YAxis stroke="#71717a" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0c0c0e', borderColor: '#27272a', color: '#fff' }}
+                      formatter={(value: any) => [formatVND(value), "Doanh thu"]}
+                    />
+                    <Bar dataKey="totalRevenue" name="Doanh thu" fill="#ea580c" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-zinc-600 font-medium">Chưa có dữ liệu xếp hạng phim</div>
+              )}
+            </div>
+          </div>
+
+          {/* Bảng số liệu: Thị phần cụm rạp */}
+          <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <Building2 size={18} className="text-blue-500" />
+                <h2 className="text-sm font-black uppercase tracking-wider text-white">Báo cáo doanh thu theo cụm rạp</h2>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-zinc-800 text-zinc-500 uppercase font-bold tracking-wider">
+                      <th className="pb-3 pl-2">Tên Cụm Rạp</th>
+                      <th className="pb-3 text-center">Số Đơn Hàng</th>
+                      <th className="pb-3 text-right pr-2">Doanh Thu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.cinemaRevenue && data.cinemaRevenue.length > 0 ? (
+                      data.cinemaRevenue.map((cinema: any, idx: number) => (
+                        <tr key={cinema.cinemaId || idx} className="border-b border-zinc-900/50 hover:bg-zinc-900/20 transition-colors">
+                          <td className="py-3.5 pl-2 font-bold text-zinc-300">{cinema.cinemaName}</td>
+                          <td className="py-3.5 text-center text-zinc-400 font-mono">{cinema.totalOrders.toLocaleString()}</td>
+                          <td className="py-3.5 text-right pr-2 font-mono font-bold text-emerald-400">{formatVND(cinema.totalRevenue)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="py-8 text-center text-zinc-600 font-medium">Hệ thống chưa ghi nhận đơn hàng nào tại các rạp</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Dòng tóm tắt nhanh chân trang */}
+            <div className="mt-4 pt-4 border-t border-zinc-900/80 flex items-center justify-between text-[11px] text-zinc-500">
+              <span className="flex items-center gap-1"><TrendingUp size={12} className="text-emerald-500" /> Cập nhật dữ liệu thời gian thực</span>
+              <span>Đơn vị tính: VNĐ</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
     </div>
   );
 }
