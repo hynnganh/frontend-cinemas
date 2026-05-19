@@ -39,7 +39,7 @@ export default function OrderDetailPage() {
       case 'PENDING': 
         return { nhan: 'CHỜ XỬ LÝ', mau: 'text-amber-400 bg-amber-500/5 border-amber-500/10' };
       case 'CANCELLED': 
-        return { nhan: 'ĐA HỦY', mau: 'text-rose-500 bg-rose-500/5 border-rose-500/10' };
+        return { nhan: 'ĐÃ HỦY', mau: 'text-rose-500 bg-rose-500/5 border-rose-500/10' };
       default: 
         return { nhan: status || 'CHƯA RÕ', mau: 'text-zinc-500 bg-zinc-500/5 border-zinc-500/10' };
     }

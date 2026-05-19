@@ -1,11 +1,10 @@
 import Banner from "./(client)/components/home/Banner";
 import MovieSection from "./(client)/components/home/MovieSection";
-import EventSection from "./(client)/components/home/EventSection";
+import HeroSection from "./(client)/components/home/HeroSection";
 import TopBanner from "./(client)/components/TopBanner";
 import TopMenu from "./(client)/components/TopMenu";
 import Navbar from "./(client)/components/Navbar";
 import Footer from "./(client)/components/Footer";
-import CinematicUniverse from "./(client)/components/home/CinematicUniverse";
 
 export default function Home() {
   return (
@@ -13,10 +12,8 @@ export default function Home() {
       <TopBanner />
       <TopMenu />
       <Navbar />
-      <Banner />
+      <HeroSection />
       <MovieSection />
-      <EventSection />
-      <CinematicUniverse />
       <Footer />
     </>
   );

@@ -55,7 +55,6 @@ export default function OrderHistoryTab() {
     fetchData();
   }, []);
 
-  // Lọc dữ liệu dựa trên trạng thái chuẩn từ API (PAID và SUCCESS được gom chung thành Thành công)
   const filteredOrders = orders.filter(o => {
     const cleanStatus = o.status ? o.status.trim() : '';
     

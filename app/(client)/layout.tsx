@@ -6,6 +6,7 @@ import TopMenu from "./components/TopMenu";
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+
       <TopBanner />
       <TopMenu />
       <Navbar />

@@ -10,17 +10,15 @@ export default function MovieSection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchShowingMovies = async () => {
+    const fetchTopRatedMovies = async () => {
       try {
-        // Chỉ lấy đúng 4 phim đang chiếu (tương đương 1 hàng trên màn hình lớn)
-        const response = await apiRequest("/api/v1/movies?status=SHOWING&page=0&size=4", { 
+        {/* 🌟 FIX LOGIC: Đổi từ sort theo ID (mới nhất) sang sort theo RATING (Điểm cao nhất) */}
+        const response = await apiRequest("/api/v1/movies?status=SHOWING&page=0&size=6&sort=rating,desc", { 
           method: "GET" 
         });
         
         if (response.ok) {
           const resData = await response.json();
-          
-          // BỘ LỌC DỮ LIỆU ĐỘNG: Bắt mọi kiểu cấu trúc JSON đầu ra của Spring Boot tránh lỗi crash trang chủ
           const targetData = resData.data;
           if (targetData) {
             setMovies(targetData.content || (Array.isArray(targetData) ? targetData : []));
@@ -29,20 +27,20 @@ export default function MovieSection() {
           }
         }
       } catch (error) {
-        console.error("Lỗi tải phim đang chiếu trang chủ:", error);
+        console.error("Lỗi tải phim đánh giá cao trang chủ:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchShowingMovies();
+    fetchTopRatedMovies();
   }, []);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 px-6 md:px-12 py-20 bg-[#0f0f0f]">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-[400px] bg-zinc-800/30 animate-pulse rounded-2xl" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 px-6 md:px-12 py-12 bg-[#0f0f0f]">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="aspect-[2/3] max-w-[155px] mx-auto w-full bg-zinc-800/30 animate-pulse rounded-[1rem]" />
         ))}
       </div>
     );
@@ -51,29 +49,30 @@ export default function MovieSection() {
   if (movies.length === 0) return null;
 
   return (
-    <section className="px-6 md:px-12 py-20 bg-[#0f0f0f]">
-      <div className="flex items-end justify-between mb-12">
-        <div className="flex items-center gap-5">
-          <div className="w-1.5 h-12 bg-red-600 rounded-full shadow-[0_0_20px_rgba(220,38,38,0.5)]" /> 
+    <section className="px-6 md:px-12 py-12 bg-[#0f0f0f]">
+      <div className="flex items-end justify-between mb-8">
+        <div className="flex items-center gap-3">
+          {/* Đổi màu shadow hiệu ứng từ đỏ sang cam rực rỡ đại diện cho điểm số/ngôi sao */}
+          <div className="w-1 h-8 bg-orange-500 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.5)]" /> 
           <div className="flex flex-col">
-            <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-[0.8]">
-              Phim Đang Chiếu
+            <h2 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase leading-none">
+              Phim Được Yêu Thích
             </h2>
-            <span className="text-red-600 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mt-2 ml-1 opacity-80">
-              Danh sách phim hot nhất tại rạp
+            <span className="text-zinc-500 text-[9px] font-bold uppercase tracking-[0.15em] mt-1 opacity-80">
+              Top siêu phẩm có điểm đánh giá cao nhất
             </span>
           </div>
         </div>
         
-        <Link href="/movies/now" className="hidden sm:block">
-          <button className="group flex items-center gap-2 text-gray-400 hover:text-white transition-all duration-300 font-bold text-xs uppercase tracking-widest">
+        <Link href="/movies/top-rated" className="block">
+          <button className="group flex items-center gap-1.5 text-zinc-500 hover:text-white transition-all duration-300 font-bold text-[10px] uppercase tracking-widest">
             Xem tất cả 
-            <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform text-red-600" />
+            <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform text-orange-500" />
           </button>
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-6">
         {movies.map((movie: any) => (
           <MovieCard
             key={movie.id}
@@ -81,8 +80,9 @@ export default function MovieSection() {
             title={movie.title}
             image={movie.posterUrl} 
             status={movie.status}
-            // FIX ĐẮT GIÁ: Nhả trực tiếp dữ liệu rating thật từ API xuống MovieCard
             rating={movie.rating} 
+            genreName={movie.genreName} 
+            ageRating={movie.ageRating} 
           />
         ))}
       </div>
