@@ -30,16 +30,15 @@ export default function BookingPage({ params }: { params: Promise<{ showtimeId: 
           const saved = sessionStorage.getItem('booking_data');
           const isBack = sessionStorage.getItem('is_back_from_combos');
 
-          // 🔥 FIX ĐẮT GIÁ: Chỉ khôi phục ghế cũ nếu có cờ xác nhận quay lại từ trang Combo
+          // Chỉ khôi phục ghế cũ nếu có cờ xác nhận quay lại từ trang Combo
           if (saved && isBack === 'true') {
             const parsed = JSON.parse(saved);
             if (String(parsed.showtimeId) === String(showtimeId) && parsed.selectedSeats) {
               setSelectedSeats(parsed.selectedSeats);
             }
-            // Khôi phục xong thì xóa cờ ngay lập tức để không ảnh hưởng đến các lần vào sau
             sessionStorage.removeItem('is_back_from_combos');
           } else {
-            // ĐI TỪ TRANG CHỦ VÀO: Xóa sạch dữ liệu cũ trong bộ nhớ tạm để tạo luồng đặt vé mới tinh 100%
+            // ĐI TỪ TRANG CHỦ VÀO: Xóa sạch dữ liệu cũ để tạo luồng đặt vé mới tinh
             sessionStorage.removeItem('booking_data');
             setSelectedSeats([]);
           }
@@ -62,64 +61,85 @@ export default function BookingPage({ params }: { params: Promise<{ showtimeId: 
       const seatMapByNum = new Map(rowSeats.map(s => [parseInt(s.seatNumber), s]));
 
       for (const currentSeat of rowSeats) {
+        // 🎯 CHỈ CHO PHÉP GHẾ ĐÔI ĐƯỢC LẺ VÀ KẸP: Nếu là SWEETBOX hoặc COUPLE thì bỏ qua hoàn toàn không check lỗi
+        const seatType = currentSeat.seatType ? String(currentSeat.seatType).toUpperCase() : 'NORMAL';
+        if (seatType === 'SWEETBOX' || seatType === 'COUPLE') {
+          continue;
+        }
+
         const statusStr = String(currentSeat.status).toUpperCase();
         const isOccupied = statusStr === 'OCCUPIED' || statusStr === 'SOLD';
         const isSelected = selectedSeats.some(s => s.id === currentSeat.id);
 
+        // Chỉ quét kiểm tra những ghế thường đang còn TRỐNG sau khi user đã chọn ghế xong
         if (!isOccupied && !isSelected) {
           const currentNum = parseInt(currentSeat.seatNumber);
 
           // --- Kiểm thử biên kẹp bên TRÁI (Số ghế thực tế - 1) ---
           const leftSeat = seatMapByNum.get(currentNum - 1);
-          let leftBlocked = false;
-          let leftSelected = false;
-          if (!leftSeat) {
-            leftBlocked = true; 
-          } else {
+          const leftIsWallOrWalkway = !leftSeat;
+          let leftBlockedBySelectionOrOrder = false;
+          let leftSelectedByMe = false;
+
+          if (!leftIsWallOrWalkway) {
             const leftOccupied = String(leftSeat.status).toUpperCase() === 'OCCUPIED' || String(leftSeat.status).toUpperCase() === 'SOLD';
             const leftSimSelected = selectedSeats.some(s => s.id === leftSeat.id);
             if (leftOccupied || leftSimSelected) {
-              leftBlocked = true;
-              if (leftSimSelected) leftSelected = true;
+              leftBlockedBySelectionOrOrder = true;
+              if (leftSimSelected) leftSelectedByMe = true;
             }
           }
 
           // --- Kiểm thử biên kẹp bên PHẢI (Số ghế thực tế + 1) ---
           const rightSeat = seatMapByNum.get(currentNum + 1);
-          let rightBlocked = false;
-          let rightSelected = false;
-          if (!rightSeat) {
-            rightBlocked = true; 
-          } else {
+          const rightIsWallOrWalkway = !rightSeat;
+          let rightBlockedBySelectionOrOrder = false;
+          let rightSelectedByMe = false;
+
+          if (!rightIsWallOrWalkway) {
             const rightOccupied = String(rightSeat.status).toUpperCase() === 'OCCUPIED' || String(rightSeat.status).toUpperCase() === 'SOLD';
             const rightSimSelected = selectedSeats.some(s => s.id === rightSeat.id);
             if (rightOccupied || rightSimSelected) {
-              rightBlocked = true;
-              if (rightSimSelected) rightSelected = true;
+              rightBlockedBySelectionOrOrder = true;
+              if (rightSimSelected) rightSelectedByMe = true;
             }
           }
 
-          if (leftBlocked && rightBlocked) {
-            if (leftSelected || rightSelected) {
-              const label = currentSeat.name || `${currentSeat.seatRow}${currentSeat.seatNumber}`;
-              
-              toast.error(`Không được để lại ghế trống đơn lẻ (${label}) ở giữa hoặc đầu hàng!`, {
-                duration: 4000,
-                position: 'top-center',
-                style: {
-                  borderRadius: '12px',
-                  background: '#1a1a1a', 
-                  color: '#fff',
-                  border: '1px solid #dc2626',
-                  fontSize: '11px', 
-                  fontWeight: '900', 
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px'
-                },
-                icon: <Armchair size={18} className="text-red-600" />, 
-              });
-              return false; 
-            }
+          // 🎯 BIỂU THỨC QUÉT LỖI TOÀN DIỆN CHO GHẾ THƯỜNG (CHẶN CẢ GIỮA VÀ NGOÀI BIÊN)
+          let isSingleSeatError = false;
+
+          // Kịch bản 1: Ghế trống thường nằm ở GIỮA HÀNG (bị chặn cứng cả 2 đầu)
+          if (!leftIsWallOrWalkway && !rightIsWallOrWalkway && leftBlockedBySelectionOrOrder && rightBlockedBySelectionOrOrder) {
+            if (leftSelectedByMe || rightSelectedByMe) isSingleSeatError = true;
+          }
+          // Kịch bản 2: Ghế trống thường nằm NGOÀI CÙNG BÊN TRÁI (Sát tường/Lối đi trái, bên phải bị user chọn chặn đầu)
+          else if (leftIsWallOrWalkway && rightBlockedBySelectionOrOrder && rightSelectedByMe) {
+            isSingleSeatError = true;
+          }
+          // Kịch bản 3: Ghế trống thường nằm NGOÀI CÙNG BÊN PHẢI (Sát tường/Lối đi phải, bên trái bị user chọn chặn đầu)
+          else if (rightIsWallOrWalkway && leftBlockedBySelectionOrOrder && leftSelectedByMe) {
+            isSingleSeatError = true;
+          }
+
+          if (isSingleSeatError) {
+            const label = currentSeat.name || `${currentSeat.seatRow}${currentSeat.seatNumber}`;
+            
+            toast.error(`Không được để lại ghế trống đơn lẻ (${label}) ở giữa hoặc đầu/cuối hàng ghế!`, {
+              duration: 4000,
+              position: 'top-center',
+              style: {
+                borderRadius: '12px',
+                background: '#1a1a1a', 
+                color: '#fff',
+                border: '1px solid #dc2626',
+                fontSize: '11px', 
+                fontWeight: '900', 
+                textTransform: 'uppercase',
+                letterSpacing: '1px'
+              },
+              icon: <Armchair size={18} className="text-red-600" />, 
+            });
+            return false; 
           }
         }
       }
