@@ -1,9 +1,10 @@
 "use client";
-import React, { useState, useEffect, use } from 'react';
-import { ChevronLeft, Loader2, Calendar, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, use, useRef } from 'react';
+import { ChevronLeft, Loader2, Calendar, ChevronDown, Monitor, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiRequest } from "../../../../lib/api"; 
+import { getTokenByRole } from "@/app/lib/auth";
 
 export default function MovieBookingPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -15,9 +16,9 @@ export default function MovieBookingPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   
   const today = new Date();
-  // Khởi tạo ngày chọn là hôm nay
   const [selectedDate, setSelectedDate] = useState<string>(today.toISOString().split('T')[0]);
   const [showPicker, setShowPicker] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { fetchMovieDetail(); }, [movieId]);
   useEffect(() => { if (selectedDate) fetchShowtimes(); }, [selectedDate, movieId]);
@@ -36,6 +37,12 @@ export default function MovieBookingPage({ params }: { params: Promise<{ id: str
     setLoading(false);
   };
 
+  const handleBookingClick = (showtimeId: string) => {
+    const userToken = getTokenByRole("USER");
+    if (!userToken) { router.push('/auth'); return; }
+    router.push(`/booking/${showtimeId}`);
+  };
+
   const groupedShowtimes = showtimes.reduce((acc: any, st: any) => {
     const name = st.cinemaItem?.name || "Rạp A&K Cinema"; 
     if (!acc[name]) acc[name] = [];
@@ -43,144 +50,87 @@ export default function MovieBookingPage({ params }: { params: Promise<{ id: str
     return acc;
   }, {});
 
-  // --- LOGIC: HIỆN TUẦN THEO NGÀY ĐANG CHỌN ---
   const getWeeklyDays = () => {
     const days = [];
     const weekdays = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-    
-    // Lấy mốc từ ngày đang được chọn
-    const baseDate = new Date(selectedDate);
-    
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(baseDate);
-      d.setDate(baseDate.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      
-      // Kiểm tra xem có phải là "Hôm nay" thực tế không
-      const isRealToday = dateStr === today.toISOString().split('T')[0];
-
-      days.push({
-        full: dateStr,
-        date: d.getDate(),
-        name: isRealToday ? "Nay" : weekdays[d.getDay()]
-      });
+    for (let i = 0; i < 14; i++) {
+      const d = new Date();
+      d.setDate(today.getDate() + i);
+      days.push({ full: d.toISOString().split('T')[0], date: d.getDate(), name: i === 0 ? "Nay" : weekdays[d.getDay()] });
     }
     return days;
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans pb-20 selection:bg-red-600">
-      
-      {/* HEADER SIÊU MẢNH */}
-      <div className="sticky top-0 z-[100] bg-[#050505]/95 backdrop-blur-md border-b border-white/5">
+    <div className="min-h-screen bg-[#030303] text-white font-sans pb-10 selection:bg-red-600">
+      {/* Header tinh gọn */}
+      <div className="sticky top-0 bg-[#030303]/90 backdrop-blur-md border-b border-zinc-900/50">
         <div className="max-w-4xl mx-auto px-4 py-3">
-          
-          <div className="flex items-center justify-between mb-6">
-            <Link href={`/movies/${movieId}`} className="flex items-center gap-2 group">
-              <ChevronLeft size={16} className="text-zinc-500 group-hover:text-red-600 transition-colors" />
-              <h1 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 truncate max-w-[120px]">
-                {movie?.title || "Đang tải..."}
-              </h1>
+          <div className="flex items-center justify-between mb-4">
+            <Link href={`/movies/${movieId}`} className="flex items-center gap-3 group">
+              <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                <ChevronLeft size={16} className="text-zinc-400" />
+              </div>
+              <h1 className="text-[11px] font-black uppercase tracking-widest italic">{movie?.title || "Đang tải..."}</h1>
             </Link>
 
-            {/* CHỌN THÁNG/NĂM - DROP DOWN TẠI CHỖ */}
             <div className="relative">
-              <button 
-                onClick={() => setShowPicker(!showPicker)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/50 rounded-full border border-white/10 hover:border-red-600/50 transition-all"
-              >
-                <span className="text-[9px] font-black uppercase tracking-widest text-red-600 italic">
-                  {new Date(selectedDate).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
-                </span>
-                <ChevronDown size={10} className={`text-zinc-600 transition-transform ${showPicker ? 'rotate-180' : ''}`} />
+              <button onClick={() => setShowPicker(!showPicker)} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 rounded-lg border border-zinc-800 hover:border-red-500/50 transition-all">
+                <Calendar size={12} className="text-red-500" />
+                <span className="text-[9px] font-bold uppercase">{new Date(selectedDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+                <ChevronDown size={10} className="opacity-50" />
               </button>
 
               {showPicker && (
-                <>
-                  <div className="fixed inset-0" onClick={() => setShowPicker(false)} />
-                  <div className="absolute right-0 mt-2 z-20 bg-[#0f0f0f] border border-white/10 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-top-2 duration-200">
-                    <p className="text-[8px] font-bold text-zinc-600 uppercase mb-2 ml-1">Chọn lịch vạn niên</p>
-                    <input 
-                      type="date" 
-                      value={selectedDate}
-                      onChange={(e) => {
-                        setSelectedDate(e.target.value);
-                        setShowPicker(false);
-                      }}
-                      className="bg-zinc-900 text-white text-[11px] font-black uppercase p-2 rounded-lg outline-none color-scheme-dark border border-white/5"
-                    />
-                  </div>
-                </>
+                <div className="absolute right-0 mt-2 z-20 bg-zinc-900 border border-zinc-800 rounded-xl p-2 w-40">
+                  <input type="date" value={selectedDate} onChange={(e) => { setSelectedDate(e.target.value); setShowPicker(false); }} className="w-full bg-transparent text-xs p-1" />
+                </div>
               )}
             </div>
           </div>
 
-          {/* WEEKLY STRIP - TỰ ĐỘNG CHẠY THEO NGÀY CHỌN */}
-          <div className="flex justify-between items-center px-2">
-            {getWeeklyDays().map((d) => {
-              const isActive = selectedDate === d.full;
-              return (
-                <button 
-                  key={d.full} 
-                  onClick={() => setSelectedDate(d.full)}
-                  className="flex flex-col items-center group relative py-2"
-                >
-                  <span className={`text-[7px] font-black uppercase tracking-tighter mb-1 transition-colors ${isActive ? 'text-red-600' : 'text-zinc-600 group-hover:text-zinc-400'}`}>
-                    {d.name}
-                  </span>
-                  <span className={`text-[14px] font-[1000] italic transition-all ${isActive ? 'text-white scale-110 shadow-sm' : 'text-zinc-600 group-hover:text-zinc-300'}`}>
-                    {d.date}
-                  </span>
-                  {isActive && (
-                    <div className="absolute -bottom-1 w-1 h-1 bg-red-600 rounded-full shadow-[0_0_8px_#dc2626]" />
-                  )}
-                </button>
-              );
-            })}
+          <div ref={scrollContainerRef} className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            {getWeeklyDays().map((d) => (
+              <button key={d.full} onClick={() => setSelectedDate(d.full)}
+                className={`flex flex-col items-center justify-center min-w-[45px] h-12 rounded-lg border transition-all ${selectedDate === d.full ? 'bg-red-600 border-red-500' : 'bg-zinc-900/30 border-zinc-800'}`}>
+                <span className="text-[8px] font-bold opacity-70">{d.name}</span>
+                <span className="text-xs font-black">{d.date}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* DANH SÁCH SUẤT CHIẾU */}
-      <div className="max-w-4xl mx-auto px-6 mt-10 space-y-10">
+      {/* Danh sách suất chiếu */}
+      <div className="max-w-4xl mx-auto px-4 mt-6 space-y-6">
         {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-red-600/30" size={20} /></div>
+          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-red-600" /></div>
         ) : Object.keys(groupedShowtimes).length > 0 ? (
           Object.entries(groupedShowtimes).map(([cinemaName, times]: any) => (
-            <div key={cinemaName} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="h-[1px] w-6 bg-red-600" />
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 italic">{cinemaName}</h4>
+            <div key={cinemaName} className="bg-zinc-900/20 border border-zinc-800/50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-4 border-b border-zinc-800 pb-3">
+                <MapPin size={12} className="text-red-500" />
+                <h4 className="text-[10px] font-black uppercase tracking-widest">{cinemaName}</h4>
               </div>
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                 {times.map((st: any) => (
-                  <button 
-                    key={st.id}
-                    onClick={() => router.push(`/booking/${st.id}`)}
-                    className="h-9 bg-zinc-900/40 border border-white/5 rounded-lg flex items-center justify-center transition-all hover:bg-white hover:text-black text-[11px] font-[1000] italic active:scale-95"
-                  >
-                    {st.startTime.split('T')[1].substring(0, 5)}
+                  <button key={st.id} onClick={() => handleBookingClick(st.id)}
+                    className="py-2 bg-zinc-950 border border-zinc-800 hover:border-white rounded-md transition-all text-center group">
+                    <span className="block text-[11px] font-bold">{st.startTime.split('T')[1].substring(0, 5)}</span>
+                    <span className="block text-[7px] uppercase opacity-40 group-hover:text-red-500">{st.roomName || "2D"}</span>
                   </button>
                 ))}
               </div>
             </div>
           ))
         ) : (
-          <div className="py-32 text-center">
-            <p className="text-[9px] font-black uppercase tracking-[0.5em] text-zinc-800 italic leading-loose">
-              Không có suất chiếu <br/> cho ngày này
-            </p>
-          </div>
+          <div className="py-20 text-center opacity-30"><Monitor size={24} className="mx-auto mb-2" /><p className="text-[10px] uppercase font-bold">Không có suất chiếu</p></div>
         )}
       </div>
 
       <style jsx global>{`
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          filter: invert(1);
-          cursor: pointer;
-        }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
       `}</style>
     </div>
   );

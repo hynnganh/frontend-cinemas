@@ -1,5 +1,6 @@
 import PostSection from "./(client)/components/home/PostSection";
 import MovieSection from "./(client)/components/home/MovieSection";
+import ComboSection from "./(client)/components/home/ComboSection";
 import HeroSection from "./(client)/components/home/HeroSection";
 import TopBanner from "./(client)/components/TopBanner";
 import TopMenu from "./(client)/components/TopMenu";
@@ -13,8 +14,9 @@ export default function Home() {
       <TopMenu />
       <Navbar />
       <HeroSection />
-      <MovieSection />
+      <ComboSection />
       <PostSection />
+      <MovieSection />
       <Footer />
     </>
   );

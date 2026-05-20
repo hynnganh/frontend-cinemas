@@ -213,7 +213,7 @@ export default function HeroSection() {
         
         <div className="flex items-center justify-between max-w-[1400px] mx-auto pb-1 border-b border-white/[0.02]">
           <h2 className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-zinc-400 drop-shadow">
-            Phim Mới Thêm Vào
+            Phim Mới Nhất
           </h2>
           
           <div className="flex items-center gap-2">

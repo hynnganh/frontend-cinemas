@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Loader2, Clock, ChevronRight, Star, Calendar as CalendarIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { apiRequest, getImageUrl } from '@/app/lib/api';
+import { getTokenByRole } from '@/app/lib/auth';
 
 const MovieShowtimeItem = ({ movie, onSelect }: any) => (
   <div className="group flex gap-4 p-4 rounded-[2rem] bg-zinc-900/30 border border-white/5 hover:border-red-600/30 hover:bg-zinc-900/60 transition-all duration-300">
@@ -66,9 +67,16 @@ export default function Cinema() {
     setSelectedDate(new Date().toISOString().split('T')[0]);
   }, []);
 
-  const handleBooking = (showtimeId: number) => {
-    router.push(`/booking/${showtimeId}`);
-  };
+const handleBooking = (showtimeId: number) => {
+  // Kiểm tra token với vai trò là USER
+  const userToken = getTokenByRole("USER");
+
+  if (!userToken) {
+    router.push('/auth');
+    return;
+  }
+  router.push(`/booking/${showtimeId}`);
+};
 
   useEffect(() => {
     const fetchCinemas = async () => {

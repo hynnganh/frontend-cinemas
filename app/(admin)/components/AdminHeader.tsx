@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, Search, ChevronDown, ShieldCheck, LogOut } from 'lucide-react';
 import Cookies from 'js-cookie';
+import { apiAdminRequest } from "@/app/lib/api"; // Đảm bảo đường dẫn import đúng
 
 export default function AdminHeader() {
   const [thongTinAdmin, setThongTinAdmin] = useState<any>(null);
@@ -9,31 +10,18 @@ export default function AdminHeader() {
 
   const xuLyDangXuat = useCallback(() => {
     const keyToken = 'token_admin';
-    
     localStorage.removeItem(keyToken);
     Cookies.remove(keyToken, { path: '/' });
     localStorage.removeItem('user_info_admin');
-
     window.dispatchEvent(new Event("auth-changed"));
     window.location.href = '/login';
   }, []);
 
   useEffect(() => {
     const taiThongTin = async () => {
-      const token = localStorage.getItem('token_admin');
-      
-      if (!token) {
-        xuLyDangXuat();
-        return;
-      }
-
+      // Sử dụng apiAdminRequest thay vì fetch thủ công
       try {
-        const res = await fetch('http://localhost:8080/api/v1/users/me', {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const res = await apiAdminRequest('/api/v1/users/me');
 
         if (res.ok) {
           const ketQua = await res.json();

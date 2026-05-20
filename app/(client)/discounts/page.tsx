@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react'; // Thêm useMemo
-import { Ticket, Loader2, MapPin, Copy, CheckCircle2, ArrowRight, Wallet, Sparkles, Clock, Zap } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Ticket, Loader2, MapPin, Copy, CheckCircle2, ArrowRight, Clock, Zap, Heart } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api';
 import { useRouter } from 'next/navigation';
 
@@ -22,68 +22,69 @@ const VoucherCard = ({ voucher }: { voucher: any }) => {
   };
 
   return (
-    <div className="group relative bg-[#0f0f11] border border-white/5 rounded-[2rem] p-1 transition-all duration-500 hover:scale-[1.01] hover:shadow-[0_20px_50px_rgba(220,38,38,0.15)]">
-      <div className="relative flex flex-col md:flex-row items-center gap-6 bg-[#0f0f11] rounded-[1.9rem] p-5 z-10 overflow-hidden">
+    <div className="group relative bg-[#0c0c0e] border border-zinc-900 rounded-[2rem] p-1 transition-all duration-300 hover:scale-[1.01] hover:border-red-600/30 hover:shadow-[0_15px_30px_rgba(220,38,38,0.1)]">
+      <div className="relative flex flex-col sm:flex-row items-center gap-4 bg-[#0c0c0e] rounded-[1.9rem] p-4 z-10 overflow-hidden">
         
-        {/* Khối Trái: Visual Ticket */}
-        <div className="relative shrink-0 w-full md:w-36 h-28 bg-gradient-to-br from-zinc-800 to-black rounded-2xl flex flex-col items-center justify-center border border-white/10 shadow-2xl">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-600 to-red-900" />
+        {/* Khối Trái: Vé xem phim mini dáng tròn trịa, tone Đỏ - Đen cá tính */}
+        <div className="relative shrink-0 w-full sm:w-32 h-24 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black rounded-2xl flex flex-col items-center justify-center border border-zinc-800 shadow-sm">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900" />
           
           <div className="flex flex-col items-center justify-center">
-             <span className="text-sm font-black text-red-500 uppercase tracking-widest mb-1 italic">Giảm ngay</span>
+             <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-0.5">Giảm liền</span>
              <div className="flex items-start">
-                <span className="text-4xl font-[1000] text-white tracking-tighter italic leading-none">
+                <span className="text-3xl font-[1000] text-white tracking-tighter leading-none italic">
                     {formatDiscount(voucher.discountValue)}
                 </span>
-                <span className="text-xs font-bold text-white mt-1 ml-0.5">đ</span>
+                <span className="text-[10px] font-bold text-red-500 mt-0.5 ml-0.5">đ</span>
              </div>
           </div>
 
-          <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-[#050505] rounded-full border border-white/5 shadow-inner" />
-          <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-[#050505] rounded-full border border-white/5 shadow-inner" />
+          {/* Vết cắt lượn sóng nhỏ xinh tiệp màu nền rạp phim */}
+          <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-[#050505] rounded-full border border-zinc-900" />
+          <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-[#050505] rounded-full border border-zinc-900" />
         </div>
 
-        {/* Khối Giữa: Nội dung chính */}
-        <div className="flex-1 min-w-0 text-center md:text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full mb-3 border border-white/5">
-            <Zap size={10} className="text-yellow-500 fill-yellow-500" />
-            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest italic">Ưu đãi tiền mặt</span>
+        {/* Khối Giữa: Thông tin chữ nhỏ nhắn, gọn gàng, trắng sạch sẽ */}
+        <div className="flex-1 min-w-0 text-center sm:text-left space-y-1">
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-red-600/10 rounded-full border border-red-600/20">
+            <Zap size={10} className="text-red-500 fill-red-500" />
+            <span className="text-[9px] font-bold text-red-400 uppercase tracking-wider">Mã Thành Viên</span>
           </div>
           
-          <h3 className="text-xl font-black text-white uppercase italic tracking-tighter truncate leading-tight mb-3">
+          <h3 className="text-base font-black text-white uppercase italic truncate leading-tight flex items-center justify-center sm:justify-start gap-1">
             {voucher.title}
           </h3>
           
-          <div className="flex flex-wrap justify-center md:justify-start gap-y-2 gap-x-5">
-            <div className="flex items-center gap-2 text-zinc-500">
-              <MapPin size={14} className="text-red-600" />
-              <span className="text-[10px] font-bold uppercase tracking-tight">{voucher.cinemaItem?.name || "Ngọc Anh Cinema"}</span>
+          <div className="flex flex-col gap-0.5 pt-0.5 text-zinc-500">
+            <div className="flex items-center justify-center sm:justify-start gap-1">
+              <MapPin size={12} className="text-red-500/80" />
+              <span className="text-[11px] font-bold uppercase truncate text-zinc-400">{voucher.cinemaItem?.name || "Hệ thống A&K Cinema"}</span>
             </div>
-            <div className="flex items-center gap-2 text-zinc-500">
-              <Clock size={14} className="text-zinc-600" />
-              <span className="text-[10px] font-bold uppercase tracking-tight">Hạn dùng: {new Date(voucher.endDate).toLocaleDateString('vi-VN')}</span>
+            <div className="flex items-center justify-center sm:justify-start gap-1">
+              <Clock size={12} className="text-zinc-600" />
+              <span className="text-[11px] font-medium text-zinc-500">Hạn dùng: {new Date(voucher.endDate).toLocaleDateString('vi-VN')}</span>
             </div>
           </div>
         </div>
 
-        {/* Khối Phải: Thao tác */}
-        <div className="flex flex-row md:flex-col items-center gap-3 w-full md:w-auto md:pl-6 md:border-l md:border-white/5">
+        {/* Khối Phải: Nút bấm Đỏ - Trắng - Đen nhỏ gọn xink iu */}
+        <div className="flex flex-row sm:flex-col items-center gap-2 w-full sm:w-auto sm:pl-4 sm:border-l sm:border-zinc-900">
           <div 
             onClick={() => handleCopy(voucher.code)}
-            className={`flex-1 md:flex-none flex items-center justify-center gap-3 px-5 py-3 rounded-2xl border transition-all cursor-pointer active:scale-95 group/copy ${
-                copied ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-black border-white/10 hover:border-red-600/50'
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all cursor-pointer active:scale-95 text-xs font-mono font-bold ${
+                copied ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-black border-zinc-800 hover:border-red-600/30 text-zinc-300 hover:text-red-500'
             }`}
           >
-            <span className={`text-xs font-black tracking-[0.2em] ${!copied && 'text-zinc-200'}`}>{voucher.code}</span>
-            {copied ? <CheckCircle2 size={16} /> : <Copy size={16} className="text-zinc-600 group-hover/copy:text-red-500 transition-colors" />}
+            <span>{voucher.code}</span>
+            {copied ? <CheckCircle2 size={13} /> : <Copy size={13} className="text-zinc-600" />}
           </div>
           
           <button 
             onClick={() => router.push('/movies/now')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-3 bg-red-600 text-white hover:bg-white hover:text-black rounded-2xl transition-all duration-300 active:scale-90 font-black uppercase italic text-[10px] tracking-widest shadow-lg shadow-red-600/20"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2 bg-red-600 text-white rounded-xl transition-all duration-300 active:scale-95 font-black uppercase italic text-[11px] tracking-wide hover:bg-white hover:text-black shadow-sm shadow-red-600/10"
           >
-            Dùng ngay
-            <ArrowRight size={14} />
+            Dùng luôn
+            <ArrowRight size={12} />
           </button>
         </div>
       </div>
@@ -99,97 +100,92 @@ export default function MyVoucherWallet() {
   useEffect(() => {
     const fetchVouchers = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = typeof window !== "undefined" ? localStorage.getItem('token_user') : null;
         const res = await apiRequest('/api/v1/vouchers/my-vouchers', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await res.json();
         setVouchers(result.data || []);
-      } catch (e) { console.error(e); } finally { setLoading(false); }
+      } catch (e) { 
+        console.error(e); 
+      } finally { 
+        setLoading(false); 
+      }
     };
     fetchVouchers();
   }, []);
 
-  // LOGIC CHÍNH: Lọc voucher còn hạn
   const activeVouchers = useMemo(() => {
     const now = new Date();
-    // Đặt về 0h để so sánh chính xác theo ngày
     now.setHours(0, 0, 0, 0);
-
     return vouchers.filter(v => {
       const expiryDate = new Date(v.endDate);
-      // Nếu ngày hết hạn lớn hơn hoặc bằng ngày hiện tại
       return expiryDate >= now;
     });
   }, [vouchers]);
 
   if (loading) return (
-    <div className="h-screen bg-[#050505] flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-red-600" size={40} strokeWidth={3} />
-      <span className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 animate-pulse">Đang kiểm tra túi đồ...</span>
+    <div className="h-screen bg-[#050505] flex flex-col items-center justify-center gap-2">
+      <Loader2 className="animate-spin text-red-600" size={32} strokeWidth={3} />
+      <span className="text-[11px] font-black uppercase tracking-widest text-zinc-600 animate-pulse">Đang kiểm tra ví...</span>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] selection:bg-red-600/30">
-      <div className="pt-12 pb-24 px-6 md:px-12">
-        <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-[#050505] text-zinc-400 pb-20 font-sans antialiased selection:bg-red-600/20 selection:text-red-500">
+      <div className="pt-10 px-4 sm:px-6">
+        {/* Khung nhỏ gọn vừa vặn max-w-3xl chuẩn dáng xink iu */}
+        <div className="max-w-3xl mx-auto">
           
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 border-b border-white/5 pb-10">
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-gradient-to-tr from-red-600 to-red-900 rounded-[2rem] flex items-center justify-center shadow-[0_0_40px_rgba(220,38,38,0.3)] rotate-3">
-                <Ticket className="text-white -rotate-12" size={36} strokeWidth={2} />
+          {/* Header nhỏ gọn tinh tế, điểm chút xíu hồng cam ở tim nhỏ */}
+          <div className="flex flex-row items-center justify-between gap-4 mb-8 border-b border-zinc-900 pb-6">
+            <div className="flex items-center gap-3.5">
+              <div className="w-14 h-14 bg-gradient-to-tr from-red-600 to-red-900 rounded-2xl flex items-center justify-center shadow-md shadow-red-900/10 rotate-2">
+                <Ticket className="text-white -rotate-6" size={24} strokeWidth={2.5} />
               </div>
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="h-[2px] w-8 bg-red-600" />
-                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Member Privilege</span>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  {/* Nhấn chút xíu hồng cam cực nhẹ ở icon nhỏ đáng yêu này */}
+                  <Heart size={10} className="text-pink-400 fill-pink-500 animate-pulse" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Túi đồ cá nhân</span>
                 </div>
-                <h2 className="text-5xl font-black text-white uppercase italic tracking-tighter leading-none">
-                  Voucher <span className="text-red-600 italic">Box</span>
+                <h2 className="text-2xl font-black text-white uppercase italic tracking-tight">
+                  Voucher <span className="text-red-500 italic">Box</span>
                 </h2>
               </div>
             </div>
             
-            <div className="bg-zinc-900/40 backdrop-blur-md px-10 py-5 rounded-3xl border border-white/5 flex flex-col items-center">
-                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Khả dụng</span>
-                <div className="flex items-baseline gap-2">
-                  {/* Dùng độ dài của mảng đã lọc */}
-                  <span className="text-4xl font-[1000] text-white italic">{activeVouchers.length}</span>
-                  <span className="text-[10px] font-bold text-red-600 uppercase italic">Mã</span>
-                </div>
+            {/* Tag đếm số lượng tròn trịa nhỏ gọn */}
+            <div className="bg-[#0c0c0e] border border-zinc-900 px-4 py-2 rounded-2xl flex items-center gap-1.5 shadow-sm">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">Đang có</span>
+                <span className="text-xl font-black text-red-500 leading-none italic">{activeVouchers.length}</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">mã</span>
             </div>
           </div>
 
-          {/* List - Render activeVouchers thay vì vouchers gốc */}
+          {/* Danh sách Voucher dáng mini gọn gàng */}
           {activeVouchers.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-5 duration-700">
+            <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
               {activeVouchers.map((v, i) => (
                 <VoucherCard key={v.id || i} voucher={v} />
               ))}
             </div>
           ) : (
-            <div className="py-40 flex flex-col items-center justify-center bg-zinc-900/10 rounded-[4rem] border-2 border-dashed border-white/5">
-              <Ticket size={48} className="text-zinc-800 mb-6" />
-              <p className="text-zinc-500 text-xs font-black uppercase tracking-[0.3em] italic text-center px-4">
-                Bạn không có mã giảm giá nào còn hạn sử dụng
+            <div className="py-24 flex flex-col items-center justify-center bg-[#0c0c0e]/30 rounded-[2.5rem] border border-dashed border-zinc-900">
+              <Ticket size={40} className="text-zinc-800 mb-4" />
+              <p className="text-zinc-500 text-xs font-black uppercase tracking-widest text-center px-6 leading-relaxed">
+                Túi đồ của bạn hiện tại chưa có mã nào nè~
               </p>
               <button 
                 onClick={() => router.push('/')}
-                className="mt-8 text-red-600 text-[10px] font-black uppercase tracking-[0.2em] hover:text-white transition-colors"
+                className="mt-5 px-5 py-2 rounded-full bg-black border border-zinc-800 text-zinc-300 text-xs font-bold shadow-sm hover:border-red-600/40 hover:text-red-500 transition-all active:scale-95"
               >
-                Quay lại trang chủ →
+                Đi gom mã ngay nha 🎬
               </button>
             </div>
           )}
         </div>
       </div>
-
-      <style jsx global>{`
-        body { background-color: #050505; }
-        .font-black { font-weight: 900; }
-      `}</style>
     </div>
   );
 }

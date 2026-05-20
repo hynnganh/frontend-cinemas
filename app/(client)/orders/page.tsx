@@ -63,11 +63,17 @@ export default function OrderHistoryPage() {
                   <p className="font-black italic text-red-600">{fmtVND(o.totalAmount)}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className={`text-[9px] font-black px-3 py-1 rounded-full border ${o.status === 'SUCCESS' ? 'text-green-500 border-green-500/20 bg-green-500/5' : 'text-amber-500 border-amber-500/20 bg-amber-500/5'}`}>
-                    {o.status === 'SUCCESS' ? 'HOÀN TẤT' : 'CHỜ XỬ LÝ'}
-                  </span>
-                  {activeId === o.id ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
-                </div>
+  <span className={`text-[9px] font-black px-3 py-1 rounded-full border ${
+    o.status === 'PAID' 
+      ? 'text-green-500 border-green-500/20 bg-green-500/5' 
+      : o.status === 'CANCELLED' 
+        ? 'text-red-500 border-red-500/20 bg-red-500/5' 
+        : 'text-amber-500 border-amber-500/20 bg-amber-500/5'
+  }`}>
+    {o.status === 'PAID' ? 'HOÀN TẤT' : o.status === 'CANCELLED' ? 'ĐÃ HỦY' : 'CHỜ XỬ LÝ'}
+  </span>
+  {activeId === o.id ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
+</div>
               </div>
 
               {activeId === o.id && (

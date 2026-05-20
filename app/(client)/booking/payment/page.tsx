@@ -39,9 +39,9 @@ export default function PaymentPage() {
         // Kiểm tra điều kiện token hợp lệ, tránh bẫy chuỗi "undefined" hoặc "null"
         if (token && token !== "undefined" && token !== "null") {
           const [userRes, vRes] = await Promise.all([
-            apiRequest('/api/v1/users/me'),
-            apiRequest('/api/v1/vouchers/my-vouchers')
-          ]);
+          apiRequest('/api/v1/users/me', {}, 'USER'),
+          apiRequest('/api/v1/vouchers/my-vouchers', {}, 'USER')
+        ]);
 
           if (userRes.ok) {
             const uResult = await userRes.json();
@@ -114,10 +114,10 @@ export default function PaymentPage() {
       };
 
       // CẬP NHẬT: Loại bỏ headers thủ công vì apiRequest mới đã tự động tiêm Token & Content-Type
-      const res = await apiRequest(`/api/v1/orders`, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+    const res = await apiRequest(`/api/v1/orders`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }, 'USER');
       
       const resData = await res.json();
       
