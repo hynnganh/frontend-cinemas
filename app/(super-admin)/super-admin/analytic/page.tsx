@@ -1,91 +1,103 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { Download, Loader2, BarChart3, Star } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { apiSuperAdminRequest } from '../../../lib/api';
-import { BarChart3, LineChart, Calendar, Building2, TrendingUp, Layers } from 'lucide-react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
-export default function SuperAdminDashboard() {
+export default function ReportDashboard() {
   const [startDate, setStartDate] = useState("2026-05-01T00:00");
-  const [endDate, setEndDate] = useState("2026-05-19T23:59");
-  
-  // Khởi tạo state với cấu trúc dự kiến để tránh lỗi 'undefined'
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [endDate, setEndDate] = useState("2026-05-20T23:59");
+  const [loading, setLoading] = useState(false);
+  const [ranking, setRanking] = useState([]);
+  const [movieStats, setMovieStats] = useState([]);
 
-const fetchData = async () => {
-  setLoading(true);
-  try {
-    const res = await apiSuperAdminRequest(
-      `/api/v1/reports/dashboard?start=${new Date(startDate).toISOString()}&end=${new Date(endDate).toISOString()}`,
-      { method: 'GET' }
-    );
-    
-    // THÊM ĐOẠN NÀY ĐỂ DEBUG
-    if (!res.ok) {
-      const errorText = await res.text(); // Đọc nội dung lỗi từ server
-      console.error(`Lỗi Server (${res.status}):`, errorText);
-      throw new Error(`Server returned ${res.status}: ${errorText}`);
-    }
-    
-    const json = await res.json();
-    setData(json);
-  } catch (err) {
-    console.error("Lỗi chi tiết:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+  // Hàm helper nội bộ xử lý format ngày và query string
+  const getQuery = (params: Record<string, string> = {}) => {
+    const format = (d: string) => d.replace('T', ' ') + ':00';
+    const searchParams = new URLSearchParams({
+      start: format(startDate),
+      end: format(endDate),
+      ...params
+    });
+    return searchParams.toString();
+  };
 
-  useEffect(() => {
-    fetchData();
-  }, [startDate, endDate]);
+  const fetchData = async () => {
+    try {
+      const query = getQuery();
+      // Gọi đồng thời các API
+      const [rankRes, movieRes] = await Promise.all([
+        apiSuperAdminRequest(`/api/v1/reports/ranking?${query}`),
+        apiSuperAdminRequest(`/api/v1/reviews/stats`)
+      ]);
 
-  const formatVND = (val: number | undefined | null) => 
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val ?? 0);
+      if (rankRes.ok) setRanking(await rankRes.json());
+      if (movieRes.ok) setMovieStats(await movieRes.json());
+    } catch (e) { console.error("Lỗi tải data:", e); }
+  };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-zinc-400">Đang tải dữ liệu hệ thống...</div>;
+  const handleDownload = async () => {
+    setLoading(true);
+    try {
+      const query = getQuery({ cinemaId: '1' });
+      const res = await apiSuperAdminRequest(`/api/v1/reports/download?${query}`);
+      
+      if (!res.ok) throw new Error();
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Bao_Cao_${startDate.split('T')[0]}.xlsx`;
+      a.click();
+    } catch (err) { alert("Lỗi xuất file!"); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchData(); }, [startDate, endDate]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-200 p-6 md:p-10">
-      {/* HEADER & FILTER */}
-      <div className="flex justify-between items-center border-b border-zinc-900 pb-6 mb-8">
-        <h1 className="text-2xl font-black text-white italic tracking-tighter">SUPER ADMIN DASHBOARD</h1>
-        <div className="flex gap-2 text-xs">
-          <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-zinc-900 p-2 rounded" />
-          <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-zinc-900 p-2 rounded" />
+    <div className="p-10 bg-[#050505] min-h-screen text-zinc-200">
+      <h1 className="text-2xl font-black text-white mb-8">DASHBOARD DOANH THU</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Phần Thông số */}
+        <div className="bg-[#0c0c0e] p-8 rounded-3xl border border-zinc-900 h-fit">
+          <h2 className="font-bold mb-4">THÔNG SỐ</h2>
+          <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-zinc-950 p-3 rounded-xl mb-4 border border-zinc-900" />
+          <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-zinc-950 p-3 rounded-xl mb-6 border border-zinc-900" />
+          <button onClick={handleDownload} className="w-full bg-red-600 p-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 disabled:opacity-50" disabled={loading}>
+            {loading ? <Loader2 className="animate-spin"/> : <Download size={20}/>} TẢI EXCEL
+          </button>
+        </div>
+
+        {/* Biểu đồ Xếp hạng */}
+        <div className="lg:col-span-2 bg-[#0c0c0e] p-8 rounded-3xl border border-zinc-900">
+          <h2 className="font-bold mb-6 flex items-center gap-2"><BarChart3 className="text-red-600" /> XẾP HẠNG DOANH THU</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={ranking} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={true} vertical={false} />
+              <XAxis type="number" stroke="#6b7280" />
+              <YAxis dataKey="name" type="category" stroke="#fff" width={120} />
+              <Tooltip contentStyle={{backgroundColor: '#000', border: '1px solid #333'}} />
+              <Bar dataKey="revenue" fill="#dc2626" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* 💰 CÁC CARD CHỈ SỐ - Dùng Optional Chaining để tránh lỗi */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Tổng Doanh Thu (Gross)" value={formatVND(data?.taxReport?.totalRevenue)} color="text-white" />
-        <StatCard title="Thuế (VAT)" value={`-${formatVND(data?.taxReport?.vat)}`} color="text-red-500" />
-        <StatCard title="Tổng Cost" value={`-${formatVND(data?.totalCost)}`} color="text-orange-500" />
-        <StatCard title="Lợi Nhuận Thuần" value={formatVND(data?.netProfit)} color="text-emerald-400" />
+      {/* Bảng Phim xuất sắc */}
+      <div className="mt-8 bg-[#0c0c0e] p-8 rounded-3xl border border-zinc-900">
+        <h2 className="font-bold mb-6 flex items-center gap-2"><Star className="text-yellow-500" /> PHIM ĐƯỢC ĐÁNH GIÁ CAO</h2>
+        <table className="w-full text-left">
+          <thead><tr className="text-zinc-500 text-xs uppercase"><th className="pb-4">Tên Phim</th><th className="pb-4 text-right">Điểm TB</th><th className="pb-4 text-right">Lượt đánh giá</th></tr></thead>
+          <tbody>
+            {movieStats.map((movie: any, idx) => (
+              <tr key={idx} className="border-t border-zinc-900/50"><td className="py-4 font-bold">{movie.title}</td><td className="py-4 text-right text-yellow-500">{movie.avgRating?.toFixed(1)}</td><td className="py-4 text-right">{movie.count}</td></tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* 📊 BIỂU ĐỒ */}
-      <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-6 mt-8 h-80">
-        <h2 className="text-xs font-bold text-zinc-500 mb-6 uppercase">Biểu đồ doanh thu hàng ngày</h2>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data?.dailyRevenue ?? []}>
-            <CartesianGrid stroke="#141416" vertical={false} />
-            <XAxis dataKey="date" stroke="#52525b" fontSize={10} />
-            <YAxis stroke="#52525b" fontSize={10} tickFormatter={(v) => `${v / 1000000}tr`} />
-            <Tooltip contentStyle={{ backgroundColor: '#050505', border: '1px solid #27272a' }} />
-            <Area type="monotone" dataKey="totalRevenue" stroke="#dc2626" fill="#dc2626" fillOpacity={0.1} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ title, value, color }: { title: string, value: string, color: string }) {
-  return (
-    <div className="bg-[#0c0c0e] border border-zinc-900 rounded-2xl p-5">
-      <span className="text-[10px] uppercase text-zinc-500 font-bold tracking-widest">{title}</span>
-      <p className={`text-xl font-black ${color} mt-1`}>{value}</p>
     </div>
   );
 }
