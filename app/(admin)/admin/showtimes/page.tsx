@@ -97,24 +97,34 @@ export default function AdminShowtimePage() {
     loadData();
   }, [loadData]);
 
-  const handleSave = async (data: any) => {
-    const tid = toast.loading("Đang xử lý...");
-    try {
-      const res = await apiAdminRequest(
-        data.id ? `/api/v1/showtimes/${data.id}` : "/api/v1/showtimes",
-        {
-          method: data.id ? "PUT" : "POST",
-          body: JSON.stringify({ ...data, cinemaItemId: cinemaId, price: 75000 }),
-        }
-      );
-      if (!res.ok) throw new Error();
-      toast.success("Thành công!", { id: tid });
-      setIsModalOpen(false);
-      loadData();
-    } catch {
-      toast.error("Lỗi xử lý lịch chiếu!", { id: tid });
+const handleSave = async (data: any) => {
+  const tid = toast.loading("Đang xử lý...");
+  try {
+    const res = await apiAdminRequest(
+      data.id ? `/api/v1/showtimes/${data.id}` : "/api/v1/showtimes",
+      {
+        method: data.id ? "PUT" : "POST",
+        body: JSON.stringify({ ...data, cinemaItemId: cinemaId, price: 75000 }),
+      }
+    );
+
+    // Chuyển kết quả sang dạng JSON để đọc message lỗi
+    const result = await res.json();
+
+    if (!res.ok) {
+      // Nếu Backend có trả về message thì lấy, không thì lấy mặc định
+      const errorMessage = result.message || result.error || "Lỗi không xác định";
+      throw new Error(errorMessage);
     }
-  };
+
+    toast.success("Thành công!", { id: tid });
+    setIsModalOpen(false);
+    loadData();
+  } catch (error: any) {
+    // Bây giờ toast sẽ hiện nội dung thật sự từ Backend (ví dụ: "Trùng giờ chiếu")
+    toast.error(error.message || "Lỗi xử lý lịch chiếu!", { id: tid });
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#000000] text-zinc-300 p-6 font-sans antialiased select-none tracking-tight">

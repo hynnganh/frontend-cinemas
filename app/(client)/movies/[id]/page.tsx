@@ -154,17 +154,17 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
 
         {/* NÚT QUAY LẠI */}
         <div className="absolute top-8 left-8 z-[50]">
-          <button 
-            onClick={() => router.back()} 
-            className="group flex items-center gap-2 transition-all duration-300"
-          >
-            <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white/20 bg-black/20 backdrop-blur-sm group-hover:bg-red-600 group-hover:border-red-600 transition-all duration-300">
-              <ArrowLeft size={20} className="text-white" />
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-              Quay lại
-            </span>
-          </button>
+<button 
+  onClick={() => router.push('/')} 
+  className="group flex items-center gap-2 transition-all duration-300"
+>
+  <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white/20 bg-black/20 backdrop-blur-sm group-hover:bg-red-600 group-hover:border-red-600 transition-all duration-300">
+    <ArrowLeft size={20} className="text-white" />
+  </div>
+  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+    Về trang chủ
+  </span>
+</button>
         </div>
 
         <div className="absolute inset-0 flex items-end pb-12">
