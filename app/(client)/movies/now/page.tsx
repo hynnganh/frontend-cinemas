@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import MovieCard from '../MovieCard';
 import { apiRequest } from "../../../lib/api";
@@ -11,40 +12,79 @@ export default function PhimDangChieu() {
   useEffect(() => {
 
     const fetchMovies = async () => {
+
       try {
 
-        const response = await apiRequest(
+        // ⭐ API PHIM ĐANG CHIẾU
+        const movieResponse = await apiRequest(
           "/api/v1/movies?status=SHOWING",
           {
             method: "GET"
           }
         );
 
-        if (response.ok) {
-
-          const resData = await response.json();
-          const targetData = resData.data;
-
-          if (targetData) {
-            setMovies(
-              targetData.content ||
-              (Array.isArray(targetData)
-                ? targetData
-                : [])
-            );
-          } else {
-            setMovies(
-              Array.isArray(resData)
-                ? resData
-                : (resData.content || [])
-            );
+        // ⭐ API TOP PHIM BÁN CHẠY
+        const topResponse = await apiRequest(
+          "/api/v1/movies/top-tickets",
+          {
+            method: "GET"
           }
+        );
+
+        let showingMovies: any[] = [];
+        let topMovies: any[] = [];
+
+        // ===== PHIM ĐANG CHIẾU =====
+        if (movieResponse.ok) {
+
+          const movieData = await movieResponse.json();
+
+          const targetData = movieData.data;
+
+          showingMovies =
+            targetData?.content ||
+            (Array.isArray(targetData)
+              ? targetData
+              : []);
         }
 
+        // ===== TOP PHIM BÁN CHẠY =====
+        if (topResponse.ok) {
+
+          const topData = await topResponse.json();
+
+          topMovies = topData.data || [];
+        }
+
+        // ⭐ GHÉP totalTickets VÀO MOVIE
+        const mergedMovies = showingMovies.map((movie) => {
+
+          const matchedMovie = topMovies.find(
+            (top) => top.movieId === movie.id
+          );
+
+          return {
+            ...movie,
+            totalTickets: matchedMovie?.totalTickets || 0
+          };
+        });
+
+        // ⭐ SORT THEO SỐ VÉ BÁN
+        mergedMovies.sort(
+          (a, b) => b.totalTickets - a.totalTickets
+        );
+
+        setMovies(mergedMovies);
+
       } catch (error) {
-        console.error("Lỗi khi tải danh sách phim:", error);
+
+        console.error(
+          "Lỗi khi tải danh sách phim:",
+          error
+        );
 
       } finally {
+
         setLoading(false);
       }
     };
