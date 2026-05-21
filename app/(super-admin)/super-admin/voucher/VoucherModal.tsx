@@ -1,277 +1,145 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { X, Save, Loader2, Tag, DollarSign, Activity, AlertCircle, LayoutGrid } from 'lucide-react';
-import { apiSuperAdminRequest } from '@/app/lib/api'; 
+import React, { useEffect, useState } from "react";
+import { X, Save, Loader2, AlertCircle, Tag, Percent, DollarSign, Gift, Coins } from "lucide-react";
+import { apiSuperAdminRequest } from "@/app/lib/api";
 
-interface VoucherModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: any) => void;
-  initialData: any;
-  isSubmitting: boolean;
-}
-
-export default function VoucherModal({ isOpen, onClose, onSubmit, initialData, isSubmitting }: VoucherModalProps) {
+export default function VoucherModal({ isOpen, onClose, onSubmit, initialData, isSubmitting }: any) {
   const [promotions, setPromotions] = useState<any[]>([]);
-  const [loadingData, setLoadingData] = useState(false);
-
+  const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
-    code: "", 
-    title: "", 
-    description: "", 
-    discountValue: 0,
-    minOrderAmount: 0, 
-    usageLimit: 1,
-    startDate: new Date().toISOString().slice(0, 16),
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
-    promotionId: ""
+    code: "", title: "", description: "", discountValue: 0, minOrderAmount: 0,
+    usageLimit: 1, startDate: "", endDate: "", promotionId: "",
+    voucherType: "EVENT", costPoints: 0
   });
 
-  // Fetch dữ liệu bổ trợ (Chỉ lấy Promotions)
   useEffect(() => {
     if (isOpen) {
-      const fetchData = async () => {
-        setLoadingData(true);
-        try {
-          const promoRes = await apiSuperAdminRequest('/api/v1/promotions');
-          if (promoRes.ok) {
-            const result = await promoRes.json();
-            setPromotions(result.data || []);
-          }
-        } catch (error) { 
-          console.error("Lỗi fetch promotion:", error); 
-        } finally { 
-          setLoadingData(false); 
-        }
-      };
-      fetchData();
-    }
-  }, [isOpen]);
-
-  // Sync dữ liệu khi Edit/Create
-  useEffect(() => {
-    if (isOpen) {
+      apiSuperAdminRequest('/api/v1/promotions').then(r => r.json()).then(d => setPromotions(d.data || []));
       if (initialData) {
         setFormData({
           ...initialData,
-          startDate: new Date(initialData.startDate).toISOString().slice(0, 16),
-          endDate: new Date(initialData.endDate).toISOString().slice(0, 16),
-          promotionId: initialData.promotion?.id || initialData.promotionId || ""
-        });
-      } else {
-        setFormData({
-          code: "", title: "", description: "", discountValue: 0,
-          minOrderAmount: 0, usageLimit: 1,
-          startDate: new Date().toISOString().slice(0, 16),
-          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
-          promotionId: ""
+          startDate: initialData.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : "",
+          endDate: initialData.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : "",
+          promotionId: initialData.promotionId || ""
         });
       }
     }
-  }, [initialData, isOpen]);
+  }, [isOpen, initialData]);
 
-  // --- LOGIC RÀNG BUỘC (VALIDATIONS) ---
-  const codeRegex = /^[A-Z0-9]{3,15}$/;
-  const isCodeInvalid = !codeRegex.test(formData.code);
-  const isTitleInvalid = formData.title.trim().length < 5;
-  const isUsageLimitInvalid = formData.usageLimit <= 0 || !Number.isInteger(formData.usageLimit);
-  const isDiscountInvalid = formData.discountValue <= 0;
-  const isMinOrderInvalid = formData.minOrderAmount < 0;
-  const isTimeInvalid = new Date(formData.endDate) <= new Date(formData.startDate);
-  
-  // RÀNG BUỘC MỚI: Số tiền giảm không được lớn hơn giá trị đơn tối thiểu
-  const isDiscountGreaterThanMinOrder = formData.discountValue > formData.minOrderAmount;
-
-  // Điều kiện tổng để active nút Submit
-  const canSubmit = 
-    !isCodeInvalid && 
-    !isTitleInvalid && 
-    !isUsageLimitInvalid && 
-    !isDiscountInvalid && 
-    !isMinOrderInvalid && 
-    !isTimeInvalid && 
-    !isDiscountGreaterThanMinOrder && // Thêm kiểm tra vào đây
-    !isSubmitting;
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: type === 'number' ? (value === '' ? 0 : Number(value)) : value 
-    }));
+  const validate = () => {
+    const newErrors = [];
+    if (!formData.code || formData.code.length < 3) newErrors.push("Mã code phải từ 3 ký tự.");
+    if (formData.discountValue >= formData.minOrderAmount) newErrors.push("Giá trị giảm phải nhỏ hơn đơn tối thiểu.");
+    if (formData.voucherType === "EVENT" && !formData.promotionId) newErrors.push("Vui lòng chọn sự kiện.");
+    if (formData.voucherType === "REDEEM" && formData.costPoints <= 0) newErrors.push("Số điểm đổi phải lớn hơn 0.");
+    setErrors(newErrors);
+    return newErrors.length === 0;
   };
+
+const handleChange = (e: any) => {
+  const { name, value, type } = e.target;
+
+  let finalValue: any =
+    type === "number" ? Number(value) : value;
+
+  // FORCE UPPERCASE CODE
+  if (name === "code") {
+    finalValue = String(value)
+      .toUpperCase()
+      .replace(/\s+/g, "");
+  }
+
+  setFormData((prev) => ({
+    ...prev,
+    [name]: finalValue,
+  }));
+};
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative bg-[#060608] border border-zinc-900 p-5 rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
-        
-        {/* MODAL HEADER */}
-        <div className="flex items-center justify-between border-b border-zinc-900 pb-2.5 mb-4">
-          <h2 className="text-xs font-black text-white uppercase tracking-tight">
-            {initialData ? 'Cập nhật' : 'Thêm mới'} <span className="text-red-600">Voucher</span>
+      <div className="relative bg-[#060608] border border-zinc-900 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-5 border-b border-zinc-900">
+          <h2 className="text-xs font-black text-white uppercase tracking-widest">
+            {initialData ? "Cập nhật" : "Thiết lập"} Voucher
           </h2>
-          <button 
-            type="button"
-            onClick={onClose} 
-            className="w-6 h-6 flex items-center justify-center bg-zinc-950 border border-zinc-900 rounded-lg hover:border-zinc-800 text-zinc-500 hover:text-white transition-all"
-          >
-            <X size={12} />
-          </button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
         </div>
 
-        {/* MODAL FORM */}
-        <form onSubmit={(e) => { e.preventDefault(); if(canSubmit) onSubmit(formData); }} className="space-y-3 text-[11px]">
-          
-          {/* MÃ CODE & GIỚI HẠN */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-zinc-500 flex items-center gap-1.5">
-                <Tag size={11} /> Mã định danh (Code)
-              </label>
-              <input 
-                name="code" required 
-                value={formData.code} 
-                onChange={(e) => setFormData({...formData, code: e.target.value.toUpperCase().replace(/\s/g, '')})}
-                className={`w-full bg-zinc-950 border ${formData.code && isCodeInvalid ? 'border-red-900' : 'border-zinc-900'} p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800 transition-all uppercase placeholder:text-zinc-700`} 
-                placeholder="VD: MOVIE50" 
-              />
-              {formData.code && isCodeInvalid && (
-                <p className="text-[8px] font-bold text-red-500 uppercase tracking-tight">3-15 ký tự chữ/số, không khoảng trắng</p>
-              )}
+        <div className="p-6 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden">
+          <form id="voucher-form" onSubmit={(e) => { e.preventDefault(); if (validate()) onSubmit(formData); }} className="space-y-6">
+            
+            {/* Loại Voucher & Code */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase">Mã Code</label>
+<input
+  name="code"
+  value={formData.code}
+  onChange={handleChange}
+  placeholder="VD: SALE2026"
+  className="w-full bg-zinc-950 border border-zinc-800 p-3 rounded-lg text-white font-bold text-xs uppercase"
+/>              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase">Hình thức</label>
+                <select name="voucherType" value={formData.voucherType} onChange={handleChange} className="w-full bg-zinc-950 border border-zinc-800 p-3 rounded-lg text-white font-bold text-xs">
+                  <option value="EVENT">Voucher sự kiện</option>
+                  <option value="REDEEM">Voucher đổi điểm</option>
+                </select>
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-zinc-500 flex items-center gap-1.5">
-                <Activity size={11} /> Giới hạn phát hành
-              </label>
-              <input 
-                name="usageLimit" type="number" required min="1"
-                value={formData.usageLimit || ''} onChange={handleChange}
-                className={`w-full bg-zinc-950 border ${isUsageLimitInvalid ? 'border-red-900' : 'border-zinc-900'} p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800`} 
-              />
-              {isUsageLimitInvalid && (
-                <p className="text-[8px] font-bold text-red-500 uppercase tracking-tight">Phải là số nguyên dương &gt; 0</p>
-              )}
-            </div>
-          </div>
 
-          {/* TIÊU ĐỀ KHUYẾN MÃI */}
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-zinc-500">Tiêu đề hiển thị ứng dụng</label>
-            <input 
-              name="title" required 
-              value={formData.title} onChange={handleChange}
-              className={`w-full bg-zinc-950 border ${formData.title && isTitleInvalid ? 'border-red-900' : 'border-zinc-900'} p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800 placeholder:text-zinc-700`} 
-              placeholder="Nhập tên chương trình áp dụng mã giảm giá..." 
-            />
-            {formData.title && isTitleInvalid && (
-              <p className="text-[8px] font-bold text-red-500 uppercase tracking-tight">Tiêu đề phải dài tối thiểu 5 ký tự</p>
+            {/* Điều kiện loại */}
+            {formData.voucherType === "EVENT" ? (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1"><Gift size={12}/> Sự kiện áp dụng</label>
+                <select name="promotionId" value={formData.promotionId} onChange={handleChange} className="w-full bg-zinc-950 border border-zinc-800 p-3 rounded-lg text-white font-bold text-xs">
+                  <option value="">Chọn sự kiện...</option>
+                  {promotions.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-amber-500 uppercase flex items-center gap-1"><Coins size={12}/> Điểm đổi (PTS)</label>
+                <input name="costPoints" type="number" value={formData.costPoints} onChange={handleChange} className="w-full bg-zinc-950 border border-amber-900/30 p-3 rounded-lg text-amber-500 font-bold text-xs" />
+              </div>
             )}
-          </div>
 
-          {/* SỰ KIỆN */}
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-zinc-500 flex items-center gap-1.5">
-              <LayoutGrid size={11} /> Thuộc chiến dịch / Sự kiện
-            </label>
-            <div className="relative">
-              <select
-                name="promotionId"
-                value={formData.promotionId}
-                onChange={handleChange}
-                className="w-full bg-zinc-950 border border-zinc-900 p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800 appearance-none text-zinc-400"
-              >
-                <option value="">HỆ THỐNG RIÊNG LẺ (KHO KHÔNG THUỘC SỰ KIỆN)</option>
-                {promotions.map((p: any) => (
-                  <option key={p.id} value={p.id} className="bg-[#060608] text-white">{p.title.toUpperCase()}</option>
-                ))}
-              </select>
+            {/* Cấu hình giá trị (Đã làm rõ) */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-2"><Tag size={12} /> Cấu hình giá trị</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-[9px] text-zinc-400">Số tiền giảm</p>
+                  <div className="relative"><input name="discountValue" type="number" value={formData.discountValue} onChange={handleChange} className="w-full bg-zinc-950 border border-zinc-800 p-3 rounded-lg text-white font-bold text-xs pl-8" /><Percent className="absolute left-3 top-3.5 text-zinc-600" size={12} /></div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] text-zinc-400">Đơn tối thiểu</p>
+                  <div className="relative"><input name="minOrderAmount" type="number" value={formData.minOrderAmount} onChange={handleChange} className="w-full bg-zinc-950 border border-zinc-800 p-3 rounded-lg text-white font-bold text-xs pl-8" /><DollarSign className="absolute left-3 top-3.5 text-zinc-600" size={12} /></div>
+                </div>
+              </div>
+              <p className="text-[9px] text-zinc-600 italic">
+                * Áp dụng giảm {formData.discountValue.toLocaleString()}đ cho đơn từ {formData.minOrderAmount.toLocaleString()}đ.
+              </p>
             </div>
-          </div>
 
-          {/* SỐ TIỀN GIẢM & ĐƠN TỐI THIỂU */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-zinc-500 flex items-center gap-1.5">
-                <DollarSign size={11} className="text-red-600"/> Giá trị giảm chiếc
-              </label>
-              <input 
-                name="discountValue" type="number" required min="1"
-                value={formData.discountValue || ''} onChange={handleChange}
-                className={`w-full bg-zinc-950 border ${isDiscountInvalid || isDiscountGreaterThanMinOrder ? 'border-red-900' : 'border-zinc-900'} p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800`} 
-              />
-              {isDiscountInvalid && (
-                <p className="text-[8px] font-bold text-red-500 uppercase tracking-tight">Mức giảm phải lớn hơn 0</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-zinc-500">Điều kiện đơn tối thiểu</label>
-              <input 
-                name="minOrderAmount" type="number" required min="0"
-                value={formData.minOrderAmount ?? ''} onChange={handleChange}
-                className={`w-full bg-zinc-950 border ${isMinOrderInvalid || isDiscountGreaterThanMinOrder ? 'border-red-900' : 'border-zinc-900'} p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800`} 
-              />
-              {isMinOrderInvalid && (
-                <p className="text-[8px] font-bold text-red-500 uppercase tracking-tight">Giá trị đơn không được âm</p>
-              )}
-            </div>
-          </div>
+            {errors.length > 0 && (
+              <div className="bg-red-950/20 border border-red-900/50 p-3 rounded-lg">
+                {errors.map((err, i) => <p key={i} className="text-[10px] text-red-500 font-bold flex items-center gap-2"><AlertCircle size={12} /> {err}</p>)}
+              </div>
+            )}
+          </form>
+        </div>
 
-          {/* THÔNG BÁO LỖI LOGIC GIẢM GIÁ / ĐƠN TỐI THIỂU */}
-          {isDiscountGreaterThanMinOrder && !isDiscountInvalid && !isMinOrderInvalid && (
-            <div className="flex items-center gap-2 text-red-500 bg-red-500/5 border border-red-950/40 p-2 rounded-lg">
-              <AlertCircle size={12} />
-              <p className="text-[9px] font-black uppercase tracking-wide">Lỗi: Giá trị đơn tối thiểu không được thấp hơn mức giảm giá!</p>
-            </div>
-          )}
-
-          {/* NGÀY HIỆU LỰC */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-zinc-500">Hiệu lực từ ngày</label>
-              <input 
-                name="startDate" type="datetime-local" required 
-                value={formData.startDate} onChange={handleChange}
-                className="w-full bg-zinc-950 border border-zinc-900 p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800 [color-scheme:dark]" 
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-zinc-500">Thời hạn đóng mã</label>
-              <input 
-                name="endDate" type="datetime-local" required 
-                value={formData.endDate} onChange={handleChange}
-                className={`w-full bg-zinc-950 border ${isTimeInvalid ? 'border-red-600' : 'border-zinc-900'} p-2.5 rounded-xl text-white font-bold outline-none focus:border-zinc-800 transition-colors [color-scheme:dark]`} 
-              />
-            </div>
-          </div>
-
-          {/* CẢNH BÁO LỖI THỜI GIAN */}
-          {isTimeInvalid && (
-            <div className="flex items-center gap-2 text-red-500 bg-red-500/5 border border-red-950/40 p-2 rounded-lg">
-              <AlertCircle size={12} />
-              <p className="text-[9px] font-black uppercase tracking-wide">Cảnh báo: Thời gian đóng mã phải sau mốc bắt đầu kích hoạt!</p>
-            </div>
-          )}
-
-          {/* BUTTON ACTION GỌN HÀNG */}
-          <div className="pt-1.5">
-            <button 
-              type="submit" 
-              disabled={!canSubmit}
-              className="w-full h-10 bg-red-600 disabled:bg-zinc-900/50 text-white disabled:text-zinc-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-md border border-transparent disabled:border-zinc-900/20"
-            >
-              {isSubmitting ? (
-                <Loader2 className="animate-spin text-white opacity-80" size={14} />
-              ) : (
-                <><Save size={14} /> {initialData ? "Lưu thay đổi" : "Kích hoạt tạo mã mới"}</>
-              )}
-            </button>
-          </div>
-        </form>
+        <div className="p-5 border-t border-zinc-900 bg-zinc-950/50">
+          <button type="submit" form="voucher-form" disabled={isSubmitting} className="w-full h-12 bg-red-600 hover:bg-red-700 rounded-xl text-white font-black uppercase text-xs flex items-center justify-center gap-2">
+            {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : "Lưu cấu hình"}
+          </button>
+        </div>
       </div>
     </div>
   );

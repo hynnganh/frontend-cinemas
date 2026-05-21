@@ -1,13 +1,13 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiRequest, getImageUrl } from '@/app/lib/api'; 
-import { getTokenByRole } from '@/app/lib/auth'; // Import hàm lấy token chuẩn theo phân vai
 import toast, { Toaster } from 'react-hot-toast';
 import { 
   Loader2, ChevronLeft, TicketPercent, Tag, Info, 
   CreditCard, Wallet, User, MapPin, Calendar, 
-  Clock, Monitor, ShieldCheck, CheckCircle2
+  Clock, Monitor, ShieldCheck, CheckCircle2, Armchair
 } from 'lucide-react';
 
 export default function PaymentPage() {
@@ -20,7 +20,7 @@ export default function PaymentPage() {
   const [paymentMethod, setPaymentMethod] = useState("VNPAY");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+useEffect(() => {
     const initPage = async () => {
       const sData = sessionStorage.getItem('booking_data');
       if (!sData) {
@@ -32,26 +32,56 @@ export default function PaymentPage() {
       const parsedData = JSON.parse(sData);
       setBookingData(parsedData);
 
-      // CẬP NHẬT: Lấy token tự động thông qua cơ chế fallback của hàm getTokenByRole()
-      const token = getTokenByRole();
+      // --- KHỐI CONSOLE LOG DEBUG TOKEN VÀ ROLE ---
+      console.log("=== DEBUG MULTI-TAB MULTI-ROLE ===");
       
+      // 1. Kiểm tra tất cả các token đang có trong hệ thống để xem có bị dẫm chân nhau không
+      const tokenUser = typeof window !== "undefined" ? localStorage.getItem('token_user') : null;
+      const tokenAdmin = typeof window !== "undefined" ? localStorage.getItem('token_admin') : null;
+      const tokenStaff = typeof window !== "undefined" ? localStorage.getItem('token_staff') : null;
+      
+      console.log("Token User hiện tại:", tokenUser);
+      console.log("Token Admin hiện tại (nếu có):", tokenAdmin);
+      console.log("Token Staff hiện tại (nếu có):", tokenStaff);
+
+      // 2. Decode thử Token đang dùng xem thực tế bên trong chứa thông tin của ai
+      if (tokenUser) {
+        try {
+          const base64Url = tokenUser.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+
+          const decoded = JSON.parse(jsonPayload);
+          console.log("👉 Dữ liệu thực tế bên trong tokenUser:", decoded);
+          console.log("👉 Role trong token:", decoded.role || decoded.roles || decoded.authorities || "Không tìm thấy");
+        } catch (e) {
+          console.error("Không thể decode token, có thể token không đúng định dạng JWT:", e);
+        }
+      } else {
+        console.warn("⚠️ CẢNH BÁO: Không tìm thấy token_user trong localStorage!");
+      }
+      console.log("==================================");
+      // --------------------------------------------
+
       try {
-        // Kiểm tra điều kiện token hợp lệ, tránh bẫy chuỗi "undefined" hoặc "null"
-        if (token && token !== "undefined" && token !== "null") {
-          const [userRes, vRes] = await Promise.all([
+        const [userRes, vRes] = await Promise.all([
           apiRequest('/api/v1/users/me', {}, 'USER'),
           apiRequest('/api/v1/vouchers/my-vouchers', {}, 'USER')
         ]);
 
-          if (userRes.ok) {
-            const uResult = await userRes.json();
-            setUserData(uResult.data?.user || uResult.data || uResult);
-          }
+        if (userRes.ok) {
+          const uResult = await userRes.json();
+          console.log("Kết quả trả về từ /users/me:", uResult);
+          setUserData(uResult.data?.user || uResult.data || uResult);
+        } else {
+          console.error("API /users/me thất bại, status:", userRes.status);
+        }
 
-          if (vRes.ok) {
-            const vResult = await vRes.json();
-            setVouchers(vResult.data || []);
-          }
+        if (vRes.ok) {
+          const vResult = await vRes.json();
+          setVouchers(vResult.data || []);
         }
       } catch (err) {
         console.error("Lỗi lấy dữ liệu:", err);
@@ -62,7 +92,7 @@ export default function PaymentPage() {
     initPage();
   }, [router]);
 
-  // TỔNG HỢP TẤT CẢ LOGIC TÍNH TOÁN
+  // TỔNG HỢP LOGIC TÍNH TOÁN TIỀN BẠC
   const calculateTotals = () => {
     const seatPrice = Number(bookingData?.seatPrice) || 0;
     const comboPrice = Number(bookingData?.comboPrice) || 0;
@@ -76,7 +106,7 @@ export default function PaymentPage() {
 
   const { subTotal, discount, finalTotal } = calculateTotals();
 
-  // BỘ LỌC VOUCHER THEO JSON API
+  // BỘ LỌC VOUCHER THỎA MÃN ĐIỀU KIỆN
   const validVouchers = vouchers.filter(v => {
     const now = new Date();
     const start = new Date(v.startDate);
@@ -94,13 +124,6 @@ export default function PaymentPage() {
     setIsProcessing(true);
     
     try {
-      // CẬP NHẬT: Kiểm tra token nghiêm ngặt bằng cơ chế mới chống lỗi 403 Forbidden
-      const token = getTokenByRole();
-      if (!token || token === "undefined" || token === "null") {
-        toast.error("Vui lòng đăng nhập lại hệ thống!");
-        return;
-      }
-      
       const payload = {
         showtimeId: Number(bookingData.showtimeId),
         seatIds: bookingData.selectedSeats.map((s: any) => Number(s.id)),
@@ -113,11 +136,11 @@ export default function PaymentPage() {
         voucherCode: selectedVoucher?.code || "" 
       };
 
-      // CẬP NHẬT: Loại bỏ headers thủ công vì apiRequest mới đã tự động tiêm Token & Content-Type
-    const res = await apiRequest(`/api/v1/orders`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    }, 'USER');
+      // apiRequest tự động tiêm Token & gán Content-Type: application/json chuẩn xác
+      const res = await apiRequest(`/api/v1/orders`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }, 'USER');
       
       const resData = await res.json();
       
@@ -139,7 +162,7 @@ export default function PaymentPage() {
         toast.error(errorMessage);
       }
     } catch (err) { 
-      toast.error("Lỗi kết nối!"); 
+      toast.error("Lỗi kết nối hệ thống!"); 
     } finally { 
       setIsProcessing(false); 
     }
@@ -150,7 +173,6 @@ export default function PaymentPage() {
       <Loader2 className="animate-spin text-red-600" size={40} />
     </div>
   );
-
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 md:p-10 font-sans">
       <Toaster position="top-center" reverseOrder={false} />

@@ -1,120 +1,21 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
-  MapPin, 
-  Loader2, 
-  X, 
-  Calendar, 
-  Check,
-  Ticket as TicketIcon, 
-  Coffee, 
-  ChevronRight, 
-  Clock, 
-  CreditCard 
-} from 'lucide-react';
+import { Loader2, X, Ticket as TicketIcon, Check, AlertTriangle, Calendar, Clock, MapPin, Film } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api'; 
 import { QRCodeSVG } from 'qrcode.react';
 import { Toaster } from 'react-hot-toast';
+import OrderTicketItem from './OrderTicketItem';
 
-// ============================================================================
-// 1. COMPONENT THÀNH PHẦN: DÒNG ĐƠN HÀNG GOM GHẾ
-// ============================================================================
-function OrderTicketItem({ order, onOpenDetail }: { order: any; onOpenDetail: (order: any) => void }) {
-  const isUsed = order.status === 'USED';
-  const isCancelled = order.status === 'CANCELLED';
+const checkIsExpired = (dateStr: string, timeStr: string) => {
+  if (!dateStr || !timeStr) return false;
+  const [day, month, year] = dateStr.split('/').map(Number);
+  const startTime = timeStr.split('-')[0].trim(); 
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const movieTime = new Date(year, month - 1, day, hours, minutes);
+  return movieTime < new Date();
+};
 
-  const tickets = order.orderDetails?.filter((d: any) => d.itemType === 'TICKET') || [];
-  const combos = order.orderDetails?.filter((d: any) => d.itemType === 'COMBO') || [];
-
-  const seatNames = tickets.map((t: any) => {
-    const match = t.itemName.match(/Ghế\s+([A-Z0-9]+)/i);
-    return match ? match[1] : "...";
-  }).sort().join(", ");
-
-  return (
-    <div 
-      onClick={() => !isCancelled && onOpenDetail(order)} 
-      className={`relative group flex items-stretch transition-all duration-500 h-28 mb-3.5 rounded-2xl border overflow-hidden select-none ${
-        isCancelled 
-          ? 'bg-zinc-950/20 border-zinc-900/50 opacity-40 cursor-not-allowed' 
-          : isUsed 
-            ? 'bg-zinc-900/40 border-zinc-800/60 opacity-80 hover:opacity-100 hover:border-zinc-600 cursor-pointer shadow-md'
-            : 'bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-white/5 hover:border-red-500/40 cursor-pointer hover:translate-x-1 shadow-xl shadow-black/40'
-      }`}
-    >
-      {/* CON DẤU ĐÃ SOÁT VÉ (BÊN NGOÀI ITEM) */}
-      {isUsed && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none rotate-[-15deg] scale-110">
-          <div className="border-[2px] border-emerald-500/60 bg-emerald-950/90 backdrop-blur-md px-4 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xl shadow-black">
-            <Check size={14} className="text-emerald-400 stroke-[3]" />
-            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.3em]">ĐÃ SOÁT VÉ</span>
-          </div>
-        </div>
-      )}
-
-      {/* ĐƯỜNG ĐÈN CHỈ THỊ */}
-      <div className={`w-2.5 shrink-0 transition-colors duration-500 ${isUsed ? 'bg-emerald-600/50' : isCancelled ? 'bg-zinc-900' : 'bg-red-600 group-hover:bg-red-500'}`} />
-
-      {/* THÔNG TIN CHI TIẾT ĐƠN HÀNG */}
-      <div className={`flex-1 flex flex-col justify-center px-5 min-w-0 transition-all duration-300 ${isUsed ? 'blur-[0.5px] grayscale group-hover:blur-0 group-hover:grayscale-0' : ''}`}>
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`text-[8px] font-black tracking-widest uppercase px-1.5 py-0.5 rounded bg-zinc-950 border border-white/5 ${isUsed ? 'text-zinc-500' : 'text-red-500'}`}>
-            ĐƠN: #{order.id}
-          </span>
-          <div className="flex items-center gap-1 text-[9px] text-zinc-500 font-bold">
-            <Clock size={10} />
-            {order.time || "N/A"}
-          </div>
-        </div>
-        
-        <h4 className={`text-sm font-black truncate uppercase tracking-tight transition-colors ${isUsed ? 'text-zinc-400 group-hover:text-white' : 'text-white group-hover:text-red-400'}`}>
-          {order.movieTitle || "Vé Xem Phim"}
-        </h4>
-        
-        <div className="flex items-center gap-4 mt-1.5 h-5">
-          <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 shrink-0">
-            <Calendar size={11} className="text-zinc-600" />
-            {order.date || "Hôm nay"}
-          </div>
-          <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 truncate">
-            <MapPin size={11} className="text-zinc-600" />
-            <span className="truncate max-w-[120px]">{order.cinemaName}</span>
-          </div>
-          {combos.length > 0 && (
-            <div className="flex items-center gap-1 text-[8px] font-black text-pink-500 bg-pink-950/20 border border-pink-900/30 px-1.5 py-0.5 rounded-md uppercase shrink-0">
-              <Coffee size={10} />
-              <span>+{combos.length} Combo</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ĐƯỜNG RĂNG CƯA NGHỆ THUẬT */}
-      <div className="relative w-6 flex flex-col justify-between py-3 opacity-20 pointer-events-none">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="w-1 h-1 rounded-full bg-black -mx-0.5" />
-        ))}
-      </div>
-
-      {/* CUỐNG VÉ BÊN PHẢI */}
-      <div className={`w-28 shrink-0 flex flex-col items-center justify-center border-l border-white/5 relative group-hover:bg-white/[0.03] transition-all ${isUsed ? 'bg-zinc-900/50' : 'bg-red-600/[0.02]'}`}>
-        <span className="text-[8px] font-black text-zinc-600 uppercase mb-0.5 tracking-widest">Vị trí ghế</span>
-        <div className="px-2 w-full text-center truncate">
-          <p className={`text-xs font-black tracking-tight uppercase transition-colors ${isUsed ? 'text-zinc-500 group-hover:text-zinc-300' : 'text-white group-hover:text-red-400'}`}>
-            {seatNames || "Combo"}
-          </p>
-        </div>
-        <ChevronRight size={13} className={`transition-colors mt-1 ${isUsed ? 'text-zinc-600 group-hover:text-zinc-400' : 'text-zinc-600 group-hover:text-red-500'}`} />
-      </div>
-    </div>
-  );
-}
-
-
-// ============================================================================
-// 2. MAIN COMPONENT CHÍNH: TRANG VÉ CỦA TÔI
-// ============================================================================
 export default function TicketsTab() {
   const [activeFilter, setActiveFilter] = useState('upcoming');
   const [orders, setOrders] = useState<any[]>([]);
@@ -131,7 +32,7 @@ export default function TicketsTab() {
           setOrders(validOrders);
         }
       } catch (err) { 
-        console.error("Lỗi fetch lịch sử đơn vé: ", err); 
+        console.error("Lỗi lấy lịch sử vé: ", err); 
       } finally { 
         setLoading(false); 
       }
@@ -140,8 +41,13 @@ export default function TicketsTab() {
   }, []);
 
   const filteredOrders = orders.filter(o => {
-    if (activeFilter === 'upcoming') return o.status === 'PAID';
-    if (activeFilter === 'done') return o.status === 'USED';
+    const isExpired = o.status === 'PAID' && checkIsExpired(o.date, o.time);
+    if (activeFilter === 'upcoming') {
+      return o.status === 'PAID' && !isExpired;
+    }
+    if (activeFilter === 'done') {
+      return o.status === 'USED' || isExpired;
+    }
     return true;
   });
 
@@ -164,22 +70,26 @@ export default function TicketsTab() {
     }).sort().join(", ");
   };
 
+  const isSelectedExpired = selectedOrder && selectedOrder.status === 'PAID' && checkIsExpired(selectedOrder.date, selectedOrder.time);
+  const isSelectedUsed = selectedOrder && selectedOrder.status === 'USED';
+
   return (
     <div className="min-h-screen bg-[#040406] text-white px-4 sm:px-6 lg:px-64 py-12 relative overflow-hidden">
       <Toaster />
       
-      {/* Nền Cyberpunk */}
+      {/* Hiệu ứng mờ góc nền Điện ảnh */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[130px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[130px] pointer-events-none" />
 
-      {/* Header Tab */}
-      <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8 relative z-10 animate-in fade-in slide-in-from-top-8 duration-700">
+      {/* Header điều hướng */}
+      <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-zinc-900 pb-8 relative z-10">
         <div>
-           <h2 className="text-3xl font-[1000] uppercase tracking-tighter italic">Vé điện tử <span className="text-red-600">của tôi</span></h2>
-           <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1.5">Hệ thống gom nhóm vé thông minh</p>
+           <h2 className="text-3xl font-black uppercase tracking-tighter italic">Vé điện tử <span className="text-red-500">của tôi</span></h2>
+           <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] mt-1.5">Hệ thống quản lý vé thông minh</p>
         </div>
 
-        <div className="flex bg-zinc-950 p-1.5 rounded-2xl border border-white/5 gap-1 shadow-inner">
+        {/* Nút chuyển đổi bộ lọc */}
+        <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-900 gap-1 shadow-inner self-start sm:self-auto">
           {[
             { id: 'upcoming', label: 'Vé sắp xem' },
             { id: 'done', label: 'Lịch sử xem' }
@@ -187,10 +97,10 @@ export default function TicketsTab() {
             <button 
               key={tab.id} 
               onClick={() => setActiveFilter(tab.id)} 
-              className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all duration-300 ${
+              className={`px-5 py-2 rounded-xl text-[11px] font-black uppercase transition-all duration-300 whitespace-nowrap ${
                 activeFilter === tab.id 
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' 
-                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' 
+                  : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
               {tab.label}
@@ -199,23 +109,19 @@ export default function TicketsTab() {
         </div>
       </div>
 
-      {/* DANH SÁCH ĐƠN HÀNG */}
+      {/* DANH SÁCH VÉ */}
       {loading ? (
-        <div className="flex justify-center py-24 animate-in fade-in duration-500"><Loader2 className="animate-spin text-red-600" size={32} strokeWidth={3} /></div>
+        <div className="flex justify-center py-24"><Loader2 className="animate-spin text-red-500" size={32} strokeWidth={2.5} /></div>
       ) : (
         <div className="space-y-1 max-h-[72vh] overflow-y-auto pr-1 no-scrollbar pb-20 relative z-10">
           {filteredOrders.length === 0 ? (
-            <div className="py-24 text-center border border-dashed border-white/5 rounded-[2.5rem] bg-zinc-950/20 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-500">
-              <TicketIcon className="mx-auto text-zinc-700 mb-4 animate-bounce" size={40} />
-              <p className="text-zinc-500 text-xs font-black uppercase tracking-widest">Không tìm thấy dữ liệu vé tương ứng!</p>
+            <div className="py-24 text-center border border-dashed border-zinc-800 rounded-[2.5rem] bg-zinc-950/20 backdrop-blur-sm">
+              <TicketIcon className="mx-auto text-zinc-700 mb-4" size={36} />
+              <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Không có dữ liệu vé tương ứng</p>
             </div>
           ) : (
-            filteredOrders.map((order, index) => (
-              <div 
-                key={order.id} 
-                className="animate-in fade-in slide-in-from-bottom-8 fill-mode-both"
-                style={{ animationDelay: `${index * 100}ms`, animationDuration: '500ms' }}
-              >
+            filteredOrders.map((order) => (
+              <div key={order.id} className="transition-all duration-300">
                 <OrderTicketItem order={order} onOpenDetail={(o) => setSelectedOrder(o)} />
               </div>
             ))
@@ -223,116 +129,160 @@ export default function TicketsTab() {
         </div>
       )}
 
-      {/* ============================================================================ */}
-      {/* E-TICKET POPUP MODAL */}
-      {/* ============================================================================ */}
+{/* MODAL CHI TIẾT VÉ - BỐ CỤC NGANG ĐIỆN ẢNH */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setSelectedOrder(null)} />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none">
+          {/* Lớp nền mờ */}
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300" onClick={() => setSelectedOrder(null)} />
           
-          <div className="relative bg-[#09090d] border border-zinc-800/60 rounded-[2.2rem] w-full max-w-[320px] shadow-[0_25px_60px_rgba(0,0,0,0.85)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-6 duration-400">
+          {/* Container chính dạng Ngang (Chống tràn 100%) */}
+          <div className="relative bg-zinc-950 border border-zinc-850 rounded-[2rem] w-full max-w-2xl max-h-[85vh] shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-200 z-10">
             
-            <div className="p-4 pb-3 border-b border-dashed border-zinc-800 flex justify-between items-center bg-gradient-to-b from-zinc-900/40 to-transparent">
-              <div className="flex items-center gap-2 pl-1">
-                <TicketIcon size={16} className="text-red-500" />
-                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">A&K Cinema Pass</span>
-              </div>
-              <button 
-                onClick={() => setSelectedOrder(null)} 
-                className="w-7 h-7 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all shadow-inner"
-              >
-                <X size={13} strokeWidth={3}/>
-              </button>
-            </div>
+            {/* Nút đóng góc trên phải */}
+            <button 
+              onClick={() => setSelectedOrder(null)} 
+              className="absolute top-4 right-4 z-30 p-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white transition-all shadow-md hover:scale-105 active:scale-95"
+            >
+              <X size={14} strokeWidth={2.5}/>
+            </button>
 
-            <div className="p-5 text-center space-y-4">
-              
-              {/* KHỐI QR CODE CÓ CHỨA DẤU ĐÃ SOÁT VÉ */}
-              <div className="relative inline-block group">
-                {/* 🎯 QR CODE BỊ LÀM MỜ NẾU LÀ VÉ CŨ */}
-                <div className={`bg-white p-3.5 rounded-[1.8rem] shadow-xl transition-all duration-500 ${selectedOrder.status === 'USED' ? 'opacity-30 grayscale blur-[1px]' : ''}`}>
-                  <QRCodeSVG value={getModalBookingCode()} size={140} level="H" includeMargin={false} />
-                  <div className="absolute inset-0 border-4 border-black/5 rounded-[1.8rem] pointer-events-none" />
+            {/* VẾ KHÁCH HÀNG (BÊN TRÁI): THÔNG TIN PHIM */}
+            <div className="flex-1 p-6 md:p-8 flex flex-col justify-between overflow-y-auto no-scrollbar">
+              <div className="space-y-5">
+                {/* Header nhỏ */}
+                <div className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.25em] text-zinc-500 uppercase">
+                  <Film size={12} className="text-red-500" />
+                  A&K Cinema Pass
                 </div>
-                
-                {/* Dấu đóng lên mã QR bên trong Modal */}
-                {selectedOrder.status === 'USED' && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none rotate-[-15deg] scale-125 shadow-2xl animate-in zoom-in-50 fade-in duration-500">
-                    <div className="border-[3px] border-emerald-500/80 bg-emerald-950/80 backdrop-blur-md px-5 py-2 rounded-xl flex items-center gap-2">
-                      <Check size={18} className="text-emerald-400 stroke-[4]" />
-                      <span className="text-xs font-[1000] text-emerald-400 uppercase tracking-[0.3em] drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]">ĐÃ SOÁT</span>
-                    </div>
-                  </div>
-                )}
-              </div>
 
-              {/* MÃ CHỮ BÊN DƯỚI QR */}
-              <div className="w-full flex justify-center">
-                <div className={`bg-black/50 border border-zinc-900 rounded-xl py-1.5 px-4 font-mono text-base font-black tracking-[0.25em] shadow-inner transition-colors ${selectedOrder.status === 'USED' ? 'text-zinc-600 line-through decoration-zinc-500/50' : 'text-zinc-100'}`}>
-                  {getModalBookingCode()}
-                </div>
-              </div>
-
-              {/* 🎯 KHỐI THÔNG TIN CHI TIẾT: GIỮ NGUYÊN SỰ SÁNG SỦA, RỰC RỠ, KHÔNG LÀM MỜ DÙ LÀ VÉ CŨ */}
-              <div className="text-left space-y-3.5 bg-zinc-950/70 border border-zinc-900/60 p-4 rounded-2xl shadow-inner">
+                {/* Tên phim */}
                 <div>
-                  <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-0.5">Tác Phẩm Điện Ảnh</p>
-                  <p className="text-xs font-black text-white uppercase italic tracking-tight line-clamp-1">{selectedOrder.movieTitle}</p>
+                  <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Tác phẩm điện ảnh</span>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight leading-tight">
+                    {selectedOrder.movieTitle}
+                  </h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 border-t border-zinc-900/60 pt-2.5">
-                  <div>
-                    <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-0.5">Ngày Chiếu</p>
-                    <p className="text-[11px] font-bold text-zinc-200">{selectedOrder.date}</p>
+                {/* Chi tiết suất chiếu & Ghế */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-zinc-900">
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+                      <Calendar size={11} className="text-zinc-400" />
+                      Ngày chiếu
+                    </div>
+                    <span className="text-sm font-extrabold text-zinc-200 mt-1">{selectedOrder.date}</span>
                   </div>
-                  <div>
-                    <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-0.5">Suất Chiếu</p>
-                    <p className="text-[11px] font-bold text-zinc-200">{selectedOrder.time}</p>
+
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+                      <Clock size={11} className="text-zinc-400" />
+                      Suất chiếu
+                    </div>
+                    <span className="text-sm font-extrabold text-zinc-200 mt-1">{selectedOrder.time}</span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+                      <MapPin size={11} className="text-zinc-400" />
+                      Phòng chiếu
+                    </div>
+                    <span className="text-sm font-black text-red-500 mt-1 uppercase tracking-wide">
+                      {selectedOrder.roomName || "PHÒNG 01"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+                      <Film size={11} className="text-zinc-400" />
+                      Vị trí ghế
+                    </div>
+                    <span className="text-xs font-black text-zinc-100 mt-1 tracking-wide bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-md w-fit min-w-[40px] text-center shadow-inner">
+                      {cleanSeatsDisplay()}
+                    </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 border-t border-zinc-900/60 pt-2.5">
-                  <div>
-                    <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-0.5">Phòng Chiếu</p>
-                    <p className="text-[11px] font-black text-red-500 uppercase">{selectedOrder.roomName || "01"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-0.5">Vị Trí Ghế</p>
-                    <p className="text-[11px] font-black text-white uppercase tracking-wide truncate">{cleanSeatsDisplay()}</p>
-                  </div>
-                </div>
-
+                {/* Hiển thị Combo nếu có */}
                 {selectedOrder.orderDetails?.some((d: any) => d.itemType === 'COMBO') && (
-                  <div className="border-t border-zinc-900/60 pt-2.5">
-                    <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mb-1">Combo Bắp Nước Đi Kèm</p>
-                    <div className="space-y-0.5 max-h-[44px] overflow-y-auto no-scrollbar">
+                  <div className="border-t border-zinc-900 pt-4">
+                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block mb-2">Combo đi kèm</span>
+                    <div className="space-y-1.5 max-h-[60px] overflow-y-auto pr-0.5 no-scrollbar">
                       {selectedOrder.orderDetails.filter((d: any) => d.itemType === 'COMBO').map((combo: any) => (
-                        <div key={combo.id} className="flex justify-between items-center text-[10px] font-bold text-zinc-400">
-                          <span className="truncate max-w-[170px] text-zinc-400">{combo.itemName}</span>
-                          <span className="text-red-500 italic">x{combo.quantity}</span>
+                        <div key={combo.id} className="flex justify-between items-center text-xs font-semibold text-zinc-400">
+                          <span className="truncate max-w-[200px]">{combo.itemName}</span>
+                          <span className="text-pink-500 font-bold bg-pink-950/20 px-2 py-0.5 rounded border border-pink-900/30 text-[10px]">x{combo.quantity}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+              </div>
 
-                <div className="border-t border-zinc-900/60 pt-2.5 flex justify-between items-center text-[9px] font-bold text-zinc-500">
-                  <div className="flex items-center gap-1">
-                    <CreditCard size={11} />
-                    <span className="uppercase">{selectedOrder.paymentMethod}</span>
-                  </div>
-                  <div className="text-zinc-200 font-black">
-                    {selectedOrder.totalAmount?.toLocaleString()}đ
-                  </div>
-                </div>
+              {/* Status Bar phía dưới bên trái */}
+              <div className={`mt-6 py-2 px-4 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border text-center md:text-left w-fit ${
+                (isSelectedUsed || isSelectedExpired) 
+                  ? 'bg-zinc-900/40 text-zinc-500 border-zinc-900' 
+                  : 'bg-red-950/20 text-red-400 border-red-900/30 animate-pulse'
+              }`}>
+                {isSelectedUsed 
+                  ? 'VÉ ĐÃ QUA SOÁT VÉ' 
+                  : isSelectedExpired 
+                    ? 'VÉ HẾT HẠN SUẤT CHIẾU' 
+                    : 'HỆ THỐNG VÉ ĐIỆN TỬ CHÍNH THỨC'}
               </div>
             </div>
 
-            <div className={`py-3 text-center transition-colors ${selectedOrder.status === 'USED' ? 'bg-zinc-900 text-zinc-600' : 'bg-gradient-to-r from-red-600 to-rose-600 text-white'}`}>
-               <p className={`text-[8px] font-black uppercase tracking-[0.25em] ${selectedOrder.status === 'USED' ? '' : 'animate-pulse'}`}>
-                 {selectedOrder.status === 'USED' ? 'VÉ NÀY ĐÃ HẾT HIỆU LỰC SỬ DỤNG' : 'ĐƯA MÃ QR CHO NHÂN VIÊN SOÁT VÉ'}
-               </p>
+            {/* ĐƯỜNG CHIA ĐỨT ĐOẠN / RĂNG CƯA GIỮA VÉ VÀ CUỐNG VÉ */}
+            <div className="hidden md:flex flex-col justify-between py-6 relative w-[1px] border-r border-dashed border-zinc-800">
+              <div className="absolute -top-3 -left-2.5 w-5 h-5 rounded-full bg-[#040406] border-b border-zinc-850" />
+              <div className="absolute -bottom-3 -left-2.5 w-5 h-5 rounded-full bg-[#040406] border-t border-zinc-850" />
             </div>
+
+            {/* CUỐNG VÉ KIỂM SOÁT (BÊN PHẢI): QR CODE */}
+            <div className={`w-full md:w-64 p-6 md:p-8 flex flex-col items-center justify-center border-t md:border-t-0 border-zinc-900 shrink-0 ${
+              (isSelectedUsed || isSelectedExpired) ? 'bg-zinc-950' : 'bg-gradient-to-b md:bg-gradient-to-l from-red-950/[0.05] to-transparent'
+            }`}>
+              {/* Vùng chứa QR */}
+              <div className="relative p-3 rounded-2xl bg-zinc-900 border border-zinc-800/60 shadow-inner">
+                <div className={`bg-white p-3 rounded-xl shadow-md transition-all duration-300 ${
+                  (isSelectedUsed || isSelectedExpired) ? 'opacity-25 grayscale blur-[0.5px]' : ''
+                }`}>
+                  <QRCodeSVG value={getModalBookingCode()} size={130} level="H" includeMargin={false} />
+                </div>
+                
+                {/* Stamp đè lên khi hết hạn/đã dùng */}
+                {(isSelectedUsed || isSelectedExpired) && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4 rotate-[-12deg]">
+                    <div className={`border-2 backdrop-blur-sm px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-2xl ${
+                      isSelectedExpired ? 'border-amber-500 bg-zinc-950/95 text-amber-500' : 'border-emerald-500 bg-zinc-950/95 text-emerald-400'
+                    }`}>
+                      {isSelectedExpired ? <AlertTriangle size={13} className="stroke-[2.5]" /> : <Check size={13} className="stroke-[2.5]" />}
+                      <span className="text-[10px] font-black uppercase tracking-[0.15em]">
+                        {isSelectedExpired ? 'HẾT HẠN' : 'ĐÃ DÙNG'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mã chữ số dưới QR */}
+              <div className="mt-4 flex flex-col items-center w-full">
+                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Mã đặt vé</span>
+                <div className={`px-4 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800/50 font-mono text-xs font-black tracking-[0.2em] shadow-sm bg-gradient-to-b from-zinc-900 to-zinc-950 text-center w-full max-w-[180px] ${
+                  (isSelectedUsed || isSelectedExpired) ? 'text-zinc-600 line-through decoration-zinc-700' : 'text-zinc-200'
+                }`}>
+                  {getModalBookingCode()}
+                </div>
+              </div>
+
+              {/* Dòng nhắc nhở soát vé cho nhân viên */}
+              <p className={`mt-5 text-[9px] font-bold text-center tracking-wide ${
+                (isSelectedUsed || isSelectedExpired) ? 'text-zinc-600' : 'text-zinc-400'
+              }`}>
+                {isSelectedUsed || isSelectedExpired ? 'Vé không còn giá trị' : 'Đưa mã này cho nhân viên quầy soát vé'}
+              </p>
+            </div>
+
           </div>
         </div>
       )}

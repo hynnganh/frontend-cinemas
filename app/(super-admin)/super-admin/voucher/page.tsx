@@ -1,52 +1,143 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, Edit3, Ticket, Calendar, Hash, Loader2, AlertCircle, Lock } from 'lucide-react';
-import { apiSuperAdminRequest } from '@/app/lib/api';
-import toast, { Toaster } from 'react-hot-toast';
-import VoucherModal from './VoucherModal';
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Plus,
+  Search,
+  Trash2,
+  Edit3,
+  Ticket,
+  Calendar,
+  Hash,
+  Loader2,
+  AlertCircle,
+  Lock,
+  Gift,
+  Sparkles,
+  Coins,
+} from "lucide-react";
+
+import { apiSuperAdminRequest } from "@/app/lib/api";
+import toast, { Toaster } from "react-hot-toast";
+import VoucherModal from "./VoucherModal";
 
 export interface Voucher {
   id: number;
   code: string;
   title: string;
+  description?: string;
   discountValue: number;
   usedCount: number;
   usageLimit: number;
   endDate: string;
+  voucherType: "EVENT" | "REDEEM";
+  costPoints?: number;
+  promotion?: {
+    id: number;
+    title: string;
+  };
+}
+
+interface User {
+  userId: number;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  avatar?: string;
+  points?: number;
+  roles?: any[];
 }
 
 export default function AdminVoucherManager() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
-  
+  const [filterType, setFilterType] = useState("ALL");
+  const [userSearch, setUserSearch] = useState("");
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
+
+  const [selectedVoucher, setSelectedVoucher] =
+    useState<Voucher | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [rewardForm, setRewardForm] = useState({
+    email: "",
+    points: 0,
+  });
+
+  useEffect(() => {
+    fetchVouchers();
+    fetchUsers();
+  }, []);
 
   const fetchVouchers = async () => {
     setLoading(true);
+
     try {
-      const res = await apiSuperAdminRequest('/api/v1/vouchers');
-      if (res.ok) {
-        const json = await res.json();
-        setVouchers(json.data || []);
+      const res = await apiSuperAdminRequest("/api/v1/vouchers");
+
+      if (!res.ok) {
+        toast.error("Không thể tải danh sách voucher");
+        return;
       }
-    } catch (e) {
+
+      const json = await res.json();
+
+      setVouchers(Array.isArray(json.data) ? json.data : []);
+    } catch (error) {
       toast.error("Lỗi kết nối database");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchVouchers(); }, []);
+const fetchUsers = async () => {
+  setLoadingUsers(true);
 
-  const formatCurrency = (v: number) => new Intl.NumberFormat('vi-VN').format(v) + 'đ';
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('vi-VN');
+  try {
+    const res = await apiSuperAdminRequest("/api/v1/users");
 
-  // Đã sửa: Định nghĩa nhận Voucher hoặc null chuẩn xác
+    const result = await res.json();
+
+    if (!res.ok) {
+      toast.error(result.message || "Không tải được users");
+      return;
+    }
+
+    const rawUsers = result?.data?.content || [];
+
+    const filteredUsers = rawUsers.filter((user: any) => {
+      if (!Array.isArray(user.roles)) {
+        return false;
+      }
+
+      return user.roles.some((role: any) => {
+        const roleName =
+          role?.name ||
+          role?.roleName ||
+          role?.authority ||
+          role;
+
+        return String(roleName).toUpperCase() === "ROLE_USER";
+      });
+    });
+
+    setUsers(filteredUsers);
+  } catch (error) {
+    toast.error("Lỗi tải danh sách user");
+  } finally {
+    setLoadingUsers(false);
+  }
+};
+
   const handleOpenModal = (voucher: Voucher | null = null) => {
     setSelectedVoucher(voucher);
     setIsModalOpen(true);
@@ -54,19 +145,37 @@ export default function AdminVoucherManager() {
 
   const handleFormSubmit = async (data: any) => {
     setIsSubmitting(true);
+
     try {
-      const method = selectedVoucher ? 'PUT' : 'POST';
-      const url = selectedVoucher ? `/api/v1/vouchers/${selectedVoucher.id}` : '/api/v1/vouchers';
-      const res = await apiSuperAdminRequest(url, { method, body: JSON.stringify(data) });
-      
-      if (res.ok) {
-        toast.success(selectedVoucher ? "Đã cập nhật!" : "Đã tạo mã mới!");
-        fetchVouchers();
-        setIsModalOpen(false);
-      } else {
-        const errorData = await res.json();
-        toast.error(errorData.message || "Thao tác thất bại");
+      const method = selectedVoucher ? "PUT" : "POST";
+
+      const url = selectedVoucher
+        ? `/api/v1/vouchers/${selectedVoucher.id}`
+        : "/api/v1/vouchers";
+
+      const res = await apiSuperAdminRequest(url, {
+        method,
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast.error(result.message || "Thao tác thất bại");
+        return;
       }
+
+      toast.success(
+        selectedVoucher
+          ? "Đã cập nhật voucher"
+          : "Đã tạo voucher mới"
+      );
+
+      fetchVouchers();
+
+      setIsModalOpen(false);
+    } catch (error) {
+      toast.error("Lỗi hệ thống");
     } finally {
       setIsSubmitting(false);
     }
@@ -74,188 +183,338 @@ export default function AdminVoucherManager() {
 
   const handleDelete = async () => {
     if (!selectedVoucher) return;
+
     if (selectedVoucher.usedCount > 0) {
-      toast.error("Voucher này đã có người lưu, không thể xóa!");
-      setDeleteModalOpen(false);
+      toast.error("Voucher đã được sử dụng, không thể xóa");
       return;
     }
 
     setIsSubmitting(true);
+
     try {
-      const res = await apiSuperAdminRequest(`/api/v1/vouchers/${selectedVoucher.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success("Đã xóa vĩnh viễn");
-        fetchVouchers();
-        setDeleteModalOpen(false);
-      } else {
-        const result = await res.json();
-        toast.error(result.message || "Không thể xóa do ràng buộc dữ liệu");
+      const res = await apiSuperAdminRequest(
+        `/api/v1/vouchers/${selectedVoucher.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast.error(result.message || "Không thể xóa");
+        return;
       }
-    } catch (e) {
+
+      toast.success("Đã xóa voucher");
+
+      fetchVouchers();
+
+      setDeleteModalOpen(false);
+    } catch (error) {
       toast.error("Lỗi hệ thống");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filteredVouchers = vouchers.filter(v => 
-    v.code?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    v.title?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleRewardPoints = async () => {
+    if (!rewardForm.email) {
+      toast.error("Vui lòng chọn user");
+      return;
+    }
+
+    if (rewardForm.points <= 0) {
+      toast.error("Số điểm phải lớn hơn 0");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const res = await apiSuperAdminRequest(
+        "/api/v1/vouchers/reward-points",
+        {
+          method: "POST",
+          body: JSON.stringify(rewardForm),
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast.error(result.message || "Tặng điểm thất bại");
+        return;
+      }
+
+      toast.success("Đã tặng điểm thành công");
+
+      setRewardForm({
+        email: "",
+        points: 0,
+      });
+
+      setUserSearch("");
+
+      setIsRewardModalOpen(false);
+    } catch (error) {
+      toast.error("Lỗi hệ thống");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("vi-VN").format(value) + "đ";
+
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString("vi-VN");
+
+  const filteredVouchers = vouchers.filter((v) => {
+    const keyword =
+      v.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.title?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const typeMatch =
+      filterType === "ALL" || v.voucherType === filterType;
+
+    return keyword && typeMatch;
+  });
+
+const filteredUsers = useMemo(() => {
+  const keyword = userSearch
+    .toLowerCase()
+    .trim();
+
+  return users.filter((user) => {
+    const fullName =
+      `${user.firstName || ""} ${user.lastName || ""}`
+        .toLowerCase();
+
+    const email =
+      user.email?.toLowerCase() || "";
+
+    return (
+      fullName.includes(keyword) ||
+      email.includes(keyword)
+    );
+  });
+}, [users, userSearch]);
+
+  const getVoucherTypeBadge = (voucher: Voucher) => {
+    if (voucher.voucherType === "REDEEM") {
+      return (
+        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[8px] font-black uppercase tracking-wider">
+          <Gift size={10} />
+          Đổi điểm
+        </div>
+      );
+    }
+
+    return (
+      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-black uppercase tracking-wider">
+        <Sparkles size={10} />
+        Sự kiện
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#020202] text-zinc-400 p-4 md:p-6 font-sans tracking-tight select-none">
-      
       <Toaster position="top-right" reverseOrder={false} />
 
-      <div className="max-w-6xl mx-auto space-y-4">
-        
-        {/* HEADER SECTION */}
+      <div className="max-w-7xl mx-auto space-y-4">
+
+        {/* HEADER */}
         <div className="flex items-center justify-between border-b border-zinc-900 pb-4">
+
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-600/10 border border-red-600/20 rounded-lg text-red-600">
               <Ticket size={16} />
             </div>
+
             <div className="space-y-0.5">
               <h1 className="text-lg font-black uppercase tracking-tight text-white leading-none">
                 Trung tâm <span className="text-red-600">Voucher</span>
               </h1>
+
               <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest leading-none">
-                Hệ thống quản lý điều hành mã giảm giá thực tế • Quyền SUPER_ADMIN
+                Quản lý voucher sự kiện & voucher đổi điểm
               </p>
             </div>
           </div>
-          {/* Đã sửa: Truyền null rõ ràng để kích hoạt Form thêm mới */}
-          <button 
-            onClick={() => handleOpenModal(null)}
-            className="h-9 bg-red-600 hover:bg-red-500 text-white px-4 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+
+          <div className="flex items-center gap-2">
+
+            <button
+              onClick={() => setIsRewardModalOpen(true)}
+              className="h-9 bg-yellow-500 hover:bg-yellow-400 text-black px-4 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+            >
+              <Gift size={13} />
+              Tặng điểm
+            </button>
+
+            <button
+              onClick={() => handleOpenModal(null)}
+              className="h-9 bg-red-600 hover:bg-red-500 text-white px-4 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+            >
+              <Plus size={13} />
+              Tạo mới
+            </button>
+          </div>
+        </div>
+
+        {/* SEARCH */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3">
+
+          <div className="relative group">
+            <Search
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"
+              size={13}
+            />
+
+            <input
+              type="text"
+              placeholder="TÌM KIẾM MÃ VOUCHER..."
+              className="w-full bg-zinc-950 border border-zinc-900 rounded-xl py-3 pl-11 text-[10px] font-black tracking-wider outline-none focus:border-zinc-800 placeholder:text-zinc-700 text-white uppercase"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="bg-zinc-950 border border-zinc-900 rounded-xl px-4 text-[10px] font-black uppercase tracking-widest text-white outline-none focus:border-zinc-800"
           >
-            <Plus size={13} /> Tạo mới
-          </button>
+            <option value="ALL">Tất cả voucher</option>
+            <option value="EVENT">Voucher sự kiện</option>
+            <option value="REDEEM">Voucher đổi điểm</option>
+          </select>
         </div>
 
-        {/* INPUT TÌM KIẾM CHUẨN FORM SẮC NÉT */}
-        <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-600 transition-colors" size={13} />
-          <input 
-            type="text" 
-            placeholder="TÌM KIẾM MÃ VOUCHER, TIÊU ĐỀ KHUYẾN MÃI..." 
-            className="w-full bg-zinc-950 border border-zinc-900 rounded-xl py-3 pl-11 text-[10px] font-black tracking-wider outline-none focus:border-zinc-800 placeholder:text-zinc-700 text-white uppercase"
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* BẢNG DỮ LIỆU ĐƯỢC THU GỌN ROW HEIGHT THEO CHUẨN BASIC */}
+        {/* TABLE */}
         <div className="bg-[#060608] border border-zinc-900 rounded-xl overflow-hidden relative min-h-[400px] shadow-sm">
+
           {loading && (
             <div className="absolute inset-0 bg-[#020202]/80 z-10 flex items-center justify-center backdrop-blur-sm">
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="animate-spin text-red-600 opacity-80" size={24} />
-                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">Đang truy xuất...</span>
-              </div>
+              <Loader2
+                className="animate-spin text-red-600"
+                size={24}
+              />
             </div>
           )}
-          
+
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
+
               <thead>
                 <tr className="bg-zinc-950/60 border-b border-zinc-900 text-[9px] font-black uppercase text-zinc-600 tracking-wider">
-                  <th className="py-3.5 px-6 w-[240px]">Thông tin Voucher</th>
-                  <th className="py-3.5 px-4 w-[150px]">Mức giảm giá</th>
-                  <th className="py-3.5 px-4 w-[180px]">Giới hạn sử dụng</th>
-                  <th className="py-3.5 px-4 w-[140px]">Ngày hết hạn</th>
-                  <th className="py-3.5 px-6 w-[120px] text-right">Thao tác</th>
+                  <th className="py-3.5 px-6">Voucher</th>
+                  <th className="py-3.5 px-4">Loại</th>
+                  <th className="py-3.5 px-4">Giảm giá</th>
+                  <th className="py-3.5 px-4">Đổi điểm</th>
+                  <th className="py-3.5 px-4">Sử dụng</th>
+                  <th className="py-3.5 px-4">Hết hạn</th>
+                  <th className="py-3.5 px-6 text-right">Thao tác</th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-zinc-900/30 text-[11px]">
-                {filteredVouchers.length > 0 ? filteredVouchers.map((v) => (
-                  <tr key={v.id} className="hover:bg-zinc-950/40 group transition-all">
-                    
-                    {/* Thông tin Voucher */}
+
+                {filteredVouchers.map((v) => (
+                  <tr
+                    key={v.id}
+                    className="hover:bg-zinc-950/40 group transition-all"
+                  >
+
                     <td className="py-3 px-6">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-900 flex items-center justify-center text-zinc-700 group-hover:text-red-600 group-hover:border-red-900/20 transition-colors">
+
+                        <div className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-900 flex items-center justify-center text-zinc-700">
                           <Hash size={12} />
                         </div>
-                        <div className="space-y-0.5 max-w-[180px]">
-                          <p className="font-black tracking-tight text-zinc-200 uppercase">#{v.code}</p>
-                          <p className="text-[9px] font-bold text-zinc-600 uppercase truncate leading-none">
+
+                        <div className="space-y-1">
+                          <p className="font-black tracking-tight text-zinc-200 uppercase">
+                            #{v.code}
+                          </p>
+
+                          <p className="text-[9px] font-bold text-zinc-600 uppercase">
                             {v.title}
                           </p>
                         </div>
                       </div>
                     </td>
 
-                    {/* Giảm giá */}
-                    <td className="py-3 px-4 font-black text-zinc-200 tracking-tight">
-                      {v.discountValue < 100 ? `-${v.discountValue}%` : `-${formatCurrency(v.discountValue)}`}
-                    </td>
-
-                    {/* Sử dụng */}
                     <td className="py-3 px-4">
-                      <div className="flex flex-col gap-1 w-32">
-                        <div className="flex justify-between items-center text-[9px] font-black uppercase">
-                          <span className="text-zinc-500">{v.usedCount}/{v.usageLimit}</span>
-                          <span className="text-zinc-600">{Math.round((v.usedCount / v.usageLimit) * 100)}%</span>
-                        </div>
-                        <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden border border-white/[0.02]">
-                          <div 
-                            className={`h-full transition-all duration-500 ${v.usedCount >= v.usageLimit ? 'bg-zinc-700' : 'bg-red-600'}`} 
-                            style={{ width: `${Math.min((v.usedCount / v.usageLimit) * 100, 100)}%` }} 
-                          />
-                        </div>
-                      </div>
+                      {getVoucherTypeBadge(v)}
                     </td>
 
-                    {/* Hiệu lực */}
+                    <td className="py-3 px-4 font-black text-zinc-200 tracking-tight">
+                      {v.discountValue < 100
+                        ? `-${v.discountValue}%`
+                        : `-${formatCurrency(v.discountValue)}`}
+                    </td>
+
+                    <td className="py-3 px-4">
+                      {v.voucherType === "REDEEM" ? (
+                        <span className="text-yellow-400 font-black">
+                          {v.costPoints || 0} điểm
+                        </span>
+                      ) : (
+                        <span className="text-zinc-700">---</span>
+                      )}
+                    </td>
+
+                    <td className="py-3 px-4">
+                      {v.usedCount}/{v.usageLimit}
+                    </td>
+
                     <td className="py-3 px-4 text-zinc-400 text-[10px] font-semibold">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar size={11} className="text-zinc-600" />
-                        <span>{formatDate(v.endDate)}</span>
-                      </div>
+                      {formatDate(v.endDate)}
                     </td>
 
-                    {/* Thao tác tác vụ */}
                     <td className="py-3 px-6 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button 
-                          onClick={() => handleOpenModal(v)} 
-                          className="w-7 h-7 inline-flex items-center justify-center bg-zinc-950 border border-zinc-900 hover:border-zinc-800 text-zinc-600 hover:text-white rounded-lg transition-all active:scale-95"
-                          title="Chỉnh sửa voucher"
+
+                        <button
+                          onClick={() => handleOpenModal(v)}
+                          className="w-7 h-7 inline-flex items-center justify-center bg-zinc-950 border border-zinc-900 hover:text-white rounded-lg"
                         >
                           <Edit3 size={12} />
                         </button>
 
                         {v.usedCount > 0 ? (
-                          <div className="relative group/lock">
-                            <button 
-                              className="w-7 h-7 inline-flex items-center justify-center bg-zinc-950 border border-zinc-900/40 text-zinc-800 rounded-lg cursor-not-allowed"
-                              disabled
-                            >
-                              <Lock size={12} className="opacity-30" />
-                            </button>
-                            <div className="absolute bottom-full right-0 mb-2 w-36 p-2 bg-red-600 text-white text-[8px] font-black uppercase rounded-md opacity-0 group-hover/lock:opacity-100 transition-all pointer-events-none translate-y-1 group-hover/lock:translate-y-0 shadow-lg text-center z-20">
-                              Đã có khách sử dụng
-                              <div className="absolute top-full right-2.5 border-4 border-transparent border-t-red-600" />
-                            </div>
-                          </div>
+                          <button
+                            disabled
+                            className="w-7 h-7 inline-flex items-center justify-center bg-zinc-950 border border-zinc-900/40 text-zinc-800 rounded-lg cursor-not-allowed"
+                          >
+                            <Lock size={12} />
+                          </button>
                         ) : (
-                          <button 
-                            onClick={() => { setSelectedVoucher(v); setDeleteModalOpen(true); }} 
-                            className="w-7 h-7 inline-flex items-center justify-center bg-zinc-950 border border-zinc-900 hover:border-red-950 hover:text-red-500 rounded-lg text-zinc-600 transition-all active:scale-95"
-                            title="Xóa voucher"
+                          <button
+                            onClick={() => {
+                              setSelectedVoucher(v);
+                              setDeleteModalOpen(true);
+                            }}
+                            className="w-7 h-7 inline-flex items-center justify-center bg-zinc-950 border border-zinc-900 hover:text-red-500 rounded-lg"
                           >
                             <Trash2 size={12} />
                           </button>
                         )}
                       </div>
                     </td>
-
                   </tr>
-                )) : !loading && (
+                ))}
+
+                {!loading && filteredVouchers.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-20 text-center text-[9px] font-black uppercase text-zinc-600 tracking-widest">
-                      Không tìm thấy dữ liệu voucher tương thích
+                    <td
+                      colSpan={7}
+                      className="py-20 text-center text-[9px] font-black uppercase text-zinc-600 tracking-widest"
+                    >
+                      Không tìm thấy voucher phù hợp
                     </td>
                   </tr>
                 )}
@@ -263,11 +522,9 @@ export default function AdminVoucherManager() {
             </table>
           </div>
         </div>
-
       </div>
 
-      {/* MODAL VOUCHER FORM THÊM/SỬA */}
-      <VoucherModal 
+      <VoucherModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleFormSubmit}
@@ -275,36 +532,121 @@ export default function AdminVoucherManager() {
         isSubmitting={isSubmitting}
       />
 
-      {/* MODAL XÓA CHUẨN ĐỒNG BỘ LAYOUT BASIC */}
+      {/* DELETE MODAL */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setDeleteModalOpen(false)} />
+
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setDeleteModalOpen(false)}
+          />
+
           <div className="relative bg-[#060608] border border-zinc-900 p-6 rounded-xl max-w-sm w-full shadow-2xl">
-            <div className="w-12 h-12 bg-red-600/10 border border-red-600/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="text-red-500" size={20} />
-            </div>
-            <h3 className="text-sm font-black text-white text-center uppercase tracking-tight">Xác nhận xóa dữ liệu?</h3>
-            <p className="text-zinc-500 text-[10px] font-medium text-center mt-2 leading-relaxed uppercase">
-              Mã <span className="text-white font-bold">{selectedVoucher?.code}</span> sẽ bị gỡ bỏ vĩnh viễn khỏi core hệ thống.
-            </p>
+
+            <h3 className="text-sm font-black text-white text-center uppercase tracking-tight">
+              Xác nhận xóa voucher?
+            </h3>
+
             <div className="flex gap-2 mt-6">
-              <button 
-                onClick={() => setDeleteModalOpen(false)} 
-                className="flex-1 py-2.5 rounded-lg bg-zinc-950 border border-zinc-900 hover:bg-zinc-900 text-zinc-500 text-[9px] font-black uppercase tracking-widest transition-all"
+
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="flex-1 py-2.5 rounded-lg bg-zinc-950 border border-zinc-900"
               >
-                Hủy bỏ
+                Hủy
               </button>
-              <button 
-                onClick={handleDelete} 
+
+              <button
+                onClick={handleDelete}
                 disabled={isSubmitting}
-                className="flex-1 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center"
+                className="flex-1 py-2.5 rounded-lg bg-red-600 text-white"
               >
-                {isSubmitting ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "Xác nhận"}
+                {isSubmitting ? (
+                  <Loader2 size={14} className="animate-spin mx-auto" />
+                ) : (
+                  "Xác nhận"
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+{isRewardModalOpen && (
+  <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsRewardModalOpen(false)} />
+
+    <div className="relative bg-[#060608] border border-zinc-800 p-8 rounded-3xl max-w-sm w-full shadow-[0_0_50px_-12px_rgba(234,179,8,0.2)]">
+      {/* HEADER */}
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 mx-auto bg-yellow-500/10 border border-yellow-500/20 rounded-2xl flex items-center justify-center text-yellow-400 mb-4">
+          <Gift size={32} />
+        </div>
+        <h2 className="text-lg font-black text-white uppercase tracking-tighter">Tặng Điểm Thưởng</h2>
+        <p className="text-[10px] uppercase font-bold text-zinc-500 mt-1">Cộng điểm trực tiếp cho tài khoản</p>
+      </div>
+
+      <div className="space-y-6">
+        {/* USER SEARCH */}
+        <div className="space-y-2">
+          <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest px-1">Chọn người dùng</label>
+          <div className="relative group">
+            <Search size={14} className="absolute left-4 top-4 text-zinc-600 group-focus-within:text-yellow-500 transition-colors" />
+            <input
+              type="text"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Tìm theo tên hoặc email..."
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-3.5 pl-11 pr-4 text-white text-sm outline-none focus:border-yellow-500/50 transition-all"
+            />
+          </div>
+
+          <select
+            value={rewardForm.email}
+            onChange={(e) => setRewardForm(prev => ({ ...prev, email: e.target.value }))}
+            className="w-full bg-zinc-900 border border-zinc-800 p-3.5 rounded-2xl text-white font-bold text-sm outline-none focus:border-yellow-500/50 transition-all appearance-none"
+          >
+            <option value="">{loadingUsers ? "Đang tải..." : "Chọn từ danh sách kết quả"}</option>
+            {filteredUsers.map((user) => (
+              <option key={user.userId} value={user.email}>
+                {user.firstName} {user.lastName} ({user.email})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* POINTS INPUT */}
+        <div className="space-y-2">
+          <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest px-1">Số điểm cộng</label>
+          <div className="relative">
+            <Coins size={14} className="absolute left-4 top-4 text-zinc-600" />
+            <input
+              type="number"
+              min={1}
+              value={rewardForm.points || ""}
+              onChange={(e) => setRewardForm(prev => ({ ...prev, points: Number(e.target.value) }))}
+              placeholder="Nhập số điểm..."
+              className="w-full bg-zinc-900 border border-zinc-800 p-3.5 pl-11 rounded-2xl text-white font-bold outline-none focus:border-yellow-500/50 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* ACTION BUTTON */}
+        <button
+          onClick={handleRewardPoints}
+          disabled={isSubmitting}
+          className="w-full h-14 bg-yellow-500 hover:bg-yellow-400 active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-600 text-black rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <>Xác nhận cộng điểm</>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
