@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { ArrowLeft, Save, Loader2, Film, Upload, Star, Clock, Calendar, Users, Globe, Youtube } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Film, Upload, Star, Clock, Calendar, Users, Globe, Youtube, ShieldAlert } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { apiSuperAdminRequest, getImageUrl } from '@/app/lib/api';
 
@@ -18,10 +18,9 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
   const [genres, setGenres] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // --- FIX 1: Khởi tạo Preview ảnh thông minh ---
+  // --- Preview ảnh thông minh ---
   const [posterPreview, setPosterPreview] = useState(() => {
     if (!initialData?.posterUrl) return "";
-    // Nếu là link Cloudinary (bắt đầu bằng http) thì dùng luôn, ngược lại qua getImageUrl
     return initialData.posterUrl.startsWith('http') 
       ? initialData.posterUrl 
       : getImageUrl(initialData.posterUrl);
@@ -45,7 +44,6 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // Khi tạo mới thì bắt buộc có file, khi edit thì không bắt buộc (giữ ảnh cũ)
     if (type === 'create' && !selectedFile) return toast.error("Thiếu poster!");
     
     setIsSubmitting(true);
@@ -53,6 +51,7 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
     const form = e.currentTarget;
     const formData = new FormData(form);
     
+    // 🎯 THÊM MỚI: Hứng giá trị ageRating từ form để gửi đi
     const movieData = {
       title: formData.get('title')?.toString().trim(),
       description: formData.get('description')?.toString().trim(),
@@ -61,16 +60,15 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
       cast: formData.get('cast')?.toString().trim(),
       country: formData.get('country')?.toString().trim(),
       status: formData.get('status'),
+      ageRating: formData.get('ageRating'), // Bắt dữ liệu độ tuổi
       trailerUrl: formData.get('trailerUrl')?.toString().trim(),
       releaseDate: formData.get('releaseDate'),
       genreId: Number(formData.get('genreId'))
     };
 
     const formDataPayload = new FormData();
-    // Gửi kèm JSON data dưới dạng Blob (phù hợp với @RequestPart phía Spring Boot)
     formDataPayload.append('movie', new Blob([JSON.stringify(movieData)], { type: 'application/json' }));
     
-    // --- FIX 2: Chỉ append file nếu người dùng có chọn file mới ---
     if (selectedFile) {
       formDataPayload.append('file', selectedFile);
     }
@@ -78,7 +76,6 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
     try {
       const url = type === 'edit' ? `/api/v1/movies/${initialData?.id}` : `/api/v1/movies`;
       
-      // Sử dụng PUT cho edit, POST cho create
       const response = await apiSuperAdminRequest(url, { 
         method: type === 'edit' ? 'PUT' : 'POST', 
         body: formDataPayload 
@@ -189,6 +186,22 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
             </div>
 
             <div className="space-y-3">
+              
+              {/* 🎯 THÊM MỚI: Dropdown Chọn Phân Loại Độ Tuổi (Age Rating) */}
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-zinc-500 ml-1 italic flex items-center gap-1">
+                  <ShieldAlert size={10}/> Phân loại độ tuổi *
+                </label>
+                <select name="ageRating" required defaultValue={initialData?.ageRating || 'P'} className="w-full bg-black border border-white/10 rounded-xl py-2 px-3 outline-none text-[11px] font-black text-zinc-400">
+                  <option value="P">P - Phổ biến mọi độ tuổi</option>
+                  <option value="K">K - Dưới 13T có bảo hộ</option>
+                  <option value="T13">T13 - Từ 13 tuổi trở lên</option>
+                  <option value="T16">T16 - Từ 16 tuổi trở lên</option>
+                  <option value="T18">T18 - Từ 18 tuổi trở lên</option>
+                  <option value="C">C - Không được phổ biến</option>
+                </select>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[9px] font-black uppercase text-zinc-500 ml-1 italic">Trạng thái</label>
                 <select name="status" required defaultValue={initialData?.status || 'SHOWING'} className="w-full bg-black border border-white/10 rounded-xl py-2 px-3 outline-none text-[11px] font-black text-zinc-400">
