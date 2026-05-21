@@ -1,169 +1,369 @@
 "use client";
-import { useState, useEffect } from "react";
-import { 
-  BarChart3, Calendar, Download, Filter, 
-  ArrowUpRight, ArrowDownRight, TrendingUp,
-  CreditCard, Wallet, CalendarDays, Building2,
-  Trophy, Star, Activity
+
+import React, { useEffect, useState } from "react";
+import {
+  Download,
+  Loader2,
+  BarChart3,
+  Star,
+  Building2,
 } from "lucide-react";
 
-export default function StatisticsPage() {
-  const [dateRange, setDateRange] = useState("month");
-  const [loading, setLoading] = useState(false);
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
-  // Dữ liệu giả lập doanh thu theo từng rạp
-  const cinemaRevenueData = [
-    { name: "A&K Thủ Đức", revenue: 125, grow: 12, color: "bg-red-600" },
-    { name: "A&K Quận 9", revenue: 98, grow: -5, color: "bg-orange-500" },
-    { name: "A&K Bình Thạnh", revenue: 156, grow: 20, color: "bg-emerald-500" },
-    { name: "A&K Gò Vấp", revenue: 74, grow: 8, color: "bg-blue-500" },
-    { name: "A&K Tân Bình", revenue: 112, grow: 15, color: "bg-purple-500" },
-  ];
+import { apiSuperAdminRequest } from "../../lib/api";
 
-  const handleFilterChange = (range: string) => {
-    setLoading(true);
-    setDateRange(range);
-    setTimeout(() => setLoading(false), 800);
-  };
-
-  return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 p-6 md:p-10 font-sans">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-        <div>
-          <div className="flex items-center gap-2 text-red-600 font-black text-[8px] uppercase tracking-[0.4em] mb-2">
-            <Activity size={14} /> Analytics Dashboard
-          </div>
-          <h1 className="text-4xl font-[1000] uppercase tracking-tighter italic">
-            Doanh Thu <span className="text-zinc-600">Hệ Thống</span>
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-3 bg-zinc-900/50 p-1.5 rounded-2xl border border-white/5">
-          {['day', 'week', 'month', 'year'].map((item) => (
-            <button
-              key={item}
-              onClick={() => handleFilterChange(item)}
-              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                dateRange === item 
-                ? "bg-red-600 text-white shadow-lg shadow-red-600/20" 
-                : "text-zinc-500 hover:text-white"
-              }`}
-            >
-              {item === 'day' ? 'Hôm nay' : item === 'week' ? 'Tuần' : item === 'month' ? 'Tháng' : 'Năm'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-        {/* BIỂU ĐỒ SO SÁNH DOANH THU CÁC RẠP */}
-        <div className="lg:col-span-2 bg-zinc-900/30 border border-white/5 rounded-[40px] p-8 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-10">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-red-600 rounded-2xl shadow-lg shadow-red-600/20">
-                <BarChart3 size={20} className="text-white" />
-              </div>
-              <div>
-                <h2 className="text-sm font-black uppercase tracking-widest">Hiệu năng rạp</h2>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-tighter">So sánh doanh thu (Triệu VNĐ)</p>
-              </div>
-            </div>
-            <button className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold uppercase transition-all">
-              <Download size={14} /> Tải báo cáo
-            </button>
-          </div>
-
-          <div className="h-[350px] w-full flex items-end gap-6 md:gap-12 px-4 relative">
-             {cinemaRevenueData.map((data, i) => (
-               <div key={i} className="flex-1 group/bar relative flex flex-col items-center">
-                  <div className="absolute -top-10 opacity-0 group-hover/bar:opacity-100 transition-all duration-300">
-                    <span className="bg-white text-black text-[10px] font-[1000] px-2 py-1 rounded-lg">
-                      {data.revenue}M
-                    </span>
-                  </div>
-                  
-                  <div 
-                    style={{ height: `${(data.revenue / 160) * 100}%` }} 
-                    className={`w-full max-w-[40px] ${data.color} rounded-t-2xl transition-all duration-1000 group-hover/bar:brightness-125 group-hover/bar:shadow-[0_0_30px_rgba(220,38,38,0.3)] relative`}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent rounded-t-2xl"></div>
-                  </div>
-                  
-                  <div className="mt-4 text-center">
-                    <p className="text-[9px] font-black uppercase text-zinc-500 group-hover/bar:text-white transition-colors rotate-45 md:rotate-0 origin-left">
-                      {data.name.replace("A&K ", "")}
-                    </p>
-                  </div>
-               </div>
-             ))}
-          </div>
-        </div>
-
-        {/* TOP CINEMA RANKING */}
-        <div className="bg-zinc-900/30 border border-white/5 rounded-[40px] p-8 flex flex-col">
-           <h2 className="text-sm font-black uppercase tracking-widest mb-8 flex items-center gap-2">
-             <Trophy size={18} className="text-yellow-500" />
-             Bảng xếp hạng
-           </h2>
-           
-           <div className="space-y-5 flex-1">
-              {cinemaRevenueData.sort((a, b) => b.revenue - a.revenue).map((cinema, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.05] transition-all">
-                  <div className="flex items-center gap-4">
-                    <span className={`text-xl font-black italic ${index === 0 ? 'text-yellow-500' : 'text-zinc-700'}`}>
-                      0{index + 1}
-                    </span>
-                    <div>
-                      <p className="text-[10px] font-black uppercase">{cinema.name}</p>
-                      <p className={`text-[8px] font-bold uppercase ${cinema.grow > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {cinema.grow > 0 ? `+${cinema.grow}%` : `${cinema.grow}%`} so với kỳ trước
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-black italic">{cinema.revenue}.0M</p>
-                  </div>
-                </div>
-              ))}
-           </div>
-
-           <div className="mt-8 p-6 bg-red-600/10 border border-red-600/20 rounded-3xl">
-              <div className="flex items-center gap-3 mb-2">
-                <Star size={14} className="text-red-600 fill-red-600" />
-                <p className="text-[10px] font-black text-red-600 uppercase">Insight</p>
-              </div>
-              <p className="text-[11px] leading-relaxed text-zinc-400 italic">
-                Rạp <span className="text-white font-bold">A&K Bình Thạnh</span> đang dẫn đầu doanh thu nhờ lượng khách xem phim "Lật Mặt 7" tăng đột biến.
-              </p>
-           </div>
-        </div>
-      </div>
-
-      {/* FOOTER STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-         <SmallStat label="Tổng doanh thu" value="565.0M" status="up" sub="Vượt chỉ tiêu 5%" />
-         <SmallStat label="Tổng đơn hàng" value="1.248" status="up" sub="Tăng 120 đơn" />
-         <SmallStat label="Tỷ lệ lấp đầy" value="68%" status="down" sub="Giảm nhẹ buổi sáng" />
-         <SmallStat label="Khách hàng mới" value="+452" status="up" sub="Chỉ số tăng trưởng tốt" />
-      </div>
-    </div>
-  );
+interface RankingItem {
+  name: string;
+  revenue: number;
 }
 
-// --- Sub-components ---
+interface MovieStat {
+  title: string;
+  avgRating: number;
+  count: number;
+}
 
-function SmallStat({ label, value, status, sub }: any) {
+interface Cinema {
+  id: number;
+  name: string;
+}
+
+export default function ReportDashboard() {
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+
+    return new Date(
+      d.getFullYear(),
+      d.getMonth(),
+      1
+    ).toISOString().slice(0, 16);
+  });
+
+  const [endDate, setEndDate] = useState(() =>
+    new Date().toISOString().slice(0, 16)
+  );
+
+  const [loading, setLoading] = useState(false);
+
+  const [ranking, setRanking] = useState<RankingItem[]>([]);
+  const [movieStats, setMovieStats] = useState<MovieStat[]>([]);
+
+  const [cinemas, setCinemas] = useState<Cinema[]>([]);
+  const [selectedCinema, setSelectedCinema] = useState("");
+
+  const formatDate = (date: string) => {
+    return date.replace("T", " ") + ":00";
+  };
+
+  const getQuery = (params: Record<string, string> = {}) => {
+    const searchParams = new URLSearchParams({
+      start: formatDate(startDate),
+      end: formatDate(endDate),
+      ...params,
+    });
+
+    return searchParams.toString();
+  };
+
+  const fetchCinemas = async () => {
+    try {
+      const res = await apiSuperAdminRequest("/api/v1/cinema-items");
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      setCinemas(data.data || data || []);
+    } catch (error) {
+      console.error("Lỗi tải rạp:", error);
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      const query = getQuery();
+
+      const [rankRes, movieRes] = await Promise.all([
+        apiSuperAdminRequest(`/api/v1/reports/ranking?${query}`),
+        apiSuperAdminRequest(`/api/v1/reports/stats`),
+      ]);
+
+      if (rankRes.ok) {
+        const rankData = await rankRes.json();
+
+        setRanking(rankData || []);
+      }
+
+      if (movieRes.ok) {
+        const movieData = await movieRes.json();
+
+        setMovieStats(movieData || []);
+      }
+    } catch (error) {
+      console.error("Lỗi tải dữ liệu:", error);
+    }
+  };
+
+  const handleDownload = async () => {
+    setLoading(true);
+
+    try {
+      const query = selectedCinema
+        ? getQuery({
+            cinemaId: selectedCinema,
+          })
+        : getQuery();
+
+      const res = await apiSuperAdminRequest(
+        `/api/v1/reports/download?${query}`
+      );
+
+      if (!res.ok) {
+        throw new Error("Download failed");
+      }
+
+      const blob = await res.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+
+      a.href = url;
+
+      a.download = `Bao_Cao_${startDate.split("T")[0]}_den_${
+        endDate.split("T")[0]
+      }.xlsx`;
+
+      document.body.appendChild(a);
+
+      a.click();
+
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+
+      alert("Xuất file thất bại");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchCinemas();
+  }, [startDate, endDate]);
+
   return (
-    <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-[30px] hover:border-red-600/30 transition-all group">
-        <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1 group-hover:text-red-600 transition-colors">{label}</p>
-        <div className="flex items-baseline gap-2 mb-2">
-           <h4 className="text-2xl font-black italic">{value}</h4>
-           <span className={`text-[9px] font-bold ${status === 'up' ? 'text-emerald-500' : 'text-red-500'}`}>
-             {status === 'up' ? '↑' : '↓'}
-           </span>
+    <div className="min-h-screen bg-[#050505] p-8 text-zinc-300">
+      <div className="mb-8">
+        <h1 className="text-2xl font-black uppercase tracking-widest text-white">
+          Dashboard Doanh Thu
+        </h1>
+
+        <p className="mt-2 text-sm text-zinc-500">
+          Thống kê doanh thu và đánh giá phim
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+        {/* SIDEBAR */}
+        <div className="rounded-3xl border border-zinc-900 bg-[#0f0f0f] p-6 h-fit">
+          <div className="mb-5 flex items-center gap-2">
+            <Building2 size={16} className="text-red-500" />
+
+            <h2 className="text-xs font-black uppercase tracking-wider text-white">
+              Bộ lọc báo cáo
+            </h2>
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase text-zinc-600">
+                Rạp
+              </p>
+
+              <select
+                value={selectedCinema}
+                onChange={(e) => setSelectedCinema(e.target.value)}
+                className="w-full rounded-xl border border-zinc-900 bg-black p-3 text-xs text-zinc-300 outline-none"
+              >
+                <option value="">Tất cả rạp</option>
+
+                {cinemas.map((cinema) => (
+                  <option key={cinema.id} value={cinema.id}>
+                    {cinema.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase text-zinc-600">
+                Thời gian bắt đầu
+              </p>
+
+              <input
+                type="datetime-local"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full rounded-xl border border-zinc-900 bg-black p-3 text-xs outline-none"
+              />
+            </div>
+
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase text-zinc-600">
+                Thời gian kết thúc
+              </p>
+
+              <input
+                type="datetime-local"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full rounded-xl border border-zinc-900 bg-black p-3 text-xs outline-none"
+              />
+            </div>
+
+            <button
+              onClick={handleDownload}
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-xs font-black uppercase transition hover:bg-red-700 disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Download size={14} />
+              )}
+
+              Tải Excel
+            </button>
+          </div>
         </div>
-        <p className="text-[9px] text-zinc-600 font-bold italic">{sub}</p>
+
+        {/* CHART */}
+        <div className="rounded-3xl border border-zinc-900 bg-[#0f0f0f] p-6 lg:col-span-3">
+          <div className="mb-6 flex items-center gap-2">
+            <BarChart3 size={16} className="text-red-500" />
+
+            <h2 className="text-xs font-black uppercase tracking-wider text-white">
+              Doanh thu theo rạp
+            </h2>
+          </div>
+
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart
+              data={ranking}
+              layout="vertical"
+              margin={{
+                left: -10,
+              }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#1f2937"
+                horizontal
+                vertical={false}
+              />
+
+              <XAxis
+                type="number"
+                stroke="#666"
+                fontSize={10}
+              />
+
+              <YAxis
+                dataKey="name"
+                type="category"
+                stroke="#888"
+                fontSize={10}
+                width={120}
+              />
+
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#090909",
+                  border: "1px solid #27272a",
+                  borderRadius: "12px",
+                  fontSize: "12px",
+                }}
+              />
+
+              <Bar
+                dataKey="revenue"
+                fill="#dc2626"
+                radius={[0, 6, 6, 0]}
+                barSize={24}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* MOVIE TABLE */}
+      <div className="mt-6 rounded-3xl border border-zinc-900 bg-[#0f0f0f] p-6">
+        <div className="mb-5 flex items-center gap-2">
+          <Star size={16} className="text-yellow-500" />
+
+          <h2 className="text-xs font-black uppercase tracking-wider text-white">
+            Phim đánh giá cao
+          </h2>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-zinc-900 text-zinc-600 uppercase">
+                <th className="pb-4 font-bold">Tên phim</th>
+
+                <th className="pb-4 text-right font-bold">
+                  Điểm TB
+                </th>
+
+                <th className="pb-4 text-right font-bold">
+                  Lượt đánh giá
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {movieStats.map((movie, index) => (
+                <tr
+                  key={index}
+                  className="border-b border-zinc-900/50"
+                >
+                  <td className="py-4 font-semibold text-white">
+                    {movie.title}
+                  </td>
+
+                  <td className="py-4 text-right font-black text-yellow-500">
+                    {movie.avgRating?.toFixed(1)}
+                  </td>
+
+                  <td className="py-4 text-right text-zinc-400">
+                    {movie.count}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {movieStats.length === 0 && (
+            <div className="py-10 text-center text-xs font-bold uppercase tracking-widest text-zinc-600">
+              Không có dữ liệu
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
