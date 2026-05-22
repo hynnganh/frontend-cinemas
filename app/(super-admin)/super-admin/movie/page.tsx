@@ -172,18 +172,33 @@ export default function MoviesPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-8 py-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <span className="text-[9px] font-bold text-zinc-400 bg-zinc-950 border border-zinc-900/60 px-2 py-0.5 rounded uppercase tracking-wide">
-                          {movie.genreName || 'GENERAL'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-wide">
-                        <Clock size={11} className="text-zinc-600" /> {movie.duration} PHÚT
-                      </div>
-                    </div>
-                  </td>
+                 <td className="px-8 py-4">
+  <div className="space-y-2">
+    {/* Khớp chính xác với trường "genreNames" từ JSON API thực tế của bạn */}
+    <div className="flex flex-wrap gap-1.5 max-w-[280px]">
+      {movie.genreNames && Array.isArray(movie.genreNames) && movie.genreNames.length > 0 ? (
+        movie.genreNames.map((genreName: string, index: number) => (
+          <span 
+            key={index} 
+            className="text-[8px] font-black text-red-400 bg-red-950/20 border border-red-900/40 px-2 py-0.5 rounded uppercase tracking-wider transition-all hover:bg-red-950/40"
+          >
+            {genreName}
+          </span>
+        ))
+      ) : (
+        // Hiển thị trạng thái nếu mảng genreNames trả về giá trị null hoặc rỗng
+        <span className="text-[8px] font-black text-zinc-600 bg-zinc-950 border border-zinc-900 px-1.5 py-0.5 rounded uppercase tracking-wider">
+          CHƯA PHÂN LOẠI
+        </span>
+      )}
+    </div>
+
+    {/* Thời lượng phim hiển thị ngay bên dưới */}
+    <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-wide">
+      <Clock size={11} className="text-zinc-600" /> {movie.duration} PHÚT
+    </div>
+  </div>
+</td>
                   <td className="px-8 py-4">
                     <div className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${movie.status === 'SHOWING' ? 'text-emerald-500' : 'text-orange-500'}`}>
                       <div className={`w-1.5 h-1.5 rounded-full ${movie.status === 'SHOWING' ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-orange-500'}`} />

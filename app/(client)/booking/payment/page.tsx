@@ -38,11 +38,11 @@ useEffect(() => {
       // 1. Kiểm tra tất cả các token đang có trong hệ thống để xem có bị dẫm chân nhau không
       const tokenUser = typeof window !== "undefined" ? localStorage.getItem('token_user') : null;
       const tokenAdmin = typeof window !== "undefined" ? localStorage.getItem('token_admin') : null;
-      const tokenStaff = typeof window !== "undefined" ? localStorage.getItem('token_staff') : null;
+      const tokenSuperAdmin = typeof window !== "undefined" ? localStorage.getItem('token_super_admin') : null;
       
       console.log("Token User hiện tại:", tokenUser);
       console.log("Token Admin hiện tại (nếu có):", tokenAdmin);
-      console.log("Token Staff hiện tại (nếu có):", tokenStaff);
+      console.log("Token SuperAdmin hiện tại (nếu có):", tokenSuperAdmin);
 
       // 2. Decode thử Token đang dùng xem thực tế bên trong chứa thông tin của ai
       if (tokenUser) {
@@ -56,6 +56,7 @@ useEffect(() => {
           const decoded = JSON.parse(jsonPayload);
           console.log("👉 Dữ liệu thực tế bên trong tokenUser:", decoded);
           console.log("👉 Role trong token:", decoded.role || decoded.roles || decoded.authorities || "Không tìm thấy");
+          
         } catch (e) {
           console.error("Không thể decode token, có thể token không đúng định dạng JWT:", e);
         }
@@ -135,7 +136,47 @@ useEffect(() => {
         paymentMethod: paymentMethod, 
         voucherCode: selectedVoucher?.code || "" 
       };
+// --- KHỐI CONSOLE LOG CHI TIẾT ĐƠN HÀNG GỬI ĐI ---
+      console.clear(); // Xóa bớt log cũ cho sạch
+      console.log("%c🎬 === THÔNG TIN CHI TIẾT ĐƠN HÀNG GỬI ĐI ===", "color: #ea580c; font-weight: bold; font-size: 14px;");
+      
+      // 1. Thông tin chung về phim & Khách hàng
+      console.log("🎟️ Phim:", bookingData.movieTitle);
+      console.log("👤 Khách hàng:", userData?.fullName || "Khách hàng", `(${userData?.email || "Chưa có email"})`);
+      console.log("📅 Suất chiếu:", `${bookingData.time} - Ngày ${bookingData.date} | Phòng: ${bookingData.roomName}`);
+      console.log("🏢 Rạp phim:", bookingData.cinemaName);
+      
+      // 2. Chi tiết Vé ghế (In dạng bảng)
+      const seatDetails = bookingData.selectedSeats.map((s: any) => ({
+        "ID Ghế": s.id,
+        "Vị trí": `${s.seatRow}${s.seatNumber}`,
+        "Loại ghế": s.seatType || "Thường"
+      }));
+      console.log("💺 Danh sách ghế đặt:");
+      console.table(seatDetails);
 
+      // 3. Chi tiết đồ ăn nước uống (Combo)
+      if (bookingData.selectedCombos && bookingData.selectedCombos.length > 0) {
+        const comboDetails = bookingData.selectedCombos.map((c: any) => ({
+          "ID Combo": c.id,
+          "Tên Combo": c.name || c.title || "Combo",
+          "Số lượng": c.quantity
+        }));
+        console.log("🍿 Danh sách Combo kèm theo:");
+        console.table(comboDetails);
+      } else {
+        console.log("🍿 Combo: Không chọn đồ ăn/nước uống.");
+      }
+
+      // 4. Chi tiết tiền bạc & Khuyến mãi
+      console.log("💰 Tạm tính:", subTotal.toLocaleString() + "đ");
+      console.log("🎫 Mã giảm giá áp dụng:", selectedVoucher ? `${selectedVoucher.code} (-${discount.toLocaleString()}đ)` : "Không áp dụng");
+      console.log("💳 Phương thức thanh toán:", paymentMethod);
+      console.log("%c🔥 TỔNG TIỀN THỰC TẾ GỬI LÊN SERVER: " + finalTotal.toLocaleString() + "đ", "color: #22c55e; font-weight: bold;");
+      
+      // 5. In ra object Payload thô (Raw object) gửi lên API
+      console.log("📦 Body Payload gửi API:", payload);
+      console.log("=======================================================");
       // apiRequest tự động tiêm Token & gán Content-Type: application/json chuẩn xác
       const res = await apiRequest(`/api/v1/orders`, {
         method: 'POST',

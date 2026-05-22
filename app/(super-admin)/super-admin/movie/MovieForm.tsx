@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { ArrowLeft, Save, Loader2, Film, Upload, Star, Clock, Calendar, Users, Globe, Youtube, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Film, Upload, Star, Clock, Calendar, Users, Globe, Youtube, ShieldAlert, Check } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { apiSuperAdminRequest, getImageUrl } from '@/app/lib/api';
 
@@ -17,6 +17,9 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [genres, setGenres] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  // 🌟 QUẢN LÝ MẢNG CÁC THỂ LOẠI ĐƯỢC CHỌN
+  const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
 
   // --- Preview ảnh thông minh ---
   const [posterPreview, setPosterPreview] = useState(() => {
@@ -28,6 +31,7 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
 
   const basePath = pathname.includes('/super-admin') ? '/super-admin/movie' : '/admin/movies';
 
+  // Tải danh sách thể loại từ server
   useEffect(() => {
     const fetchGenres = async () => {
       try {
@@ -36,22 +40,42 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
           const data = await res.json();
           setGenres(data.data || data);
         }
-      } catch (err) { console.error("Lỗi tải thể loại"); }
+      } catch (err) { 
+        console.error("Lỗi tải thể loại", err); 
+      }
     };
     fetchGenres();
   }, []);
+
+  // 🎯 ĐỒNG BỘ DỮ LIỆU CŨ: Đổ các thể loại đã có của phim vào State khi ở chế độ Edit
+  useEffect(() => {
+    if (type === 'edit' && initialData?.genres && Array.isArray(initialData.genres)) {
+      const ids = initialData.genres.map((g: any) => g.id);
+      setSelectedGenreIds(ids);
+    }
+  }, [initialData, type]);
+
+  // 🌟 HÀM XỬ LÝ BẬT/TẮT CHỌN THỂ LOẠI (Toggle)
+  const handleToggleGenre = (genreId: number) => {
+    setSelectedGenreIds(prev => 
+      prev.includes(genreId) 
+        ? prev.filter(id => id !== genreId) // Nếu chọn rồi -> bỏ chọn
+        : [...prev, genreId]                // Nếu chưa chọn -> thêm vào mảng
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (type === 'create' && !selectedFile) return toast.error("Thiếu poster!");
+    if (selectedGenreIds.length === 0) return toast.error("Vui lòng chọn ít nhất 1 thể loại!");
     
     setIsSubmitting(true);
-    const loadingToast = toast.loading("Đang lưu...");
+    const loadingToast = toast.loading("Đang lưu nội dung phim...");
     const form = e.currentTarget;
     const formData = new FormData(form);
     
-    // 🎯 THÊM MỚI: Hứng giá trị ageRating từ form để gửi đi
+    // 🎯 PAYLOAD ĐỒNG BỘ MỚI: Gửi mảng ID thể loại lên Backend
     const movieData = {
       title: formData.get('title')?.toString().trim(),
       description: formData.get('description')?.toString().trim(),
@@ -60,10 +84,13 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
       cast: formData.get('cast')?.toString().trim(),
       country: formData.get('country')?.toString().trim(),
       status: formData.get('status'),
-      ageRating: formData.get('ageRating'), // Bắt dữ liệu độ tuổi
+      ageRating: formData.get('ageRating'), 
       trailerUrl: formData.get('trailerUrl')?.toString().trim(),
       releaseDate: formData.get('releaseDate'),
-      genreId: Number(formData.get('genreId'))
+      
+      // Khớp chính xác với mảng xử lý Many-to-Many của Spring Boot Backend
+      genreIds: selectedGenreIds,
+      genreId: selectedGenreIds[0] // Thuộc tính dự phòng cho cấu trúc cũ
     };
 
     const formDataPayload = new FormData();
@@ -82,17 +109,17 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
       });
 
       if (response.ok) {
-        toast.success('Thành công!', { id: loadingToast });
+        toast.success('Lưu phim thành công!', { id: loadingToast });
         setTimeout(() => { 
           router.push(basePath); 
           router.refresh(); 
         }, 500);
       } else { 
         const errData = await response.json();
-        toast.error(errData.message || "Lỗi cập nhật!", { id: loadingToast }); 
+        toast.error(errData.message || "Yêu cầu xử lý bị từ chối!", { id: loadingToast }); 
       }
     } catch (error) { 
-      toast.error('Lỗi server!', { id: loadingToast }); 
+      toast.error('Lỗi kết nối máy chủ dữ liệu!', { id: loadingToast }); 
     } finally { 
       setIsSubmitting(false); 
     }
@@ -186,8 +213,6 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
             </div>
 
             <div className="space-y-3">
-              
-              {/* 🎯 THÊM MỚI: Dropdown Chọn Phân Loại Độ Tuổi (Age Rating) */}
               <div className="space-y-1">
                 <label className="text-[9px] font-black uppercase text-zinc-500 ml-1 italic flex items-center gap-1">
                   <ShieldAlert size={10}/> Phân loại độ tuổi *
@@ -210,12 +235,35 @@ export default function MovieForm({ initialData, type }: MovieFormProps) {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase text-zinc-500 ml-1 italic">Thể loại *</label>
-                <select name="genreId" required defaultValue={initialData?.genre?.id} className="w-full bg-black border border-white/10 rounded-xl py-2 px-3 outline-none text-[11px] font-black text-zinc-400">
-                  <option value="">-- CHỌN --</option>
-                  {genres.map(g => <option key={g.id} value={g.id}>{g.name.toUpperCase()}</option>)}
-                </select>
+              {/* 🌟 THAY ĐỔI: GIAO DIỆN CHỌN NHIỀU THỂ LOẠI DẠNG TAGS (MULTI-SELECT) */}
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-zinc-500 ml-1 italic">
+                  Thể loại * ({selectedGenreIds.length} đã chọn)
+                </label>
+                <div className="flex flex-wrap gap-1.5 p-3 bg-black/60 border border-white/10 rounded-xl max-h-[160px] overflow-y-auto custom-scrollbar">
+                  {genres.length === 0 ? (
+                    <span className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest p-1">Đang tải danh mục...</span>
+                  ) : (
+                    genres.map(g => {
+                      const isSelected = selectedGenreIds.includes(g.id);
+                      return (
+                        <button
+                          type="button"
+                          key={g.id}
+                          onClick={() => handleToggleGenre(g.id)}
+                          className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border transition-all duration-200 flex items-center gap-1 ${
+                            isSelected
+                              ? 'bg-red-600/20 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(220,38,38,0.1)]'
+                              : 'bg-zinc-950 text-zinc-500 border-zinc-900/60 hover:border-zinc-700 hover:text-zinc-300'
+                          }`}
+                        >
+                          {isSelected && <Check size={10} className="stroke-[3]" />}
+                          {g.name}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">

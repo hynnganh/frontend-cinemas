@@ -358,7 +358,7 @@ export default function SeatDesignerPage() {
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-[260px] bg-[#0a0a0a] border-r border-white/5 p-5 flex flex-col gap-6">
           <div className="space-y-4">
-            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2 italic"><RefreshCcw size={10} /> Gen tự động</label>
+            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2 italic"><RefreshCcw size={10} /> Tạo tự động</label>
             <div className="grid grid-cols-2 gap-2">
               <input type="number" value={config.rows} onChange={(e) => setConfig({...config, rows: +e.target.value})} className="bg-zinc-900 border border-white/5 rounded-lg py-2 text-white text-center text-xs outline-none" />
               <input type="number" value={config.cols} onChange={(e) => setConfig({...config, cols: +e.target.value})} className="bg-zinc-900 border border-white/5 rounded-lg py-2 text-white text-center text-xs outline-none" />
