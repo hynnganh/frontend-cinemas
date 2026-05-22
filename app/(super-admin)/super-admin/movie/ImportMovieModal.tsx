@@ -58,7 +58,7 @@ export default function ImportMovieModal({ isOpen, onClose, onRefreshData }: Imp
 
         const parsedRows: MovieRowProgress[] = data.slice(1).map((row, i): MovieRowProgress => {
           return {
-            index: i + 2,
+            index: i + 2, // Dòng 2 trở đi trong Excel (Dòng 1 là tiêu đề cột)
             title: row[0]?.toString().trim() || "",
             genre: row[8]?.toString().trim() || "Chưa phân loại",
             duration: row[2]?.toString().trim() || "0",
@@ -109,9 +109,10 @@ export default function ImportMovieModal({ isOpen, onClose, onRefreshData }: Imp
     if (!file || rows.length === 0) return;
     setIsImporting(true);
 
+    // Hiệu ứng quét giả lập các hàng
     for (let i = 0; i < rows.length; i++) {
       setRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'processing' } : r));
-      await new Promise(resolve => setTimeout(resolve, 15));
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
     try {
@@ -123,44 +124,61 @@ export default function ImportMovieModal({ isOpen, onClose, onRefreshData }: Imp
         body: formData,
       });
 
+      const responseData = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        setRows(prev => prev.map(r => ({ ...r, status: 'success' })));
-        setSummary({ total: rows.length, success: rows.length, error: 0 });
-        toast.success(`Thêm thành công dữ liệu lõi!`);
-        setTimeout(() => {
-          handleClose();
-          onRefreshData();
-        }, 1500);
-      } else {
-        const errorJson = await res.json().catch(() => ({}));
-        const rawMessage = errorJson.message || "Lỗi import hệ thống";
+        const backendErrors: string[] = responseData.errors || [];
+        
+        // Chuyển mảng lỗi của backend thành cấu trúc Object Tra cứu nhanh nhanh theo số dòng
+        const errorMap: { [key: number]: string } = {};
+        backendErrors.forEach((errStr) => {
+          const match = errStr.match(/Dòng\s+(\d+):/i) || errStr.match(/Line\s+(\d+):/i);
+          if (match && match[1]) {
+            const lineNum = parseInt(match[1], 10);
+            errorMap[lineNum] = errStr.replace(/^Dòng\s+\d+:\s*/i, "").replace(/^Line\s+\d+:\s*/i, "");
+          }
+        });
 
-        let errorLineNumber = -1;
-        const lineMatch = rawMessage.match(/dòng\s+(\d+)/i) || rawMessage.match(/line\s+(\d+)/i);
-        if (lineMatch && lineMatch[1]) {
-          errorLineNumber = parseInt(lineMatch[1], 10);
-        }
-
+        // Áp trạng thái thật từ database trả ra lên từng dòng UI
         setRows(prev => prev.map(r => {
-          if (errorLineNumber === -1) return { ...r, status: 'error', errorLog: rawMessage };
-          if (r.index === errorLineNumber) return { ...r, status: 'error', errorLog: rawMessage };
-          if (r.index < errorLineNumber) return { ...r, status: 'success' };
-          return { ...r, status: 'pending' };
+          if (errorMap[r.index]) {
+            return { ...r, status: 'error', errorLog: errorMap[r.index] };
+          }
+          return { ...r, status: 'success' };
         }));
 
-        setSummary(() => {
-          const successCount = errorLineNumber > 2 ? errorLineNumber - 2 : 0;
-          return {
-            total: rows.length,
-            success: successCount,
-            error: rows.length - successCount
-          };
+        const totalError = Object.keys(errorMap).length;
+        const totalSuccess = rows.length - totalError;
+
+        setSummary({
+          total: rows.length,
+          success: totalSuccess,
+          error: totalError
         });
-        toast.error("Phát hiện lỗi logic từ dữ liệu nguồn!");
+
+        if (totalError === 0) {
+          toast.success(`Thêm hoàn thành! Toàn bộ ${totalSuccess} phim đã vào hệ thống.`);
+          setTimeout(() => {
+            handleClose();
+            onRefreshData();
+          }, 1500);
+        } else if (totalSuccess > 0) {
+          toast.success(`Thành công nạp ${totalSuccess} phim. Bỏ qua ${totalError} dòng lỗi.`);
+          onRefreshData();
+        } else {
+          toast.error("Không có bộ phim nào được thêm. Toàn bộ file bị lỗi dữ liệu!");
+        }
+
+      } else {
+        const rawMessage = responseData.message || "Lỗi cấu trúc hoặc kết nối từ chối.";
+        setRows(prev => prev.map(r => ({ ...r, status: 'error', errorLog: rawMessage })));
+        setSummary({ total: rows.length, success: 0, error: rows.length });
+        toast.error("Tệp tin bị máy chủ từ chối tiếp nhận!");
       }
     } catch (err) {
-      setRows(prev => prev.map(r => ({ ...r, status: 'error', errorLog: "Ngắt kết nối máy chủ dữ liệu." })));
+      setRows(prev => prev.map(r => ({ ...r, status: 'error', errorLog: "Ngắt kết nối máy chủ dữ liệu hoặc mất tín hiệu mạng." })));
       setSummary({ total: rows.length, success: 0, error: rows.length });
+      toast.error("Lỗi đường truyền hệ thống!");
     } finally {
       setIsImporting(false);
     }
@@ -183,7 +201,7 @@ export default function ImportMovieModal({ isOpen, onClose, onRefreshData }: Imp
             <div className="w-1.5 h-6 bg-red-600 rounded-full shadow-[0_0_8px_rgba(220,38,38,0.5)]" />
             <div>
               <h3 className="text-sm font-black text-white uppercase tracking-wider">Import Kho Phim Hệ Thống</h3>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Xử lý thêm tập tin Excel 10 cột dữ liệu lõi</p>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Xử lý thêm tập tin Excel dữ liệu lõi</p>
             </div>
           </div>
           <button onClick={handleClose} disabled={isImporting} className="p-1 rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all disabled:opacity-30">
@@ -279,7 +297,7 @@ export default function ImportMovieModal({ isOpen, onClose, onRefreshData }: Imp
                     {row.status === 'error' && (
                       <div className="mt-2 ml-14 p-2.5 bg-red-950/20 border border-red-900/30 rounded-lg text-red-400 text-[10px] flex gap-2 items-start leading-relaxed animate-in slide-in-from-top-1 duration-200">
                         <AlertTriangle size={12} className="shrink-0 mt-0.5 text-red-500" />
-                        <div><span className="font-black uppercase tracking-wider text-[9px] mr-1">Lỗi hệ thống:</span> {row.errorLog}</div>
+                        <div><span className="font-black uppercase tracking-wider text-[9px] mr-1">Lỗi logic:</span> {row.errorLog}</div>
                       </div>
                     )}
                   </div>
