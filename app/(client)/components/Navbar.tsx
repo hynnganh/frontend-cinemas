@@ -38,6 +38,8 @@ export default function Navbar() {
     },
     { title: "SỰ KIỆN", href: "/events" },
     { title: "COMBO Bắp & Nước", href: "/combos" },
+    // 🎯 CHỈ THÊM ĐÚNG DÒNG NÀY ĐỂ HIỂN THỊ MENU GIỚI THIỆU
+    { title: "GIỚI THIỆU", href: "/about" }, 
   ];
 
   return (
@@ -62,7 +64,6 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            {/* Desktop Navigation */}
 <nav className="hidden lg:flex gap-8 ml-4">
   {navItems.map((item) => (
     <div key={item.title} className="relative group/menu">
@@ -74,7 +75,7 @@ export default function Navbar() {
           <ChevronDown size={14} className="group-hover/menu:rotate-180 transition-transform duration-300 text-red-600" />
         </button>
       ) : (
-        // Nếu KHÔNG có submenu (SỰ KIỆN): Dùng Link để chuyển URL
+        // Nếu KHÔNG có submenu (SỰ KIỆN, GIỚI THIỆU): Dùng Link để chuyển URL
         <Link 
           href={item.href || "#"} 
           className="flex items-center gap-1.5 text-[11px] font-black text-white/70 hover:text-white transition-all tracking-[0.2em] uppercase py-2"

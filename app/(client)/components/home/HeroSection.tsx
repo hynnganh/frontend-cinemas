@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, EffectFade, Navigation } from "swiper/modules";
-import { Play, Info, ChevronLeft, ChevronRight, Star } from "lucide-react";
-import { apiRequest, getImageUrl } from "../../../lib/api"; // Kiểm tra lại đường dẫn import api của bặn nhé
+import { Play, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { apiRequest, getImageUrl } from "../../../lib/api"; 
 import Link from "next/link"; 
 
 import "swiper/css";
@@ -31,7 +31,7 @@ interface MovieCardProps {
   rating?: string | number;
   status?: string;
   ageRating?: string;
-  genreName?: string; // 🌟 Cập nhật khớp với JSON API: genreName thay vì genres
+  genreNames?: string[]; 
   variant?: "poster" | "landscape";
 }
 
@@ -45,12 +45,12 @@ function MovieCard({
   rating, 
   status, 
   ageRating, 
-  genreName, // 🌟 Nhận đúng trường dữ liệu từ API
+  genreNames = [], 
   variant = "landscape"
 }: MovieCardProps) {
   const isShowing = status === "SHOWING";
   const hasRating = rating && Number(rating) > 0;
-  const displayRating = hasRating ? Number(rating).toFixed(1) : "MỚI";
+  const displayRating = hasRating ? Number(rating).toFixed(1) : "0.0";
 
   return (
     <Link 
@@ -94,8 +94,10 @@ function MovieCard({
             {title}
           </h3>
           <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-medium">
-            {/* 🌟 Hiển thị đúng trường genreName từ cơ sở dữ liệu */}
-            <span className="line-clamp-1 max-w-[70%]">{genreName || "Chưa phân loại"}</span>
+            {/* 🌟 FIX CHỐNG LỖI: Dùng genreNames?.length để nối chuỗi */}
+            <span className="line-clamp-1 max-w-[70%]">
+              {genreNames?.length > 0 ? genreNames.join(" • ") : "Đang cập nhật"}
+            </span>
             <span className={`text-[9px] font-bold px-1.5 rounded uppercase ${
               isShowing ? "text-orange-400 bg-orange-400/10" : "text-sky-400 bg-sky-400/10"
             }`}>
@@ -120,8 +122,6 @@ export default function HeroSection() {
     const loadData = async () => {
       try {
         const bannerRes = await apiRequest("/api/v1/banners/active");
-        
-        {/* 🌟 FIX: Đổi size=5 thành size=6 để lấy chuẩn 6 phim mới thêm vào */}
         const movieRes = await apiRequest("/api/v1/movies?status=SHOWING&page=0&size=6&sort=id,desc");
 
         if (bannerRes.ok) {
@@ -239,7 +239,7 @@ export default function HeroSection() {
               480: { slidesPerView: 2.2 },
               768: { slidesPerView: 3.2 },
               1024: { slidesPerView: 4.5 },
-              1400: { slidesPerView: 5 }, // Có thể tăng nhẹ thông số slidesPerView nếu muốn nhìn rõ card thứ 6 hơn trên màn hình lớn
+              1400: { slidesPerView: 5 }, 
             }}
             className="!overflow-visible"
           >
@@ -249,11 +249,14 @@ export default function HeroSection() {
                   <MovieCard
                     id={movie.id}
                     title={movie.title}
-                    image={movie.posterUrl} // 🌟 Khớp với posterUrl từ JSON bặn gửi
+                    image={movie.posterUrl} 
                     status={movie.status}
                     rating={movie.rating}
                     ageRating={movie.ageRating}
-                    genreName={movie.genreName} // 🌟 Khớp với genreName từ JSON bặn gửi
+                    
+                    // 🎯 CHỐT HẠ: Hứng mọi loại API (Danh sách hoặc Chi tiết)
+                    genreNames={movie.genreNames || movie.genres?.map((g: any) => g.name) || []} 
+                    
                     variant="landscape"
                   />
                 </div>

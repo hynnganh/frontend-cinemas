@@ -1,13 +1,28 @@
-const CinemaCard = ({ cinema, isActive, onClick }: any) => (
-  <div 
-    onClick={onClick}
-    className={`p-6 rounded-[2.2rem] cursor-pointer transition-all duration-500 ${
-      isActive ? 'bg-red-600 shadow-2xl' : 'hover:bg-white/5 border border-transparent hover:border-white/10'
-    }`}
-  >
-    <h3 className="text-lg font-black uppercase tracking-tight">{cinema.name}</h3>
-    <p className={`text-[10px] font-bold mt-1 ${isActive ? 'text-red-100' : 'text-gray-500'}`}>
-      {cinema.address}
-    </p>
-  </div>
-);
+import React from 'react';
+import { ChevronRight } from 'lucide-react';
+
+export default function CinemaCard({ cinema, isActive, onClick }: any) {
+  return (
+    <div 
+      onClick={onClick} 
+      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between group ${
+        isActive 
+          ? 'bg-red-600/10 border-red-500/50 shadow-sm' 
+          : 'bg-zinc-900/30 border-white/5 hover:bg-zinc-900/60 hover:border-white/10'
+      }`}
+    >
+      <div className="min-w-0 text-left pr-2">
+        <h3 className={`text-[11px] font-black uppercase truncate transition-colors ${isActive ? 'text-red-500' : 'text-zinc-300 group-hover:text-white'}`}>
+          {cinema.name}
+        </h3>
+        <p className={`text-[9px] mt-0.5 truncate transition-colors ${isActive ? 'text-red-400/70' : 'text-zinc-500'}`}>
+          {cinema.address}
+        </p>
+      </div>
+      <ChevronRight 
+        size={14} 
+        className={isActive ? 'text-red-500 opacity-100' : 'text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity'} 
+      />
+    </div>
+  );
+}

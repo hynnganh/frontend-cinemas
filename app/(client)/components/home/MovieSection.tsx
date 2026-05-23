@@ -6,13 +6,12 @@ import { ChevronRight, Calendar } from "lucide-react";
 import { apiRequest } from "../../../lib/api";
 
 export default function MovieSection() {
-  const [movies, setMovies] = useState([]);
+  const [movies, setMovies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUpcomingMovies = async () => {
       try {
-        // 🌟 FIX LOGIC: Chuyển sang status=COMING_SOON và sắp xếp theo ID mới nhất
         const response = await apiRequest("/api/v1/movies?status=COMING_SOON&page=0&size=6&sort=id,desc", { 
           method: "GET" 
         });
@@ -52,7 +51,6 @@ export default function MovieSection() {
     <section className="px-6 md:px-12 py-14 bg-[#050505]">
       <div className="flex items-end justify-between mb-8 max-w-[1400px] mx-auto">
         <div className="flex items-center gap-3">
-          {/* Thanh chỉ dòng chuyển sang tone Hồng Pastel mang cảm giác mong đợi, đón chờ */}
           <div className="w-1.5 h-8 bg-pink-500 rounded-full shadow-[0_0_15px_rgba(236,72,153,0.5)]" /> 
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
@@ -84,8 +82,12 @@ export default function MovieSection() {
               image={movie.posterUrl} 
               status={movie.status}
               rating={movie.rating} 
-              genreName={movie.genreName} 
+              
+              // 🎯 FIX TRIỆT ĐỂ: Hứng cả 2 trường hợp (genreNames của API Danh sách hoặc genres của API Chi tiết)
+              genreNames={movie.genreNames || movie.genres?.map((g: any) => g.name) || []} 
+              
               ageRating={movie.ageRating} 
+              reviewCount={movie.reviewCount || 0} 
             />
           </div>
         ))}
