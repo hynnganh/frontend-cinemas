@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Save, Plus, Pencil, Upload } from "lucide-react";
-import { BASE_URL } from "@/app/lib/api"; // Chỉ lấy BASE_URL
+import { BASE_URL } from "@/app/lib/api";
 import toast from "react-hot-toast";
 
 interface FormProps {
@@ -10,72 +10,104 @@ interface FormProps {
   idHienTai: number | null;
   duLieu: any;
   setDuLieu: (data: any) => void;
-  onLuu: (formData: FormData) => void;
+  onLuu: (formData: FormData) => Promise<any>;
   onDong: () => void;
 }
 
-export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLuu, onDong }: FormProps) {
+export default function FormBanner({
+  dangSua,
+  idHienTai,
+  duLieu,
+  setDuLieu,
+  onLuu,
+  onDong,
+}: FormProps) {
+
   const [anhXemTruoc, setAnhXemTruoc] = useState<string | null>(null);
   const [fileAnh, setFileAnh] = useState<File | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<any>({});
+  const [loading, setLoading] = useState(false);
 
-  // Tự xử lý chuỗi URL cục bộ tại form mà không gọi hàm chung từ API
   useEffect(() => {
     if (duLieu.imageUrl) {
-      if (duLieu.imageUrl.startsWith("http") || duLieu.imageUrl.startsWith("blob:")) {
+      if (
+        duLieu.imageUrl.startsWith("http") ||
+        duLieu.imageUrl.startsWith("blob:")
+      ) {
         setAnhXemTruoc(duLieu.imageUrl);
       } else {
-        const cleanPath = duLieu.imageUrl.startsWith("/") ? duLieu.imageUrl.slice(1) : duLieu.imageUrl;
+        const cleanPath = duLieu.imageUrl.startsWith("/")
+          ? duLieu.imageUrl.slice(1)
+          : duLieu.imageUrl;
+
         setAnhXemTruoc(`${BASE_URL}/uploads/banners/${cleanPath}`);
       }
     } else {
       setAnhXemTruoc(null);
     }
-    setFileAnh(null); 
+
+    setFileAnh(null);
+    setFieldErrors({});
   }, [duLieu.imageUrl]);
 
   const thayDoiFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error("Ảnh quá nặng! Vui lòng chọn ảnh dưới 2MB.");
-        return;
-      }
-      setFileAnh(file);
-      setAnhXemTruoc(URL.createObjectURL(file)); 
-    }
-  };
+    if (!file) return;
 
-  const guiForm = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!dangSua && !fileAnh) {
-      toast.error("Vui lòng tải ảnh banner lên!");
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Ảnh quá nặng! Vui lòng chọn ảnh dưới 2MB.");
       return;
     }
 
-    if (duLieu.title.trim().length < 5) {
-      toast.error("Tiêu đề phải có ít nhất 5 ký tự.");
-      return;
-    }
-
-    const data = new FormData();
-    const bannerRequest = {
-      title: duLieu.title.trim(),
-      linkUrl: duLieu.linkUrl.trim(),
-      position: duLieu.position || "HOME_TOP",
-      status: duLieu.status || "ACTIVE",
-      sortOrder: Math.max(0, duLieu.sortOrder || 0)
-    };
-
-    data.append("banner", new Blob([JSON.stringify(bannerRequest)], { type: "application/json" }));
-    
-    if (fileAnh) {
-      data.append("file", fileAnh);
-    }
-
-    onLuu(data);
+    setFileAnh(file);
+    setAnhXemTruoc(URL.createObjectURL(file));
   };
 
+const guiForm = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const errors: any = {};
+
+  if (!duLieu.title?.trim() || duLieu.title.trim().length < 5) {
+    errors.title = "Tiêu đề phải >= 5 ký tự";
+  }
+
+  if (!duLieu.linkUrl?.trim()) {
+    errors.linkUrl = "Link không được để trống";
+  }
+
+  if (!dangSua && !fileAnh) {
+    toast.error("Vui lòng tải ảnh banner!");
+    return;
+  }
+
+  if (Object.keys(errors).length > 0) {
+    toast.error(Object.values(errors)[0] as string);
+    return;
+  }
+
+  const data = new FormData();
+
+  data.append(
+    "banner",
+    new Blob(
+      [
+        JSON.stringify({
+          title: duLieu.title.trim(),
+          linkUrl: duLieu.linkUrl.trim(),
+          status: duLieu.status || "ACTIVE",
+        }),
+      ],
+      { type: "application/json" }
+    )
+  );
+
+  if (fileAnh) {
+    data.append("file", fileAnh);
+  }
+
+  onLuu(data);
+};
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
       <div className="bg-zinc-950 border border-white/10 w-full max-w-lg rounded-[2.5rem] shadow-2xl relative animate-in fade-in zoom-in duration-300">
@@ -83,7 +115,7 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
           <X size={20} />
         </button>
 
-        <form onSubmit={guiForm} className="p-8 space-y-6">
+        <form onSubmit={guiForm} className="p-8 space-y-6" noValidate>
           <header className="border-b border-white/5 pb-4">
             <h2 className="text-sm font-black uppercase italic text-red-600 flex items-center gap-2">
               {dangSua ? <Pencil size={14} /> : <Plus size={14} />}
@@ -96,7 +128,7 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
             <div className="space-y-2">
               <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest flex justify-between">
                 Hình ảnh banner (1920x800)
-                <span className="text-red-500">* Bắt buộc</span>
+                <span className="text-zinc-500">* Do BE kiểm tra</span>
               </label>
               <div className="relative group aspect-video rounded-2xl border-2 border-dashed border-white/5 bg-zinc-900 flex flex-col items-center justify-center overflow-hidden transition-all hover:border-red-600/40">
                 {anhXemTruoc ? (
@@ -118,44 +150,38 @@ export default function FormBanner({ dangSua, idHienTai, duLieu, setDuLieu, onLu
             </div>
 
             <div className="grid gap-4">
-              <input 
-                required 
-                maxLength={255}
-                value={duLieu.title} 
-                onChange={e => setDuLieu({...duLieu, title: e.target.value})} 
-                placeholder="Tiêu đề banner..." 
-                className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50 transition-all" 
-              />
+              <div>
+                <input 
+                  type="text"
+                  value={duLieu.title || ""} 
+                  onChange={e => setDuLieu({...duLieu, title: e.target.value})} 
+                  placeholder="Tiêu đề banner..." 
+                  className={`w-full bg-black border ${fieldErrors.title ? 'border-red-600/70' : 'border-white/5'} rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50 transition-all`}
+                />
+                {fieldErrors.title && <p className="text-[10px] text-red-500 mt-1 pl-1">{fieldErrors.title}</p>}
+              </div>
 
-              <input 
-                required 
-                value={duLieu.linkUrl} 
-                onChange={e => setDuLieu({...duLieu, linkUrl: e.target.value})} 
-                placeholder="Đường dẫn điều hướng (URL)..." 
-                className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50 transition-all" 
-              />
+              <div>
+                <input 
+                  type="text"
+                  value={duLieu.linkUrl || ""} 
+                  onChange={e => setDuLieu({...duLieu, linkUrl: e.target.value})} 
+                  placeholder="Đường dẫn điều hướng (URL)..." 
+                  className={`w-full bg-black border ${fieldErrors.linkUrl ? 'border-red-600/70' : 'border-white/5'} rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50 transition-all`}
+                />
+                {fieldErrors.linkUrl && <p className="text-[10px] text-red-500 mt-1 pl-1">{fieldErrors.linkUrl}</p>}
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <select 
-                  value={duLieu.position} 
-                  onChange={e => setDuLieu({...duLieu, position: e.target.value})} 
+                  value={duLieu.status || "ACTIVE"} 
+                  onChange={e => setDuLieu({...duLieu, status: e.target.value})} 
                   className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-[10px] font-bold uppercase text-white outline-none focus:border-red-600/50 cursor-pointer"
                 >
-                  <option value="HOME_TOP">Vị trí: Đầu trang chủ</option>
-                  <option value="HOME_SIDE">Vị trí: Bên cạnh</option>
+                  <option value="ACTIVE">Trạng thái: Hoạt động</option>
+                  <option value="INACTIVE">Trạng thái: Không hoạt động</option>
+                  <option value="PENDING">Trạng thái: Chờ duyệt (Lỗi BE)</option>
                 </select>
-
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={duLieu.sortOrder} 
-                    onChange={e => setDuLieu({...duLieu, sortOrder: parseInt(e.target.value) || 0})} 
-                    className="w-full bg-black border border-white/5 rounded-xl py-3 px-4 text-xs text-white outline-none focus:border-red-600/50" 
-                    placeholder="Thứ tự..."
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] text-zinc-700 font-bold uppercase pointer-events-none">Ưu tiên</span>
-                </div>
               </div>
             </div>
           </div>

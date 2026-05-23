@@ -70,9 +70,10 @@ export default function PromotionModal({ isOpen, mode, data, onClose, onRefresh 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const [fieldErrors, setFieldErrors] = useState<any>({});
   useEffect(() => {
     if (isOpen) {
+      setFieldErrors({});
       loadOptions();
       if (data) {
         setForm({ 
@@ -115,40 +116,79 @@ export default function PromotionModal({ isOpen, mode, data, onClose, onRefresh 
   };
 
   const handleSave = async () => {
-    if (!form.title) return toast.error("Vui lòng nhập tên chương trình");
+    setFieldErrors({});
+
+    if (!form.title.trim()) {
+      toast.error("Vui lòng nhập tên chương trình");
+      return;
+    }
+
+    if (!form.content.trim()) {
+      toast.error("Vui lòng nhập nội dung chương trình");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const formData = new FormData();
+
       formData.append("title", form.title);
       formData.append("content", form.content);
-      formData.append("movieId", form.movieId.toString());
-      formData.append("cinemaItemId", form.cinemaItemId.toString());
-      if (selectedFile) formData.append("file", selectedFile);
 
-      const isEdit = mode === 'edit';
-      const url = isEdit ? `/api/v1/promotions/${data.id}` : '/api/v1/promotions';
-      
+      if (form.movieId && form.movieId !== 0) {
+        formData.append("movieId", form.movieId.toString());
+      }
+
+      if (form.cinemaItemId && form.cinemaItemId !== 0) {
+        formData.append("cinemaItemId", form.cinemaItemId.toString());
+      }
+
+      if (selectedFile) {
+        formData.append("file", selectedFile);
+      }
+
+      const isEdit = mode === "edit";
+
+      const url = isEdit
+        ? `/api/v1/promotions/${data.id}`
+        : "/api/v1/promotions";
+
       const res = await apiSuperAdminRequest(url, {
-        method: isEdit ? 'PUT' : 'POST',
-        body: formData
+        method: isEdit ? "PUT" : "POST",
+        body: formData,
       });
 
-      if (res.ok) {
-        toast.success(isEdit ? "Cập nhật sự kiện thành công" : "Tạo sự kiện mới thành công");
-        onRefresh();
-        onClose();
-      } else {
-        const errData = await res.json();
-        toast.error(errData.message || "Lỗi phản hồi hệ thống");
+      const result = await res.json();
+
+      if (!res.ok) {
+        const errors = result?.data;
+
+        // 👉 case validation backend
+        if (errors && typeof errors === "object") {
+          setFieldErrors(errors);
+
+          const firstError = Object.values(errors)[0];
+          toast.error(firstError as string);
+
+          return;
+        }
+
+        toast.error(result?.message || "Có lỗi xảy ra");
+        return;
       }
-    } catch (e) {
-      toast.error("Mất kết nối hệ thống");
+
+      toast.success(isEdit ? "Cập nhật thành công" : "Tạo sự kiện thành công");
+
+      onRefresh();
+      onClose();
+
+    } catch (error: any) {
+      toast.error(error?.message || "Thao tác thất bại");
     } finally {
       setIsSubmitting(false);
     }
   };
-
   if (!isOpen) return null;
 
   return (
