@@ -206,54 +206,6 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
           </div>
         </main>
       </div>
-
-      {/* SIDEBAR PHẢI (LIVE MONITORING) */}
-      <aside className="hidden xl:flex w-72 h-screen border-l border-zinc-900 bg-[#060608] p-6 flex-col gap-6 shrink-0 z-20">
-        <div>
-          <h3 className="text-white text-[11px] font-bold uppercase tracking-wider mb-5 flex items-center justify-between">
-            Công suất phòng chiếu
-            <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold animate-pulse">Live</span>
-          </h3>
-          
-          <div className="space-y-4 overflow-y-auto hide-scrollbar max-h-[65vh]">
-            {cinemaStats.map((r, i) => (
-              <div key={i} className="space-y-1.5 group">
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-zinc-400 group-hover:text-zinc-200 transition-colors">{r.cinemaName}</span>
-                  <span className={`font-bold ${r.occupancyRate > 80 ? 'text-red-500' : r.occupancyRate > 50 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                    {r.occupancyRate}%
-                  </span>
-                </div>
-                <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-1000 ${
-                      r.occupancyRate > 80 ? 'bg-red-600' : r.occupancyRate > 50 ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`} 
-                    style={{ width: `${r.occupancyRate}%` }} 
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* LOG PANEL COMPONENT */}
-        <div className="mt-auto p-4.5 bg-zinc-950/60 border border-zinc-900 rounded-xl relative overflow-hidden group">
-          <div className="absolute -bottom-4 -right-4 text-white/[0.01] group-hover:text-red-600/[0.02] transition-colors duration-500">
-            <Zap size={80} />
-          </div>
-          <div className="flex items-center gap-1.5 text-white text-[10px] font-bold uppercase tracking-wider mb-1">
-            <SlidersHorizontal size={10} className="text-red-500" />
-            <span>Hệ thống Core v2.4</span>
-          </div>
-          <p className="text-[10px] text-zinc-600 mb-4 leading-relaxed">
-            Bộ mã hóa token và phân mảnh đa tab độc lập toàn diện.
-          </p>
-          <button className="w-full py-2.5 bg-zinc-900 text-zinc-400 text-[10px] font-bold uppercase tracking-wider rounded-lg border border-zinc-800 hover:bg-red-600 hover:text-white hover:border-transparent transition-all duration-200">
-            Kiểm tra logs
-          </button>
-        </div>
-      </aside>
     </div>
   );
 }
