@@ -24,9 +24,7 @@ export default function BannerManager() {
     title: "",
     linkUrl: "",
     imageUrl: "",
-    position: "HOME_TOP",
     status: "ACTIVE",
-    sortOrder: 0,
   };
 
   const [duLieuForm, setDuLieuForm] = useState(emptyForm);
@@ -58,32 +56,42 @@ export default function BannerManager() {
   }, []);
 
   // ================= SAVE =================
-  const handleLuu = async (formData: FormData) => {
-    const method = dangSua ? "PUT" : "POST";
-    const url = dangSua ? `/api/v1/banners/${idHienTai}` : "/api/v1/banners";
-    const t = toast.loading("Đang xử lý...");
+const handleLuu = async (formData: FormData) => {
+  const method = dangSua ? "PUT" : "POST";
+  const url = dangSua ? `/api/v1/banners/${idHienTai}` : "/api/v1/banners";
 
-    try {
-      const res = await apiSuperAdminRequest(url, {
-        method,
-        body: formData,
-      });
+  const t = toast.loading("Đang xử lý...");
 
-      if (!res.ok) {
-        if (res.status === 403) throw new Error("Bạn không có quyền thực hiện!");
-        throw new Error();
-      }
+  try {
+    const res = await apiSuperAdminRequest(url, {
+      method,
+      body: formData,
+    });
 
-      toast.success("Thành công!", { id: t });
-      setShowForm(false);
-      setDangSua(false);
-      setIdHienTai(null);
-      setDuLieuForm(emptyForm);
-      fetchBanners();
-    } catch (err: any) {
-      toast.error(err.message || "Lưu banner thất bại", { id: t });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      const msg =
+        data?.message ||
+        data?.error ||
+        "Dữ liệu không hợp lệ";
+
+      toast.error(msg, { id: t });
+      return; // ❗ QUAN TRỌNG
     }
-  };
+
+    toast.success("Thành công!", { id: t });
+
+    setShowForm(false);
+    setDangSua(false);
+    setIdHienTai(null);
+    setDuLieuForm(emptyForm);
+
+    fetchBanners();
+  } catch (err: any) {
+    toast.error("Lỗi kết nối server", { id: t });
+  }
+};
 
   // ================= DELETE PROCESS =================
   const yeuCauXoa = (id: number) => {
@@ -123,9 +131,7 @@ export default function BannerManager() {
       title: b.title || "",
       linkUrl: b.linkUrl || "",
       imageUrl: b.imageUrl || "",
-      position: b.position || "HOME_TOP",
       status: b.status || "ACTIVE",
-      sortOrder: b.sortOrder || 0,
     });
 
     setShowForm(true);
@@ -164,11 +170,11 @@ export default function BannerManager() {
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* HEADER */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-900 pb-6 gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-900 pb-6 gap-2">
           <div className="space-y-0.5">
-            <h1 className="text-xl font-black uppercase tracking-tight text-white">
-              Quản lý Banners
-            </h1>
+            <h1 className="text-lg font-black uppercase tracking-tight text-white leading-none">
+                Quản Lý <span className="text-red-600">Banners</span>
+              </h1>
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
               Media Component // SuperAdmin Interface
             </p>

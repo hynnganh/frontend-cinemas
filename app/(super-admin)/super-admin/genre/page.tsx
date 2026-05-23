@@ -13,7 +13,7 @@ export default function CategoryManager() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  
+  const [errorMessage, setErrorMessage] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ name: "", description: "" });
@@ -35,28 +35,56 @@ export default function CategoryManager() {
 
   useEffect(() => { fetchCategories(); }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const method = isEditing ? 'PUT' : 'POST';
-    const url = isEditing ? `/api/v1/genres/${currentId}` : '/api/v1/genres';
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    try {
-      const res = await apiSuperAdminRequest(url, {
-        method,
-        body: JSON.stringify(formData)
-      });
+  setErrorMessage("");
 
-      if (res.ok) {
-        toast.success(isEditing ? "Cập nhật thành công!" : "Thêm thể loại mới thành công!");
-        resetForm();
-        fetchCategories();
-      } else {
-        toast.error("Có lỗi xảy ra, vui lòng kiểm tra lại.");
-      }
-    } catch (e) {
-      toast.error("Thao tác thất bại.");
+  const method = isEditing ? "PUT" : "POST";
+
+  const url = isEditing
+    ? `/api/v1/genres/${currentId}`
+    : "/api/v1/genres";
+
+  try {
+    const res = await apiSuperAdminRequest(url, {
+      method,
+      body: JSON.stringify(formData),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      toast.success(
+        isEditing
+          ? "Cập nhật thành công!"
+          : "Thêm thể loại mới thành công!"
+      );
+
+      resetForm();
+      fetchCategories();
+
+    } else {
+
+      // ✅ HIỆN LỖI RA UI
+      setErrorMessage(
+        data?.message ||
+        data?.error ||
+        "Có lỗi xảy ra"
+      );
+
+      toast.error(data?.message || "Có lỗi xảy ra");
     }
-  };
+
+  } catch (error: any) {
+
+    setErrorMessage(
+      error?.message || "Thao tác thất bại"
+    );
+
+    toast.error("Thao tác thất bại");
+  }
+};
 
   const confirmDelete = (id: number) => {
     toast((t) => (
