@@ -75,7 +75,9 @@ export default function ChiTietSuatChieu() {
     fetchData();
   }, [fetchData]);
 
-  // Hàm xử lý Lưu sau khi Sửa
+  // ==========================================
+  // ✏️ XỬ LÝ LƯU SAU KHI SỬA (Bắt lỗi ràng buộc BE)
+  // ==========================================
   const handleSaveEdit = async (formData: any) => {
     if (!cinemaId) return;
     const toastId = toast.loading("Đang cập nhật hệ thống...");
@@ -90,15 +92,18 @@ export default function ChiTietSuatChieu() {
         setIsEditModalOpen(false);
         fetchData(); 
       } else {
-        const result = await res.json();
-        toast.error(result.message || "Trùng lịch chiếu!", { id: toastId });
+        // 🎯 Lấy chính xác thông báo lỗi từ Backend (Ví dụ: Lỗi khách đã thanh toán, lỗi trùng giờ)
+        const result = await res.json().catch(() => ({}));
+        toast.error(result.message || "Không thể cập nhật! Có thể do trùng lịch hoặc đã có khách đặt vé.", { id: toastId });
       }
     } catch (e) {
       toast.error("Lỗi hệ thống!", { id: toastId });
     }
   };
 
-  // Hàm xử lý Xóa thực tế sau khi nhấn nút xác nhận từ Modal tự dựng
+  // ==========================================
+  // ❌ XỬ LÝ XÓA THỰC TẾ (Bắt lỗi ràng buộc BE)
+  // ==========================================
   const handleConfirmDelete = async () => {
     setIsDeleteModalOpen(false); // Đóng ngay modal để tránh double click
     const toastId = toast.loading("Đang gỡ bỏ suất chiếu...");
@@ -108,7 +113,9 @@ export default function ChiTietSuatChieu() {
         toast.success("Đã xóa suất chiếu thành công!", { id: toastId });
         router.push('/admin/showtimes');
       } else {
-        toast.error("Không thể xóa suất chiếu này!", { id: toastId });
+        // 🎯 Lấy chính xác thông báo lỗi từ Backend (Đã có vé thanh toán)
+        const result = await res.json().catch(() => ({}));
+        toast.error(result.message || "Không thể xóa! Suất chiếu này đã có khách hàng mua vé.", { id: toastId });
       }
     } catch (e) { 
       toast.error("Lỗi kết nối máy chủ!", { id: toastId }); 
@@ -172,7 +179,7 @@ export default function ChiTietSuatChieu() {
                  <Edit3 size={16} /> Chỉnh sửa lịch
                </button>
                <button 
-                 onClick={() => setIsDeleteModalOpen(true)} // MỞ MODAL XÓA THAY VÌ WINDOW.CONFIRM
+                 onClick={() => setIsDeleteModalOpen(true)}
                  className="flex items-center justify-center gap-2 py-3 bg-zinc-950 text-zinc-400 rounded-xl font-black text-xs uppercase border border-zinc-900 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-[0.99]"
                >
                  <Trash2 size={16} /> Gỡ bỏ suất
