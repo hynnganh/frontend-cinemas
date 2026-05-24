@@ -11,12 +11,10 @@ import {
   ChevronRight,
   Loader2,
   Building2,
-  MapPin,
   Info,
   Save,
   ShieldCheck,
   AlertTriangle,
-  Clock3,
 } from "lucide-react";
 
 import toast from "react-hot-toast";
@@ -24,7 +22,6 @@ import toast from "react-hot-toast";
 import { apiSuperAdminRequest }
 from "@/app/lib/api";
 
-// ================= TYPES =================
 interface AddCinemaModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -34,12 +31,9 @@ interface AddCinemaModalProps {
 
 interface ErrorState {
   name?: string;
-  city?: string;
   address?: string;
-  hoursPerRoom?: string;
 }
 
-// ================= COMPONENT =================
 export default function AddCinemaModal({
   isOpen,
   onClose,
@@ -47,18 +41,8 @@ export default function AddCinemaModal({
   initialData,
 }: AddCinemaModalProps) {
 
-  // ================= STATES =================
   const [cinemaName, setCinemaName] =
     useState("");
-
-  const [city, setCity] =
-    useState("TP. Hồ Chí Minh");
-
-  const [address, setAddress] =
-    useState("");
-
-  const [hoursPerRoom, setHoursPerRoom] =
-    useState(12);
 
   const [errors, setErrors] =
     useState<ErrorState>({});
@@ -66,7 +50,6 @@ export default function AddCinemaModal({
   const [isSubmitting, setIsSubmitting] =
     useState(false);
 
-  // ================= LOAD DATA =================
   useEffect(() => {
 
     if (initialData && isOpen) {
@@ -75,24 +58,8 @@ export default function AddCinemaModal({
         initialData.name || ""
       );
 
-      setCity(
-        initialData.city || "TP. Hồ Chí Minh"
-      );
-
-      setAddress(
-        initialData.address || ""
-      );
-
-      setHoursPerRoom(
-        initialData.hoursPerRoom || 12
-      );
-
-    } else if (isOpen) {
-
+    } else {
       setCinemaName("");
-      setCity("TP. Hồ Chí Minh");
-      setAddress("");
-      setHoursPerRoom(12);
     }
 
     setErrors({});
@@ -101,12 +68,10 @@ export default function AddCinemaModal({
 
   if (!isOpen) return null;
 
-  // ================= VALIDATE =================
   const validateForm = () => {
 
     const newErrors: ErrorState = {};
 
-    // NAME
     if (!cinemaName.trim()) {
 
       newErrors.name =
@@ -120,51 +85,12 @@ export default function AddCinemaModal({
         "Tên chi nhánh tối thiểu 3 ký tự";
     }
 
-    // CITY
-    if (!city.trim()) {
-
-      newErrors.city =
-        "Thành phố không được để trống";
-    }
-
-    // ADDRESS
-    if (!address.trim()) {
-
-      newErrors.address =
-        "Địa chỉ không được để trống";
-
-    } else if (
-      address.trim().length < 5
-    ) {
-
-      newErrors.address =
-        "Địa chỉ quá ngắn";
-    }
-
-    // HOURS
-    if (
-      !hoursPerRoom ||
-      hoursPerRoom <= 0
-    ) {
-
-      newErrors.hoursPerRoom =
-        "Số giờ hoạt động phải lớn hơn 0";
-
-    } else if (
-      hoursPerRoom > 24
-    ) {
-
-      newErrors.hoursPerRoom =
-        "Không được lớn hơn 24 giờ";
-    }
-
     setErrors(newErrors);
 
     return Object.keys(newErrors)
       .length === 0;
   };
 
-  // ================= SUBMIT =================
   const handleSubmit = async (
     e: React.FormEvent
   ) => {
@@ -216,12 +142,7 @@ export default function AddCinemaModal({
                 cinemaName.trim(),
 
               city:
-                city.trim(),
-
-              address:
-                address.trim(),
-
-              hoursPerRoom,
+                "TPHCM",
 
               cinemaId:
                 initialData?.cinema?.id ||
@@ -234,7 +155,6 @@ export default function AddCinemaModal({
       const result =
         await res.json();
 
-      // SUCCESS
       if (res.ok) {
 
         toast.success(
@@ -246,12 +166,32 @@ export default function AddCinemaModal({
         );
 
         onSuccess();
+
         onClose();
 
         return;
       }
 
-      // BACKEND ERROR
+      if (
+        result?.data &&
+        typeof result.data === "object"
+      ) {
+
+        setErrors(result.data);
+
+        const firstError =
+          Object.values(result.data)[0];
+
+        toast.error(
+          String(firstError),
+          {
+            id: loadingToast,
+          }
+        );
+
+        return;
+      }
+
       toast.error(
         result?.message ||
           result?.error ||
@@ -278,7 +218,6 @@ export default function AddCinemaModal({
     }
   };
 
-  // ================= UI =================
   return (
 
     <div
@@ -293,7 +232,6 @@ export default function AddCinemaModal({
         }
       >
 
-        {/* HEADER */}
         <div className="p-8 border-b border-white/5 flex justify-between items-center">
 
           <div className="flex items-center gap-3">
@@ -341,7 +279,6 @@ export default function AddCinemaModal({
           </button>
         </div>
 
-        {/* FORM */}
         <div className="flex-1 overflow-y-auto p-8">
 
           <form
@@ -349,7 +286,6 @@ export default function AddCinemaModal({
             className="space-y-7"
           >
 
-            {/* NAME */}
             <div className="space-y-3">
 
               <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
@@ -371,7 +307,7 @@ export default function AddCinemaModal({
                     e.target.value
                   )
                 }
-                placeholder="VD: CGV Vincom Quận 1"
+                placeholder="VD: Quận 1"
                 className={`w-full bg-white/[0.03] border rounded-2xl px-5 py-4 text-white outline-none transition-all
                 ${
                   errors.name
@@ -388,45 +324,6 @@ export default function AddCinemaModal({
               )}
             </div>
 
-            {/* CITY */}
-            <div className="space-y-3">
-
-              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
-
-                <MapPin
-                  size={12}
-                  className="text-red-600"
-                />
-
-                Thành phố
-              </label>
-
-              <input
-                type="text"
-                value={city}
-                disabled={isSubmitting}
-                onChange={(e) =>
-                  setCity(
-                    e.target.value
-                  )
-                }
-                className={`w-full bg-white/[0.03] border rounded-2xl px-5 py-4 text-white outline-none transition-all
-                ${
-                  errors.city
-                    ? "border-red-500"
-                    : "border-white/10 focus:border-red-600/50"
-                }`}
-              />
-
-              {errors.city && (
-                <p className="text-red-500 text-xs flex items-center gap-1">
-                  <AlertTriangle size={12} />
-                  {errors.city}
-                </p>
-              )}
-            </div>
-
-            {/* ADDRESS */}
             <div className="space-y-3">
 
               <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
@@ -439,24 +336,6 @@ export default function AddCinemaModal({
                 Địa chỉ
               </label>
 
-              <textarea
-                value={address}
-                disabled={isSubmitting}
-                onChange={(e) =>
-                  setAddress(
-                    e.target.value
-                  )
-                }
-                rows={3}
-                placeholder="Nhập địa chỉ chi nhánh..."
-                className={`w-full bg-white/[0.03] border rounded-2xl px-5 py-4 text-white outline-none transition-all resize-none
-                ${
-                  errors.address
-                    ? "border-red-500"
-                    : "border-white/10 focus:border-red-600/50"
-                }`}
-              />
-
               {errors.address && (
                 <p className="text-red-500 text-xs flex items-center gap-1">
                   <AlertTriangle size={12} />
@@ -465,49 +344,16 @@ export default function AddCinemaModal({
               )}
             </div>
 
-            {/* HOURS */}
-            <div className="space-y-3">
+            <div className="bg-zinc-900/40 border border-white/5 rounded-2xl px-5 py-4">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-2">
+                Thành phố mặc định
+              </p>
 
-              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
-
-                <Clock3
-                  size={12}
-                  className="text-red-600"
-                />
-
-                Giờ hoạt động / phòng
-              </label>
-
-              <input
-                type="number"
-                min={1}
-                max={24}
-                value={hoursPerRoom}
-                disabled={isSubmitting}
-                onChange={(e) =>
-                  setHoursPerRoom(
-                    Number(
-                      e.target.value
-                    )
-                  )
-                }
-                className={`w-full bg-white/[0.03] border rounded-2xl px-5 py-4 text-white outline-none transition-all
-                ${
-                  errors.hoursPerRoom
-                    ? "border-red-500"
-                    : "border-white/10 focus:border-red-600/50"
-                }`}
-              />
-
-              {errors.hoursPerRoom && (
-                <p className="text-red-500 text-xs flex items-center gap-1">
-                  <AlertTriangle size={12} />
-                  {errors.hoursPerRoom}
-                </p>
-              )}
+              <p className="text-white font-bold text-sm">
+                TPHCM
+              </p>
             </div>
 
-            {/* BUTTON */}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -536,7 +382,6 @@ export default function AddCinemaModal({
           </form>
         </div>
 
-        {/* FOOTER */}
         <div className="p-8 border-t border-white/5 bg-black/20">
 
           <div className="flex items-start gap-4">

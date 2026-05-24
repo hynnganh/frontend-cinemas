@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
 import {
   X,
   Loader2,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { apiSuperAdminRequest } from "@/app/lib/api";
+
 import toast from "react-hot-toast";
 
 interface AddModalProps {
@@ -31,25 +33,27 @@ export default function AddCinemaItemModal({
   const [isSubmitting, setIsSubmitting] =
     useState(false);
 
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] =
+    useState<any>({});
 
-  const [formData, setFormData] = useState({
-    name: "",
-    address: "",
-    city: "",
-    hoursPerRoom: 1,
-    cinemaId: cinemaId,
-  });
+  const [formData, setFormData] =
+    useState({
+      name: "",
+      address: "",
+      city: "TP.HCM",
+      hoursPerRoom: 1,
+      cinemaId: cinemaId,
+    });
 
-  // ================= INIT DATA =================
   useEffect(() => {
 
     if (initialData) {
 
       setFormData({
         name: initialData.name || "",
-        address: initialData.address || "",
-        city: initialData.city || "",
+        address:
+          initialData.address || "",
+        city: "TP.HCM",
         hoursPerRoom:
           initialData.hoursPerRoom || 1,
         cinemaId: cinemaId,
@@ -60,7 +64,7 @@ export default function AddCinemaItemModal({
       setFormData({
         name: "",
         address: "",
-        city: "",
+        city: "TP.HCM",
         hoursPerRoom: 1,
         cinemaId: cinemaId,
       });
@@ -74,12 +78,10 @@ export default function AddCinemaItemModal({
 
   const isEdit = !!initialData;
 
-  // ================= VALIDATE =================
   const validateForm = () => {
 
     const newErrors: any = {};
 
-    // NAME
     if (!formData.name.trim()) {
 
       newErrors.name =
@@ -93,21 +95,12 @@ export default function AddCinemaItemModal({
         "Tên chi nhánh tối thiểu 3 ký tự";
     }
 
-    // ADDRESS
     if (!formData.address.trim()) {
 
       newErrors.address =
         "Địa chỉ không được để trống";
     }
 
-    // CITY
-    if (!formData.city.trim()) {
-
-      newErrors.city =
-        "Thành phố không được để trống";
-    }
-
-    // HOURS
     if (
       !formData.hoursPerRoom ||
       formData.hoursPerRoom <= 0
@@ -119,10 +112,11 @@ export default function AddCinemaItemModal({
 
     setErrors(newErrors);
 
-    return Object.keys(newErrors).length === 0;
+    return (
+      Object.keys(newErrors).length === 0
+    );
   };
 
-  // ================= SUBMIT =================
   const handleSubmit = async (
     e: React.FormEvent
   ) => {
@@ -158,17 +152,21 @@ export default function AddCinemaItemModal({
         : "POST";
 
       const res =
-        await apiSuperAdminRequest(url, {
-          method,
-          body: JSON.stringify({
-            ...formData,
-            name: formData.name.trim(),
-            address:
-              formData.address.trim(),
-            city: formData.city.trim(),
-            cinemaId,
-          }),
-        });
+        await apiSuperAdminRequest(
+          url,
+          {
+            method,
+            body: JSON.stringify({
+              ...formData,
+              name:
+                formData.name.trim(),
+              address:
+                formData.address.trim(),
+              city: "TP.HCM",
+              cinemaId,
+            }),
+          }
+        );
 
       let result: any = null;
 
@@ -181,14 +179,15 @@ export default function AddCinemaItemModal({
         result = null;
       }
 
-      // ================= SUCCESS =================
       if (res.ok) {
 
         toast.success(
           result?.message ||
-            (isEdit
-              ? "Cập nhật thành công"
-              : "Tạo chi nhánh thành công"),
+            (
+              isEdit
+                ? "Cập nhật thành công"
+                : "Tạo chi nhánh thành công"
+            ),
           {
             id: loadingToast,
           }
@@ -201,7 +200,28 @@ export default function AddCinemaItemModal({
         return;
       }
 
-      // ================= ERROR =================
+      if (
+        result?.data &&
+        typeof result.data === "object"
+      ) {
+
+        setErrors(result.data);
+
+        const firstError =
+          Object.values(
+            result.data
+          )[0];
+
+        toast.error(
+          String(firstError),
+          {
+            id: loadingToast,
+          }
+        );
+
+        return;
+      }
+
       toast.error(
         result?.message ||
           result?.error ||
@@ -223,13 +243,12 @@ export default function AddCinemaItemModal({
     }
   };
 
-  // ================= UI =================
   return (
+
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
 
       <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-md rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95">
 
-        {/* ================= HEADER ================= */}
         <div className="flex justify-between items-center mb-8">
 
           <div className="flex items-center gap-2">
@@ -243,9 +262,11 @@ export default function AddCinemaItemModal({
             />
 
             <span className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-400 italic">
+
               {isEdit
                 ? "Chỉnh sửa chi nhánh"
                 : "Khởi tạo chi nhánh"}
+
             </span>
           </div>
 
@@ -257,17 +278,17 @@ export default function AddCinemaItemModal({
           </button>
         </div>
 
-        {/* ================= FORM ================= */}
         <form
           onSubmit={handleSubmit}
           className="grid grid-cols-2 gap-4"
         >
 
-          {/* ================= NAME ================= */}
           <div className="col-span-2 space-y-1">
 
             <label className="text-[9px] font-black uppercase text-zinc-700 tracking-widest ml-1 italic">
+
               Tên chi nhánh
+
             </label>
 
             <input
@@ -276,7 +297,7 @@ export default function AddCinemaItemModal({
                   ? "border-red-600"
                   : "border-white/5 focus:border-red-600"
               }`}
-              placeholder="VD: CGV Quận 1"
+              placeholder="VD: Rạp A&K Đường 103"
               value={formData.name}
               onChange={(e) =>
                 setFormData({
@@ -287,18 +308,23 @@ export default function AddCinemaItemModal({
             />
 
             {errors.name && (
+
               <p className="text-red-500 text-[11px] flex items-center gap-1 mt-1">
+
                 <AlertTriangle size={12} />
+
                 {errors.name}
+
               </p>
             )}
           </div>
 
-          {/* ================= ADDRESS ================= */}
           <div className="col-span-2 space-y-1">
 
             <label className="text-[9px] font-black uppercase text-zinc-700 tracking-widest ml-1 italic">
+
               Địa chỉ chi tiết
+
             </label>
 
             <input
@@ -318,49 +344,38 @@ export default function AddCinemaItemModal({
             />
 
             {errors.address && (
+
               <p className="text-red-500 text-[11px] flex items-center gap-1 mt-1">
+
                 <AlertTriangle size={12} />
+
                 {errors.address}
+
               </p>
             )}
           </div>
 
-          {/* ================= CITY ================= */}
           <div className="space-y-1">
 
             <label className="text-[9px] font-black uppercase text-zinc-700 tracking-widest ml-1 italic">
+
               Thành phố
+
             </label>
 
             <input
-              className={`w-full bg-zinc-900 border rounded-xl px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-zinc-700 ${
-                errors.city
-                  ? "border-red-600"
-                  : "border-white/5 focus:border-red-600"
-              }`}
-              placeholder="TP.HCM"
-              value={formData.city}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  city: e.target.value,
-                })
-              }
+              className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-sm text-zinc-400 outline-none cursor-not-allowed"
+              value="TP.HCM"
+              disabled
             />
-
-            {errors.city && (
-              <p className="text-red-500 text-[11px] flex items-center gap-1 mt-1">
-                <AlertTriangle size={12} />
-                {errors.city}
-              </p>
-            )}
           </div>
 
-          {/* ================= HOURS ================= */}
           <div className="space-y-1">
 
             <label className="text-[9px] font-black uppercase text-zinc-700 tracking-widest ml-1 italic">
+
               Giờ hoạt động
+
             </label>
 
             <input
@@ -376,30 +391,36 @@ export default function AddCinemaItemModal({
                 setFormData({
                   ...formData,
                   hoursPerRoom:
-                    Number(e.target.value),
+                    Number(
+                      e.target.value
+                    ),
                 })
               }
             />
 
             {errors.hoursPerRoom && (
+
               <p className="text-red-500 text-[11px] flex items-center gap-1 mt-1">
+
                 <AlertTriangle size={12} />
+
                 {errors.hoursPerRoom}
+
               </p>
             )}
           </div>
 
-          {/* ================= WARNING ================= */}
           <div className="col-span-2 mt-2 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5">
 
             <p className="text-[11px] text-amber-400 leading-relaxed">
+
               Không thể xoá chi nhánh nếu vẫn còn
               suất chiếu đang hoạt động trong hệ
               thống.
+
             </p>
           </div>
 
-          {/* ================= BUTTON ================= */}
           <button
             type="submit"
             disabled={isSubmitting}
@@ -411,11 +432,14 @@ export default function AddCinemaItemModal({
           >
 
             {isSubmitting ? (
+
               <Loader2
                 size={14}
                 className="animate-spin"
               />
+
             ) : (
+
               <>
                 {isEdit ? (
                   <Save size={14} />

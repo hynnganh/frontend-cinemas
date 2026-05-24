@@ -164,7 +164,6 @@ export default function PromotionModal({ isOpen, mode, data, onClose, onRefresh 
       if (!res.ok) {
         const errors = result?.data;
 
-        // 👉 case validation backend
         if (errors && typeof errors === "object") {
           setFieldErrors(errors);
 

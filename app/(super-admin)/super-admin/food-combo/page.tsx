@@ -34,27 +34,77 @@ export default function FoodManagement() {
 
   useEffect(() => { fetchCombos(); }, []);
 
-  const handleFormSubmit = async (data: FormData) => {
-    const isUpdate = !!editingItem;
-    const endpoint = isUpdate ? `/api/v1/combos/${editingItem.id}` : '/api/v1/combos';
-    setIsSubmitting(true);
-    const toastId = toast.loading(isUpdate ? "Đang cập nhật..." : "Đang tạo...");
+const handleFormSubmit = async (data: FormData) => {
+  const isUpdate = !!editingItem;
 
-    try {
-      const res = await apiSuperAdminRequest(endpoint, { method: isUpdate ? "PUT" : "POST", body: data });
-      if (res.ok) {
-        toast.success("Thành công!", { id: toastId });
-        setIsModalOpen(false);
-        fetchCombos();
-      } else {
-        toast.error("Thao tác thất bại", { id: toastId });
-      }
-    } catch (error) {
-      toast.error("Lỗi hệ thống", { id: toastId });
-    } finally {
-      setIsSubmitting(false);
+  const endpoint = isUpdate
+    ? `/api/v1/combos/${editingItem.id}`
+    : "/api/v1/combos";
+
+  setIsSubmitting(true);
+
+  const toastId = toast.loading(
+    isUpdate ? "Đang cập nhật..." : "Đang tạo..."
+  );
+
+  try {
+
+    const res = await apiSuperAdminRequest(endpoint, {
+      method: isUpdate ? "PUT" : "POST",
+      body: data,
+    });
+
+    // ❌ VALIDATION ERROR
+    if (!res.ok) {
+
+      const result = await res.json().catch(() => null);
+
+      toast.error(
+        result?.message || "Dữ liệu không hợp lệ",
+        { id: toastId }
+      );
+
+      // 🔥 QUAN TRỌNG
+      // RETURN RES CHO FORM CON XỬ LÝ FIELD ERROR
+      return {
+        ok: false,
+        json: async () => result,
+      };
     }
-  };
+
+    // ✅ SUCCESS
+    toast.success(
+      isUpdate
+        ? "Cập nhật thành công!"
+        : "Tạo combo thành công!",
+      { id: toastId }
+    );
+
+    setIsModalOpen(false);
+
+    setEditingItem(null);
+
+    fetchCombos();
+
+    return {
+      ok: true,
+    };
+
+  } catch (error) {
+
+    toast.error("Lỗi hệ thống", { id: toastId });
+
+    return {
+      ok: false,
+      json: async () => ({
+        message: "Không thể kết nối máy chủ",
+      }),
+    };
+
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const confirmDelete = async () => {
     if (!itemToDelete) return;

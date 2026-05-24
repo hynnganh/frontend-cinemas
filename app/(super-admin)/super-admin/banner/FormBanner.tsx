@@ -128,7 +128,6 @@ const guiForm = async (e: React.FormEvent) => {
             <div className="space-y-2">
               <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest flex justify-between">
                 Hình ảnh banner (1920x800)
-                <span className="text-zinc-500">* Do BE kiểm tra</span>
               </label>
               <div className="relative group aspect-video rounded-2xl border-2 border-dashed border-white/5 bg-zinc-900 flex flex-col items-center justify-center overflow-hidden transition-all hover:border-red-600/40">
                 {anhXemTruoc ? (
