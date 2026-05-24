@@ -39,7 +39,7 @@ const formatVND = (value: number) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
-  }).format(value);
+  }).format(value || 0);
 
 /* ================= PAGE ================= */
 export default function AdminStatisticsPage() {
@@ -54,13 +54,23 @@ export default function AdminStatisticsPage() {
 
   const [chartData, setChartData] = useState<ChartItem[]>([]);
 
+  // 👉 lấy user từ localStorage (hoặc redux nếu bạn dùng)
+  const user = typeof window !== "undefined"
+    ? JSON.parse(localStorage.getItem("user") || "{}")
+    : {};
+
+  const cinemaId = user?.managedCinemaItemId;
+
+  /* ================= FETCH ================= */
   const fetchDashboard = async () => {
     try {
       setLoading(true);
 
+      const query = cinemaId ? `?cinemaId=${cinemaId}` : "";
+
       const [dashRes, chartRes] = await Promise.all([
-        apiAdminRequest("/api/v1/reports/dashboard"),
-        apiAdminRequest("/api/v1/reports/revenue-7days"),
+        apiAdminRequest(`/api/v1/reports/dashboard${query}`),
+        apiAdminRequest(`/api/v1/reports/revenue-7days${query}`),
       ]);
 
       if (dashRes.ok) {
@@ -73,7 +83,7 @@ export default function AdminStatisticsPage() {
         setChartData(data || []);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Dashboard error:", e);
     } finally {
       setLoading(false);
     }
@@ -83,8 +93,10 @@ export default function AdminStatisticsPage() {
     fetchDashboard();
   }, []);
 
+  /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-[#050505] p-6 text-zinc-300">
+
       {/* HEADER */}
       <div className="mb-8 flex items-center justify-between">
         <div>
@@ -113,6 +125,7 @@ export default function AdminStatisticsPage() {
         <>
           {/* STATS */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+
             <StatCard
               title="Doanh thu hôm nay"
               value={formatVND(stats.todayRevenue)}
@@ -122,21 +135,21 @@ export default function AdminStatisticsPage() {
 
             <StatCard
               title="Vé đã bán"
-              value={`${stats.todayTickets} vé`}
+              value={`${stats.todayTickets}`}
               icon={<Ticket size={18} />}
               color="text-red-500"
             />
 
             <StatCard
               title="Suất chiếu"
-              value={`${stats.todayShowtimes} suất`}
+              value={`${stats.todayShowtimes}`}
               icon={<Film size={18} />}
               color="text-yellow-500"
             />
 
             <StatCard
               title="Tỉ lệ lấp đầy"
-              value={`${(stats.occupancy * 100).toFixed(0)}%`}
+              value={`${(stats.occupancy || 0).toFixed(0)}%`}
               icon={<TrendingUp size={18} />}
               color="text-cyan-500"
             />
@@ -144,6 +157,7 @@ export default function AdminStatisticsPage() {
 
           {/* CHART */}
           <div className="mt-6 rounded-3xl border border-zinc-900 bg-[#0f0f0f] p-6">
+
             <div className="mb-6 flex items-center gap-2">
               <BarChart3 className="text-red-500" size={18} />
               <h2 className="text-sm font-black uppercase text-white">
@@ -153,6 +167,7 @@ export default function AdminStatisticsPage() {
 
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={chartData}>
+
                 <defs>
                   <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#dc2626" stopOpacity={0.8} />
@@ -165,21 +180,19 @@ export default function AdminStatisticsPage() {
                 <XAxis dataKey="day" stroke="#777" />
 
                 <Tooltip
-  content={({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
 
-    return (
-      <div className="bg-black border border-zinc-800 p-3 rounded-xl shadow-lg text-xs">
-        <p className="text-white font-bold mb-1">{label}</p>
-
-        <p className="text-red-500 font-black">
-          Doanh thu:{" "}
-          {Number(payload[0].value).toLocaleString("vi-VN")} đ
-        </p>
-      </div>
-    );
-  }}
-/>
+                    return (
+                      <div className="bg-black border border-zinc-800 p-3 rounded-xl text-xs">
+                        <p className="text-white font-bold mb-1">{label}</p>
+                        <p className="text-red-500 font-black">
+                          {Number(payload[0].value).toLocaleString("vi-VN")} đ
+                        </p>
+                      </div>
+                    );
+                  }}
+                />
 
                 <Area
                   type="monotone"
@@ -189,6 +202,7 @@ export default function AdminStatisticsPage() {
                   strokeWidth={3}
                 />
               </AreaChart>
+
             </ResponsiveContainer>
           </div>
         </>
