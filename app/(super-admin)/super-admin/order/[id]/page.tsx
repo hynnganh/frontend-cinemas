@@ -133,7 +133,9 @@ export default function OrderDetailPage() {
                     </div>
                     <div>
                       <p className="text-[11px] font-black uppercase tracking-tight leading-none mb-1 text-zinc-300 group-hover:text-red-500 transition-colors">
-                        {vatPham.itemType === 'TICKET' ? 'VÉ XEM PHIM' : vatPham.itemType === 'COMBO' ? 'COMBO NƯỚC UỐNG' : vatPham.itemType}
+                        {vatPham.itemType === 'TICKET'
+                          ? vatPham.itemName
+                          : vatPham.itemName}
                       </p>
                       <p className="text-[8px] font-black text-zinc-500 uppercase tracking-wider">
                         ĐƠN GIÁ: {vatPham.price?.toLocaleString('vi-VN')}đ

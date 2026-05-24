@@ -159,7 +159,11 @@ export default function OrderDetailPage() {
                       {item.itemType === 'TICKET' ? <Ticket size={18}/> : <Coffee size={18}/>}
                     </div>
                     <div>
-                      <p className="text-xs font-black text-zinc-200 uppercase tracking-tight">{item.itemType === 'TICKET' ? 'Vé xem phim' : 'Bắp & Nước'}</p>
+                      <p className="text-xs font-black text-zinc-200 uppercase tracking-tight">
+                      {item.itemType === 'TICKET'
+                          ? item.itemName
+                          : item.itemName}
+                      </p>                      
                       <p className="text-[9px] text-zinc-500 font-black uppercase tracking-wider mt-0.5">Số lượng: {item.quantity}</p>
                     </div>
                   </div>

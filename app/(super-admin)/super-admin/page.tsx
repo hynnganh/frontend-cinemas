@@ -11,11 +11,12 @@ import {
   Star,
   Building2,
   DollarSign,
-  Ticket,
   TrendingUp,
   Film,
   RefreshCw,
   Calendar,
+  ArrowRight,
+  Zap,
 } from "lucide-react";
 
 import {
@@ -46,103 +47,77 @@ interface MovieStat {
 
 /* ================= TRANG CHÍNH ================= */
 export default function ReportDashboard() {
-
-  // ================= BỘ LỌC THỜI GIAN =================
-  const [startDate, setStartDate] =
-    useState(() => {
-      const d = new Date();
-      return new Date(
-        d.getFullYear(),
-        d.getMonth(),
-        1
-      )
-        .toISOString()
-        .slice(0, 16);
-    });
-
-  const [endDate, setEndDate] =
-    useState(() =>
-      new Date()
-        .toISOString()
-        .slice(0, 16)
-    );
-
-  // ================= TRẠNG THÁI DỮ LIỆU =================
-  const [loading, setLoading] =
-    useState(true);
-
-  const [ranking, setRanking] =
-    useState<RankingItem[]>([]);
-
-  const [movieStats, setMovieStats] =
-    useState<MovieStat[]>([]);
-
-  // ================= CHUYỂN ĐỔI ĐỊNH DẠNG NGÀY =================
-  const formatDate = (
-    date: string
-  ) => {
-    return (
-      date.replace("T", " ") +
-      ":00"
-    );
+  
+  // Hàm tiện ích: Ép đối tượng Date thành chuỗi chuấn 'YYYY-MM-DDTHH:mm' theo múi giờ địa phương
+  const toLocalDateTimeString = (date: Date) => {
+    const tzOffset = date.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(date.getTime() - tzOffset).toISOString();
+    return localISOTime.slice(0, 16);
   };
 
-  // ================= KHỞI TẠO TRUY VẤN =================
+  // ================= BỘ LỌC THỜI GIAN (ĐÃ FIX ĐỒNG BỘ GIỜ HIỆN TẠI) =================
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    // Mặc định: Đầu tháng hiện tại lúc 00:00
+    return toLocalDateTimeString(new Date(d.getFullYear(), d.getMonth(), 1, 0, 0));
+  });
+
+  const [endDate, setEndDate] = useState(() => {
+    // Mặc định: Đúng ngày hôm nay và đúng số giờ + số phút ở thời điểm hiện tại
+    return toLocalDateTimeString(new Date());
+  });
+
+  // ================= TRẠNG THÁI DỮ LIỆU =================
+  const [loading, setLoading] = useState(true);
+  const [ranking, setRanking] = useState<RankingItem[]>([]);
+  const [movieStats, setMovieStats] = useState<MovieStat[]>([]);
+
+  // ================= CÁC NÚT CHỌN NHANH THỜI GIAN =================
+  const setQuickFilter = (type: "today" | "7days" | "month") => {
+    const now = new Date();
+    if (type === "today") {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0);
+      setStartDate(toLocalDateTimeString(start));
+      setEndDate(toLocalDateTimeString(now));
+    } else if (type === "7days") {
+      const start = new Date();
+      start.setDate(now.getDate() - 7);
+      setStartDate(toLocalDateTimeString(start));
+      setEndDate(toLocalDateTimeString(now));
+    } else if (type === "month") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0);
+      setStartDate(toLocalDateTimeString(start));
+      setEndDate(toLocalDateTimeString(now));
+    }
+  };
+
+  // Chuyển đổi sang định dạng backend yêu cầu (YYYY-MM-DD HH:mm:ss)
+  const formatDateForApi = (dateStr: string) => {
+    return dateStr.replace("T", " ") + ":00";
+  };
+
   const getQuery = () => {
-    const searchParams =
-      new URLSearchParams({
-        start: formatDate(
-          startDate
-        ),
-        end: formatDate(
-          endDate
-        ),
-      });
+    const searchParams = new URLSearchParams({
+      start: formatDateForApi(startDate),
+      end: formatDateForApi(endDate),
+    });
     return searchParams.toString();
   };
 
-  // ================= TẢI DỮ LIỆU TỪ HỆ THỐNG =================
   const fetchData = async () => {
     try {
       setLoading(true);
-      const query =
-        getQuery();
+      const query = getQuery();
 
-      const [
-        rankRes,
-        movieRes,
-      ] = await Promise.all([
-        apiSuperAdminRequest(
-          `/api/v1/reports/ranking?${query}`
-        ),
-        apiSuperAdminRequest(
-          `/api/v1/reports/stats`
-        ),
+      const [rankRes, movieRes] = await Promise.all([
+        apiSuperAdminRequest(`/api/v1/reports/ranking?${query}`),
+        apiSuperAdminRequest(`/api/v1/reports/stats`),
       ]);
 
-      // ================= XỬ LÝ DỮ LIỆU XẾP HẠNG =================
-      if (rankRes.ok) {
-        const rankData =
-          await rankRes.json();
-        setRanking(
-          rankData || []
-        );
-      }
-
-      // ================= XỬ LÝ DỮ LIỆU PHIM =================
-      if (movieRes.ok) {
-        const movieData =
-          await movieRes.json();
-        setMovieStats(
-          movieData || []
-        );
-      }
-
+      if (rankRes.ok) setRanking((await rankRes.json()) || []);
+      if (movieRes.ok) setMovieStats((await movieRes.json()) || []);
     } catch (error) {
-      console.error(
-        "Lỗi tải dữ liệu hệ thống:",
-        error
-      );
+      console.error("Lỗi tải dữ liệu hệ thống:", error);
     } finally {
       setLoading(false);
     }
@@ -153,93 +128,54 @@ export default function ReportDashboard() {
   }, [startDate, endDate]);
 
   // ================= TÍNH TOÁN SỐ LIỆU TỔNG HỢP =================
-  const totalRevenue =
-    useMemo(() => {
-      return ranking.reduce(
-        (sum, item) =>
-          sum + item.revenue,
-        0
-      );
-    }, [ranking]);
+  const totalRevenue = useMemo(() => {
+    return ranking.reduce((sum, item) => sum + item.revenue, 0);
+  }, [ranking]);
 
-  const totalCinemas =
-    ranking.length;
+  const totalCinemas = ranking.length;
 
-  const topCinema =
-    ranking.length > 0
-      ? ranking.reduce(
-          (max, item) =>
-            item.revenue >
-            max.revenue
-              ? item
-              : max,
-          ranking[0]
-        )
-      : null;
+  const topCinema = ranking.length > 0
+    ? ranking.reduce((max, item) => item.revenue > max.revenue ? item : max, ranking[0])
+    : null;
 
-  const totalReviews =
-    movieStats.reduce(
-      (sum, item) =>
-        sum + item.count,
-      0
-    );
+  const totalReviews = movieStats.reduce((sum, item) => sum + item.count, 0);
 
-  // ================= GIẢ LẬP BIỂU ĐỒ XU HƯỚNG TĂNG TRƯỞNG =================
-  const revenueTrend =
-    ranking.slice(0, 5).map(
-      (item, index) => ({
-        name:
-          item.name.length > 12
-            ? item.name.slice(
-                0,
-                12
-              ) + "..."
-            : item.name,
-        revenue:
-          item.revenue,
-        growth:
-          item.revenue *
-          (0.85 +
-            index * 0.08),
-      })
-    );
+  const revenueTrend = ranking.slice(0, 5).map((item, index) => ({
+    name: item.name.length > 12 ? item.name.slice(0, 12) + "..." : item.name,
+    revenue: item.revenue,
+    growth: item.revenue * (0.85 + index * 0.08),
+  }));
 
-  // ================= ĐỊNH DẠNG TIỀN TỆ VNĐ =================
-  const formatMoney = (
-    value: number
-  ) => {
-    return new Intl.NumberFormat(
-      "vi-VN",
-      {
-        style: "currency",
-        currency: "VND",
-        maximumFractionDigits: 0,
-      }
-    ).format(value);
+  const formatMoney = (value: number) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
   return (
-    <div className="min-h-screen bg-[#030303] p-4 sm:p-8 text-zinc-400 font-sans antialiased selection:bg-red-600/30 selection:text-red-400">
+    <div className="min-h-screen bg-[#040406] p-4 sm:p-8 text-zinc-400 font-sans antialiased selection:bg-red-600/30 selection:text-red-400 relative overflow-hidden">
       
-      {/* Hiệu ứng đèn Neon Đỏ chiếu mờ ẩn sau background tổng thể */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-red-950/20 rounded-full blur-[120px] pointer-events-none" />
+      {/* Đèn chuyển màu Background */}
+      <div className="absolute top-[-10%] left-1/4 w-[500px] h-[500px] bg-red-950/15 rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto space-y-6 relative z-10">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 relative z-10">
 
-        {/* ================= THANH TIÊU ĐỀ (HEADER) ================= */}
+        {/* ================= HEADER ================= */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-900 pb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-wider text-white bg-gradient-to-r from-white via-zinc-200 to-zinc-600 bg-clip-text text-transparent">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-wider text-white bg-gradient-to-r from-white via-zinc-300 to-zinc-600 bg-clip-text text-transparent">
               Hệ Thống Tổng Quản Trị Cao Cấp
             </h1>
-            <p className="mt-1 text-xs sm:text-sm text-zinc-500 font-medium">
+            <p className="mt-1 text-xs text-zinc-500 font-medium">
               Phân tích doanh thu thương mại và hiệu suất vận hành chuỗi rạp chiếu phim toàn quốc
             </p>
           </div>
 
           <button
             onClick={fetchData}
-            className="group flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-[#0c0c0e] px-5 py-3 text-xs font-bold uppercase tracking-wider text-zinc-200 transition-all duration-300 hover:border-red-600 hover:text-white active:scale-95 self-start sm:self-auto shadow-lg"
+            className="group flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-[#0c0c0f] px-5 py-3 text-xs font-bold uppercase tracking-wider text-zinc-200 transition-all duration-300 hover:border-red-500 hover:text-white active:scale-95 shadow-md"
           >
             <RefreshCw
               size={13}
@@ -249,107 +185,115 @@ export default function ReportDashboard() {
           </button>
         </div>
 
-        {/* ================= BỘ LỌC THỜI GIAN (FILTER) ================= */}
-        <div className="rounded-2xl border border-zinc-900 bg-[#0c0c0e]/80 backdrop-blur-md p-6 shadow-xl relative overflow-hidden group hover:border-zinc-800 transition-all duration-300">
-          <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-red-800 to-transparent"></div>
+        {/* ================= BỘ LỌC THỜI GIAN NEW DESIGN ================= */}
+        <div className="rounded-2xl border border-zinc-800/80 bg-[#0b0b0e] p-5 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-red-500/20 via-transparent to-transparent" />
           
-          <div className="mb-5 flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-red-950/40 text-red-500 border border-red-900/20">
-              <Calendar size={14} />
-            </div>
-            <h2 className="text-xs font-black uppercase tracking-wider text-white">
-              Khoảng thời gian thống kê dữ liệu
-            </h2>
-          </div>
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+            
+            {/* Tiêu đề & Nút chọn nhanh */}
+            <div className="flex flex-col md:flex-row md:items-center gap-4 lg:gap-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20">
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-wider text-white">
+                    Phạm vi thời gian báo cáo
+                  </h2>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Thời gian cập nhật thời gian thực</p>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* THỜI GIAN BẮT ĐẦU */}
-            <div>
-              <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                Thời gian bắt đầu
-              </p>
-              <input
-                type="datetime-local"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-[#050505] p-3.5 text-xs text-white outline-none transition focus:border-red-600 font-medium"
-              />
+              {/* Nhóm nút chọn nhanh */}
+              <div className="flex items-center gap-2 border border-zinc-800/80 bg-zinc-950 p-1 rounded-xl self-start md:self-auto">
+                <button 
+                  onClick={() => setQuickFilter("today")}
+                  className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all text-zinc-400 hover:text-white hover:bg-zinc-900 active:scale-95"
+                >
+                  Hôm nay
+                </button>
+                <div className="w-[1px] h-3 bg-zinc-800" />
+                <button 
+                  onClick={() => setQuickFilter("7days")}
+                  className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all text-zinc-400 hover:text-white hover:bg-zinc-900 active:scale-95"
+                >
+                  7 Ngày qua
+                </button>
+                <div className="w-[1px] h-3 bg-zinc-800" />
+                <button 
+                  onClick={() => setQuickFilter("month")}
+                  className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all text-zinc-400 hover:text-white hover:bg-zinc-900 active:scale-95"
+                >
+                  Tháng này
+                </button>
+              </div>
             </div>
 
-            {/* THỜI GIAN KẾT THÚC */}
-            <div>
-              <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                Thời gian kết thúc
-              </p>
-              <input
-                type="datetime-local"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-[#050505] p-3.5 text-xs text-white outline-none transition focus:border-red-600 font-medium"
-              />
+            {/* Khung nhập liệu Input datetime */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-zinc-950 p-2 rounded-xl border border-zinc-800/70 w-full xl:w-auto">
+              
+              <div className="relative flex-1 sm:w-52">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[9px] uppercase font-black tracking-widest text-zinc-500">
+                  Từ
+                </span>
+                <input
+                  type="datetime-local"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-800/80 bg-[#0d0d12] py-2.5 pl-10 pr-3 text-xs text-zinc-200 font-bold outline-none transition-all duration-200 focus:border-red-500 focus:text-white [color-scheme:dark]"
+                />
+              </div>
+
+              <div className="hidden sm:flex items-center justify-center text-zinc-700">
+                <ArrowRight size={14} />
+              </div>
+
+              <div className="relative flex-1 sm:w-52">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[9px] uppercase font-black tracking-widest text-zinc-500">
+                  Đến
+                </span>
+                <input
+                  type="datetime-local"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-800/80 bg-[#0d0d12] py-2.5 pl-10 pr-3 text-xs text-zinc-200 font-bold outline-none transition-all duration-200 focus:border-red-500 focus:text-white [color-scheme:dark]"
+                />
+              </div>
+
             </div>
           </div>
         </div>
 
-        {/* ================= TRẠNG THÁI ĐANG TẢI (LOADING) ================= */}
+        {/* ================= LOADING OR CONTENT ================= */}
         {loading ? (
           <div className="flex h-[40vh] flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full border-2 border-zinc-800 border-t-red-600 animate-spin"></div>
+            <div className="w-10 h-10 rounded-full border-2 border-zinc-800 border-t-red-500 animate-spin" />
             <div className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mt-1">
-              Hệ thống đang xử lý dữ liệu...
+              Hệ thống đang đồng bộ...
             </div>
           </div>
         ) : (
           <>
-            {/* ================= THẺ THỐNG KÊ (STATS CARD) ================= */}
+            {/* STATS CARD */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                title="Tổng doanh thu chuỗi rạp"
-                value={formatMoney(totalRevenue)}
-                icon={<DollarSign size={16} />}
-                bgIcon="bg-red-600/10 text-red-500 border border-red-950"
-              />
-
-              <StatCard
-                title="Tổng cụm rạp hoạt động"
-                value={`${totalCinemas} chi nhánh`}
-                icon={<Building2 size={16} />}
-                bgIcon="bg-zinc-900 text-zinc-400 border border-zinc-800"
-              />
-
-              <StatCard
-                title="Tổng phản hồi từ khán giả"
-                value={`${totalReviews.toLocaleString()} lượt`}
-                icon={<Star size={16} />}
-                bgIcon="bg-zinc-900 text-zinc-400 border border-zinc-800"
-              />
-
-              <StatCard
-                title="Chi nhánh tăng trưởng cao nhất"
-                value={topCinema?.name || "Chưa có"}
-                icon={<TrendingUp size={16} />}
-                bgIcon="bg-white/10 text-white border border-zinc-800"
-                valueClass="text-red-500 font-black"
-              />
+              <StatCard title="Tổng doanh thu chuỗi rạp" value={formatMoney(totalRevenue)} icon={<DollarSign size={16} />} bgIcon="bg-red-600/10 text-red-500 border border-red-950" />
+              <StatCard title="Tổng cụm rạp hoạt động" value={`${totalCinemas} chi nhánh`} icon={<Building2 size={16} />} bgIcon="bg-zinc-900 text-zinc-400 border border-zinc-800" />
+              <StatCard title="Tổng phản hồi từ khán giả" value={`${totalReviews.toLocaleString()} lượt`} icon={<Star size={16} />} bgIcon="bg-zinc-900 text-zinc-400 border border-zinc-800" />
+              <StatCard title="Chi nhánh tăng trưởng cao nhất" value={topCinema?.name || "Chưa có"} icon={<TrendingUp size={16} />} bgIcon="bg-white/10 text-white border border-zinc-800" valueClass="text-red-500 font-black" />
             </div>
 
-            {/* ================= KHỐI BIỂU ĐỒ (CHARTS) ================= */}
+            {/* CHARTS */}
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-
-              {/* BIỂU ĐỒ CỘT DỌC */}
+              {/* BAR CHART */}
               <div className="rounded-2xl border border-zinc-900 bg-[#0c0c0e] p-6 shadow-xl relative overflow-hidden group hover:border-zinc-800 transition-all duration-300">
                 <div className="mb-6 flex items-center justify-between border-b border-zinc-900/50 pb-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-red-950/40 text-red-500">
-                      <BarChart3 size={15} />
-                    </div>
-                    <h2 className="text-xs font-black uppercase tracking-wider text-white">
-                      Xếp hạng doanh số chi nhánh rạp
-                    </h2>
+                    <div className="p-1.5 rounded-lg bg-red-950/40 text-red-500"><BarChart3 size={15} /></div>
+                    <h2 className="text-xs font-black uppercase tracking-wider text-white">Xếp hạng doanh số chi nhánh rạp</h2>
                   </div>
                   <span className="text-[9px] font-bold px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded">Đơn vị: VNĐ</span>
                 </div>
-
                 <div className="w-full h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={ranking} layout="vertical" margin={{ left: -15, right: 10 }}>
@@ -374,20 +318,15 @@ export default function ReportDashboard() {
                 </div>
               </div>
 
-              {/* BIỂU ĐỒ VÙNG DIỆN TÍCH */}
+              {/* AREA CHART */}
               <div className="rounded-2xl border border-zinc-900 bg-[#0c0c0e] p-6 shadow-xl relative overflow-hidden group hover:border-zinc-800 transition-all duration-300">
                 <div className="mb-6 flex items-center justify-between border-b border-zinc-900/50 pb-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-red-950/40 text-red-500">
-                      <TrendingUp size={15} />
-                    </div>
-                    <h2 className="text-xs font-black uppercase tracking-wider text-white">
-                      Dự báo xu hướng & hiệu suất tăng trưởng
-                    </h2>
+                    <div className="p-1.5 rounded-lg bg-red-950/40 text-red-500"><TrendingUp size={15} /></div>
+                    <h2 className="text-xs font-black uppercase tracking-wider text-white">Dự báo xu hướng & hiệu suất tăng trưởng</h2>
                   </div>
                   <span className="text-[9px] font-bold px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded">Biểu đồ dự đoán</span>
                 </div>
-
                 <div className="w-full h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={revenueTrend} margin={{ left: -15, right: 5 }}>
@@ -418,17 +357,12 @@ export default function ReportDashboard() {
               </div>
             </div>
 
-            {/* ================= BẢNG DANH SÁCH PHIM (MOVIES TABLE) ================= */}
+            {/* MOVIES TABLE */}
             <div className="rounded-2xl border border-zinc-900 bg-[#0c0c0e] p-6 shadow-xl relative overflow-hidden group hover:border-zinc-800 transition-all duration-300">
               <div className="mb-5 flex items-center gap-2 border-b border-zinc-900/50 pb-4">
-                <div className="p-1.5 rounded-lg bg-zinc-900 text-yellow-500 border border-zinc-800">
-                  <Film size={15} />
-                </div>
-                <h2 className="text-xs font-black uppercase tracking-wider text-white">
-                  Bảng xếp hạng phim có số điểm đánh giá cao từ người dùng
-                </h2>
+                <div className="p-1.5 rounded-lg bg-zinc-900 text-yellow-500 border border-zinc-800"><Film size={15} /></div>
+                <h2 className="text-xs font-black uppercase tracking-wider text-white">Bảng xếp hạng phim có số điểm đánh giá cao từ người dùng</h2>
               </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
@@ -441,25 +375,15 @@ export default function ReportDashboard() {
                   <tbody className="divide-y divide-zinc-900/40">
                     {movieStats.map((movie, index) => (
                       <tr key={index} className="transition hover:bg-zinc-900/20 group/row">
-                        <td className="py-3.5 font-semibold text-white group-hover/row:text-red-400 transition-colors">
-                          {movie.title}
-                        </td>
-                        <td className="py-3.5 text-right font-black text-yellow-500 text-sm">
-                          {movie.avgRating?.toFixed(1) || "0.0"}
-                        </td>
-                        <td className="py-3.5 text-right text-zinc-400 font-medium">
-                          {movie.count.toLocaleString()} lượt
-                        </td>
+                        <td className="py-3.5 font-semibold text-white group-hover/row:text-red-400 transition-colors">{movie.title}</td>
+                        <td className="py-3.5 text-right font-black text-yellow-500 text-sm">{movie.avgRating?.toFixed(1) || "0.0"}</td>
+                        <td className="py-3.5 text-right text-zinc-400 font-medium">{movie.count.toLocaleString()} lượt</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-
-                {/* TRẠNG THÁI TRỐNG (EMPTY STATE) */}
                 {movieStats.length === 0 && (
-                  <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-zinc-600">
-                    Hiện tại chưa ghi nhận dữ liệu phim nào
-                  </div>
+                  <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-zinc-600">Hiện tại chưa ghi nhận dữ liệu phim nào</div>
                 )}
               </div>
             </div>
@@ -470,7 +394,7 @@ export default function ReportDashboard() {
   );
 }
 
-/* ================= THÀNH PHẦN CON: THẺ THỐNG KÊ (STAT CARD COMPONENT) ================= */
+/* ================= COMPONENT CARD CON ================= */
 interface StatCardProps {
   title: string;
   value: string;
@@ -490,7 +414,6 @@ function StatCard({ title, value, icon, bgIcon, valueClass = "text-white" }: Sta
           {icon}
         </div>
       </div>
-
       <h3 className={`text-xl sm:text-2xl font-black tracking-tight mt-4 break-words ${valueClass}`}>
         {value}
       </h3>

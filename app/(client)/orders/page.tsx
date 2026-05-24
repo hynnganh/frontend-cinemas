@@ -83,14 +83,14 @@ export default function OrderHistoryPage() {
                       <div key={i.id} className="flex justify-between items-center text-xs border-b border-white/5 pb-2 last:border-0">
                         <div className="flex items-center gap-2">
                           {i.itemType === 'TICKET' ? <Ticket size={14} className="text-red-500"/> : <Coffee size={14} className="text-amber-500"/>}
-                          <span className="font-bold text-zinc-400">{i.itemType === 'TICKET' ? 'Vé phim' : 'Combo bắp nước'} x{i.quantity}</span>
-                        </div>
+<span className="font-bold text-zinc-400">
+  {i.itemName || (i.itemType === 'TICKET' ? 'Vé phim' : 'Combo')} x{i.quantity}
+</span>                        </div>
                         <span className="font-black text-zinc-200">{fmtVND(i.price)}</span>
                       </div>
                     ))}
                     <div className="pt-3 flex justify-between items-center opacity-50">
                       <div className="flex gap-2 items-center text-[10px] uppercase font-bold"><CreditCard size={12}/> {o.paymentMethod}</div>
-                      <button className="text-[10px] font-black text-red-500 hover:underline">TẢI HÓA ĐƠN</button>
                     </div>
                   </div>
                 </div>
