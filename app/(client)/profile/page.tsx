@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   User as UserIcon, Phone, Mail, Loader2, Calendar, 
-  UserCircle, Save, Edit3, CheckCircle2, ArrowLeft 
+  UserCircle, Save, Edit3, CheckCircle2, ArrowLeft, AlertCircle 
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api'; 
 import Link from 'next/link';
@@ -16,9 +16,10 @@ export default function ProfilePage() {
   const [updating, setUpdating] = useState(false); 
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
+  // Thay đổi vị trí Toast & Tự động tắt sau 3.5 giây
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
   const fetchProfile = async () => {
@@ -28,16 +29,21 @@ export default function ProfilePage() {
         const result = await res.json();
         const rawData = result.data; 
         setUserData(rawData);
+        
+        // Nhận trực tiếp mọi giá trị kể cả rỗng/null, không ép khuôn mặc định để BE xử lý lý thuyết validation
         setFormData({
-          firstName: rawData.firstName || '',
-          lastName: rawData.lastName || '',
-          mobileNumber: rawData.mobileNumber || '',
-          gender: rawData.gender || '',
-          dateOfBirth: rawData.dateOfBirth || ''
+          firstName: rawData.firstName,
+          lastName: rawData.lastName,
+          mobileNumber: rawData.mobileNumber,
+          gender: rawData.gender,
+          dateOfBirth: rawData.dateOfBirth
         });
       }
-    } catch (err) { console.error(err); } 
-    finally { setLoading(false); }
+    } catch (err) { 
+      console.error(err); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { fetchProfile(); }, []);
@@ -53,13 +59,22 @@ export default function ProfilePage() {
         method: 'PUT',
         body: JSON.stringify(formData) 
       });
+
+      const result = await res.json();
+
       if (res.ok) {
-        showToast("Cập nhật thành công!");
+        showToast("Cập nhật thành công!", "success");
         setIsEditing(false);
         fetchProfile();
-      } else { showToast("Thất bại", "error"); }
-    } catch (err) { showToast("Lỗi kết nối", "error"); } 
-    finally { setUpdating(false); }
+      } else { 
+        // Đọc thông báo lỗi trực tiếp từ Backend gửi về thay vì hardcode chữ "Thất bại"
+        showToast(result?.message || "Cập nhật thất bại từ hệ thống", "error"); 
+      }
+    } catch (err) { 
+      showToast("Lỗi kết nối mạng", "error"); 
+    } finally { 
+      setUpdating(false); 
+    }
   };
 
   if (loading) return (
@@ -69,11 +84,11 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 pb-12 overflow-x-hidden">
-      {/* Nền đỏ nhẹ nhàng hơn */}
+    <div className="min-h-screen bg-[#050505] text-zinc-100 pb-12 overflow-x-hidden relative">
+      {/* Nền đỏ Neon mờ phía sau */}
       <div className="fixed top-0 right-0 w-[400px] h-[400px] bg-red-600/5 rounded-full blur-[110px] -z-10" />
 
-      {/* Nav - Cân bằng */}
+      {/* Navigation Bar */}
       <nav className="px-6 py-4 flex justify-between items-center sticky top-0 z-50 backdrop-blur-xl border-b border-white/10 bg-black/60">
         <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-white transition-all">
           <ArrowLeft size={16} />
@@ -99,11 +114,11 @@ export default function ProfilePage() {
       <main className="max-w-5xl mx-auto mt-10 px-6">
         <div className="flex flex-col gap-8">
           
-          {/* Header - To vừa đủ để nổi bật */}
+          {/* User Identity Header */}
           <header className="space-y-2">
             <div className="flex items-center gap-4">
               <h1 className="text-3xl font-[1000] italic uppercase tracking-tighter leading-none text-white">
-                {userData?.firstName} <span className="text-red-600">{userData?.lastName}</span>
+                {userData?.firstName || "---"} <span className="text-red-600">{userData?.lastName || ""}</span>
               </h1>
               <div className="h-[2px] w-12 bg-red-600 rounded-full mt-1" />
             </div>
@@ -113,7 +128,7 @@ export default function ProfilePage() {
             </div>
           </header>
 
-          {/* MAIN FORM - To hơn một chút để dễ đọc */}
+          {/* Form Container */}
           <section className="bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative">
             <div className="mb-10">
                <h2 className="text-sm font-black italic uppercase tracking-widest flex items-center gap-4">
@@ -130,21 +145,22 @@ export default function ProfilePage() {
                   <ViewField label="Email đăng ký" value={userData?.email} icon={Mail} isLocked />
                   <ViewField label="Số điện thoại" value={userData?.mobileNumber} icon={Phone} />
                   <ViewField label="Ngày sinh" value={userData?.dateOfBirth ? new Date(userData.dateOfBirth).toLocaleDateString('vi-VN') : "---"} icon={Calendar} />
-                  <ViewField label="Giới tính" value={userData?.gender === 'MALE' ? 'Nam' : userData?.gender === 'FEMALE' ? 'Nữ' : 'Khác'} icon={UserCircle} />
+                  <ViewField label="Giới tính" value={userData?.gender === 'MALE' ? 'Nam' : userData?.gender === 'FEMALE' ? 'Nữ' : userData?.gender === 'OTHER' ? 'Khác' : '---'} icon={UserCircle} />
                 </>
               ) : (
                 <>
-                  <EditField label="Họ & Tên đệm" name="firstName" value={formData.firstName} onChange={handleChange} icon={UserIcon} />
-                  <EditField label="Tên" name="lastName" value={formData.lastName} onChange={handleChange} icon={UserIcon} />
+                  <EditField label="Họ & Tên đệm" name="firstName" value={formData.firstName || ''} onChange={handleChange} icon={UserIcon} />
+                  <EditField label="Tên" name="lastName" value={formData.lastName || ''} onChange={handleChange} icon={UserIcon} />
                   <div className="opacity-50"><ViewField label="Email" value={userData?.email} icon={Mail} isLocked /></div>
-                  <EditField label="Số điện thoại" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange} icon={Phone} />
-                  <EditField label="Ngày sinh" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} icon={Calendar} type="date" />
+                  <EditField label="Số điện thoại" name="mobileNumber" value={formData.mobileNumber || ''} onChange={handleChange} icon={Phone} />
+                  <EditField label="Ngày sinh" name="dateOfBirth" value={formData.dateOfBirth || ''} onChange={handleChange} icon={Calendar} type="date" />
                   
                   <div className="space-y-2">
                     <label className="text-[9px] font-black uppercase tracking-widest text-red-600 ml-1">Giới tính</label>
                     <div className="relative">
                       <UserCircle size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-red-600 z-10" />
-                      <select name="gender" value={formData.gender} onChange={handleChange} className="w-full bg-black border border-white/20 p-3.5 pl-12 rounded-2xl text-[13px] font-bold text-white outline-none focus:border-red-600 transition-all appearance-none cursor-pointer">
+                      <select name="gender" value={formData.gender || ''} onChange={handleChange} className="w-full bg-black border border-white/20 p-3.5 pl-12 rounded-2xl text-[13px] font-bold text-white outline-none focus:border-red-600 transition-all appearance-none cursor-pointer">
+                        <option value="">-- Chọn giới tính --</option>
                         <option value="MALE">Nam</option>
                         <option value="FEMALE">Nữ</option>
                         <option value="OTHER">Khác</option>
@@ -158,12 +174,27 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      {/* Toast */}
+      {/* ================= TOAST NOTIFICATION TRÊN GÓC PHẢI (TOP-RIGHT) ================= */}
       {toast && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-4">
-          <div className={`flex items-center gap-3 px-6 py-3 rounded-2xl border-2 shadow-2xl bg-zinc-900 ${toast.type === 'success' ? 'border-green-500 text-green-500' : 'border-red-500 text-red-500'}`}>
-            <CheckCircle2 size={18} />
-            <p className="text-[11px] font-black uppercase tracking-widest">{toast.msg}</p>
+        <div className="fixed top-6 right-6 z-[1000] max-w-sm w-full animate-in fade-in slide-in-from-top-5 duration-300">
+          <div className={`flex items-center gap-3 px-5 py-4 rounded-xl border-b-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)] bg-[#0d0d11]/95 border-x border-t border-white/5 ${
+            toast.type === 'success' 
+              ? 'border-b-green-500 text-green-400' 
+              : 'border-b-red-500 text-red-400'
+          }`}>
+            {toast.type === 'success' ? (
+              <CheckCircle2 size={18} className="text-green-500 shrink-0" />
+            ) : (
+              <AlertCircle size={18} className="text-red-500 shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">
+                {toast.type === 'success' ? 'Hệ thống thành công' : 'Lỗi phản hồi hệ thống'}
+              </p>
+              <p className="text-[12px] font-bold text-zinc-200 leading-tight truncate">
+                {toast.msg}
+              </p>
+            </div>
           </div>
         </div>
       )}
