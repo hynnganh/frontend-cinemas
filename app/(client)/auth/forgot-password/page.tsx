@@ -1,23 +1,49 @@
 "use client";
+
 import React, { useState } from 'react';
 import { Mail, ChevronLeft, ShieldCheck, Loader2, ArrowRight, Fingerprint, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { apiRequest } from '@/app/lib/api'; // Hoặc đường dẫn file chứa hàm gọi API của ông
+import toast, { Toaster } from 'react-hot-toast'; // Thêm Toaster để thông báo xịn hơn
 
 export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [email, setEmail] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      toast.error("Vui lòng nhập Email!");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
+    const toastId = toast.loading("Đang kiểm tra và gửi mã OTP...");
+
+    try {
+      // 🎯 GỌI API FORGOT PASSWORD Ở BACKEND
+      const res = await apiRequest(`/api/v1/auth/forgot-password?email=${encodeURIComponent(email)}`, {
+        method: 'POST'
+      });
+
+      if (res.ok) {
+        toast.success("Đã gửi mã OTP thành công!", { id: toastId });
+        setIsSent(true);
+      } else {
+        const result = await res.json().catch(() => ({}));
+        toast.error(result.message || "Tài khoản Email không tồn tại trong hệ thống!", { id: toastId });
+      }
+    } catch (error) {
+      toast.error("Lỗi kết nối đến máy chủ!", { id: toastId });
+    } finally {
       setLoading(false);
-      setIsSent(true);
-    }, 2000);
+    }
   };
 
   return (
     <div className="min-h-screen flex bg-[#050505] text-white font-sans overflow-hidden selection:bg-red-600/30">
+      <Toaster position="top-right" /> {/* 🎯 THÊM TOASTER HIỂN THỊ LỖI */}
       
       <div className="w-full lg:w-[55%] flex flex-col justify-center px-8 md:px-20 py-12 relative z-10 animate-in fade-in slide-in-from-left-8 duration-1000 ease-out">
         
@@ -46,7 +72,7 @@ export default function ForgotPasswordPage() {
                   <span className="text-red-600 text-3xl not-italic">Mật khẩu</span>
                 </h2>
                 <p className="text-zinc-500 text-sm font-medium leading-relaxed max-w-[380px]">
-                  Vui lòng cung cấp Email đã đăng ký thành viên. Chúng tôi sẽ gửi mã xác nhận để bạn thiết lập lại quyền truy cập.
+                  Vui lòng cung cấp Email đã đăng ký thành viên. Chúng tôi sẽ gửi mã xác nhận OTP để bạn thiết lập lại quyền truy cập.
                 </p>
               </div>
 
@@ -58,6 +84,8 @@ export default function ForgotPasswordPage() {
                     <input 
                       type="email" 
                       required 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="example@gmail.com" 
                       className="w-full bg-white/5 border border-white/10 p-4 pl-14 rounded-2xl outline-none focus:border-red-600 focus:bg-white/[0.08] transition-all text-sm text-white placeholder:text-zinc-800" 
                     />
@@ -81,21 +109,29 @@ export default function ForgotPasswordPage() {
               </form>
             </div>
           ) : (
-            /* TRẠNG THÁI GỬI THÀNH CÔNG */
+            /* 🎯 TRẠNG THÁI GỬI THÀNH CÔNG -> HIỂN THỊ NÚT CHUYỂN TỚI TRANG NHẬP OTP */
             <div className="text-center py-10 animate-in zoom-in-95 duration-700">
               <div className="w-24 h-24 bg-green-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-green-500/20 rotate-12 hover:rotate-0 transition-transform duration-500">
                 <ShieldCheck className="text-green-500 animate-pulse" size={48} />
               </div>
               <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4 italic">Kiểm tra Mail!</h2>
               <p className="text-zinc-500 text-sm mb-12 leading-relaxed font-medium">
-                Một liên kết bảo mật đã được gửi đến Email của bạn.<br/>
+                Một mã xác thực (OTP) đã được gửi đến Email của bạn.<br/>
                 Vui lòng kiểm tra cả <span className="text-white italic underline underline-offset-4">Hộp thư rác (Spam)</span>.
               </p>
+              
+              <Link 
+                href={`/auth/reset-password?email=${encodeURIComponent(email)}`}
+                className="w-full mb-6 py-4 bg-white text-black font-black uppercase text-[11px] tracking-[0.4em] rounded-2xl hover:bg-zinc-200 transition-all flex items-center justify-center"
+              >
+                Nhập mã OTP ngay
+              </Link>
+
               <button 
                 onClick={() => setIsSent(false)} 
-                className="text-[10px] font-black uppercase text-red-600 tracking-widest hover:text-white transition-colors border-b border-red-600/30 pb-1"
+                className="text-[10px] font-black uppercase text-red-600 tracking-widest hover:text-white transition-colors border-b border-red-600/30 pb-1 mt-4"
               >
-                Gửi lại mã sau 60s
+                Gửi lại mã mới
               </button>
             </div>
           )}
