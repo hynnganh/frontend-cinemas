@@ -18,8 +18,18 @@ export default function MovieBookingPage({ params }: { params: Promise<{ id: str
   // 🎯 THÊM STATE: Lưu trữ khu vực (Chi nhánh cha) đang được chọn
   const [selectedParent, setSelectedParent] = useState<string | null>(null);
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
   const today = new Date();
-  const [selectedDate, setSelectedDate] = useState<string>(today.toISOString().split('T')[0]);
+
+  const [selectedDate, setSelectedDate] = useState<string>(
+    formatLocalDate(today)
+  );
   const [showPicker, setShowPicker] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
