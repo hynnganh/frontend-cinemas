@@ -124,13 +124,19 @@ export default function AdminComboPage() {
     try {
       const token = getAdminToken();
 
-      const res = await apiRequest(`/api/v1/admin/cinema-combos/${comboId}/stock?stock=${numericStock}`, {
-        method: "PUT",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+      const res = await apiRequest(
+        `/api/v1/admin/cinema-combos/${comboId}/stock`,
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            stock: numericStock
+          })
         }
-      });
+      );
 
       if (res.ok) {
         setCombos((prev) =>
@@ -151,11 +157,19 @@ export default function AdminComboPage() {
     }
   };
 
-  const startEditing = (combo: ComboAdmin) => {
-    if (updatingStockId !== null) return;
-    setEditingId(combo.id);
-    setEditValue(combo.stock.toString());
-  };
+const startEditing = (combo: ComboAdmin) => {
+
+  if (updatingStockId !== null) return;
+
+  setEditingId(combo.id);
+
+  setEditValue(
+    combo.stock !== null &&
+    combo.stock !== undefined
+      ? combo.stock.toString()
+      : "0"
+  );
+};
 
   const filteredCombos = combos.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
