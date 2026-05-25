@@ -138,7 +138,7 @@ export default function AdminPromotionManager() {
                 {/* Banner Thumbnail */}
                 <div className="w-full lg:w-60 aspect-video lg:aspect-[16/10] rounded-lg overflow-hidden bg-zinc-950 relative shrink-0 border border-zinc-900">
                   <img 
-                    src={p.thumbnail?.startsWith("/") ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}${p.thumbnail}` : (p.thumbnail || "https://placehold.co/600x400?text=Cinema+Event")} 
+                    src={p.thumbnail?.startsWith("/") ? `${process.env.NEXT_PUBLIC_API_URL || "https://placehold.co/600x400?text=Cinema+Event"}${p.thumbnail}` : (p.thumbnail || "https://placehold.co/600x400?text=Cinema+Event")} 
                     className="w-full h-full object-cover opacity-60 group-hover:opacity-90 transition-all duration-500" 
                     alt={p.title} 
                   />

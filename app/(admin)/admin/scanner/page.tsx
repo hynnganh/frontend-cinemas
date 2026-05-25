@@ -90,7 +90,7 @@ export default function StaffScannerPage() {
     try {
       const token = localStorage.getItem("token_admin");
 
-      const res = await fetch(`http://localhost:8080/api/v1/orders/scan?bookingCode=${encodeURIComponent(bookingCode.toUpperCase())}`, {
+      const res = await fetch(`https://akcinema.vercel.app/api/v1/orders/scan?bookingCode=${encodeURIComponent(bookingCode.toUpperCase())}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -120,7 +120,7 @@ export default function StaffScannerPage() {
     setConfirmLoading(true);
     try {
       const token = localStorage.getItem("token_admin");
-      const res = await fetch(`http://localhost:8080/api/v1/orders/${orderData.id}/confirm-checkin`, {
+      const res = await fetch(`https://akcinema.vercel.app/api/v1/orders/${orderData.id}/confirm-checkin`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -40,7 +40,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
       try {
         // 1. Fetch thông tin root account
-        const adminRes = await fetch('http://localhost:8080/api/v1/users/me', {
+        const adminRes = await fetch('https://akcinema.vercel.app/api/v1/users/me', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -51,22 +51,6 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
           handleLogout();
           return;
         }
-
-        // 2. Fetch trạng thái live của các cụm rạp
-        const statsRes = await fetch('http://localhost:8080/api/v1/cinemas/occupancy', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setCinemaStats(statsData.data || []);
-        } else {
-          setCinemaStats([
-            { cinemaName: "A&K Cao Thắng", occupancyRate: 75 },
-            { cinemaName: "A&K Hùng Vương", occupancyRate: 42 },
-            { cinemaName: "A&K Trần Hưng Đạo", occupancyRate: 88 }
-          ]);
-        }
-
       } catch (error) {
         console.error("Lỗi fetch dữ liệu hệ thống:", error);
       }
