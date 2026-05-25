@@ -92,7 +92,6 @@ export default function VoucherModal({
     }
   };
 
-  // VALIDATE ĐẦU VÀO TRƯỚC KHI GỬI (ĐỒNG BỘ VỚI SPRING BOOT DTO)
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.code.trim()) newErrors.code = "Mã voucher không được để trống!";
@@ -110,35 +109,62 @@ export default function VoucherModal({
       newErrors.discountValue = "Giá trị giảm phải nhỏ hơn đơn hàng tối thiểu!";
     }
 
+    // CHỈ BẮT LỖI ĐIỂM ĐỔI KHI LÀ VOUCHER ĐỔI ĐIỂM (REDEEM)
+    if (formData.voucherType === "REDEEM" && formData.costPoints <= 0) {
+      newErrors.costPoints = "Điểm đổi thưởng phải lớn hơn 0!";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // SUBMIT FORM
+// SUBMIT FORM (ĐÃ THÊM LOG ĐỂ KIỂM TRA LỖI 400)
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setErrors({});
 
+  const payload = {
+    ...formData,
+    promotionId: formData.voucherType === "EVENT" && formData.promotionId ? Number(formData.promotionId) : null,
+    discountValue: Number(formData.discountValue),
+    minOrderAmount: Number(formData.minOrderAmount),
+    usageLimit: Number(formData.usageLimit),
+    
+    costPoints: formData.voucherType === "EVENT" ? null : Number(formData.costPoints)
+  };
+
+    console.log("=== [DEBUG FRONTEND] DỮ LIỆU PAYLOAD GỬI LÊN BACKEND ===");
+    console.log(JSON.stringify(payload, null, 2));
+    console.log("=====================================================");
+
     try {
-      const res = await onSubmit(formData);
+      const res = await onSubmit(payload);
       
-      // CHỐNG LỖI "undefined (reading 'json')" KHHI QUÊN RETURN RESPONSE
       if (!res) {
         toast.error("Lỗi cấu hình hàm submit: Không nhận được phản hồi từ Server.");
         return;
       }
 
-      // Đảm bảo dữ liệu trả về từ Spring Boot là dạng JSON hợp lệ
+      // 3. IN LOG TRẠNG THÁI HTTP CỦA SERVER TRẢ VỀ
+      console.log(`=== [DEBUG BACKEND] HTTP STATUS: ${res.status} (${res.statusText}) ===`);
+
       const contentType = res.headers?.get("content-type");
       let result: any = {};
       if (contentType && contentType.includes("application/json")) {
         result = await res.json();
+        
+        // 4. IN LOG CHI TIẾT LỖI TỪ SPRING BOOT (Nếu trả về dạng JSON)
+        console.log("=== [DEBUG BACKEND] CHI TIẾT PHẢN HỒI LỖI (JSON) ===");
+        console.log(result);
+        console.log("====================================================");
       } else {
         const txtErr = await res.text();
         toast.error("Hệ thống phản hồi không đúng định dạng JSON.");
-        console.error("BE Error Response Raw:", txtErr);
+        console.error("=== [DEBUG BACKEND] CHI TIẾT PHẢN HỒI LỖI (RAW TEXT) ===");
+        console.error(txtErr);
+        console.error("========================================================");
         return;
       }
 
@@ -157,6 +183,8 @@ export default function VoucherModal({
       onClose();
 
     } catch (err: any) {
+      console.error("=== [DEBUG FRONTEND] LỖI KẾT NỐI MẠNG ===");
+      console.error(err);
       toast.error(err?.message || "Lỗi kết nối mạng");
     }
   };
