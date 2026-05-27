@@ -148,12 +148,22 @@ export default function AuthPage() {
     }
   };
 
-  const handleSwitchView = (newView: 'login' | 'register' | 'forgot') => {
+  // 🎯 FIX MỚI 1: Hàm xóa sạch form khi bấm tay chuyển Tab (Quay xe giữa chừng)
+  const handleManualSwitchView = (newView: 'login' | 'register' | 'forgot') => {
+    setFormData({
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      mobileNumber: "",
+      dateOfBirth: "",
+      gender: "MALE",
+    });
+    setFormErrors({});
     setView(newView);
-    setFormErrors({}); // Reset lỗi khi chuyển tab
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+ const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErrors({}); // Xóa lỗi cũ trước khi gọi API
     
@@ -227,33 +237,59 @@ export default function AuthPage() {
           setTimeout(() => { window.location.href = redirectUrl; }, 800);
         } else {
           toast.success(resData.message || "Đăng ký thành công! Mời bạn đăng nhập.");
-          handleSwitchView('login');
+          
+          // Chỉ giữ lại Email/Pass sau khi gọi API Đăng Ký thành công
+          setFormData({
+            email: formData.email,
+            password: formData.password,
+            firstName: "",
+            lastName: "",
+            mobileNumber: "",
+            dateOfBirth: "",
+            gender: "MALE",
+          });
+          setFormErrors({});
+          setView('login');
         }
-      }else {
-  console.log("ERROR RESPONSE:", resData);
+      } else {
+        console.log("ERROR RESPONSE:", resData);
 
-  // SỬA ĐOẠN NÀY:
-  // Kiểm tra nếu lỗi nằm trong resData.data (theo cấu trúc ảnh bạn gửi)
-  const errorsToMap = resData.errors || resData.data; 
+        // CASE 1: Lỗi Validate từ DTO (bỏ trống, sai format)
+        const errorsToMap = resData.errors || resData.data; 
 
-  if (errorsToMap && typeof errorsToMap === "object") {
-    setFormErrors(errorsToMap);
+        if (errorsToMap && typeof errorsToMap === "object" && !Array.isArray(errorsToMap)) {
+          setFormErrors(errorsToMap);
 
-    // Lấy thông báo lỗi đầu tiên để hiển thị toast
-    const firstKey = Object.keys(errorsToMap)[0];
-    toast.error(errorsToMap[firstKey]);
-    return;
-  }
+          // Lấy thông báo lỗi đầu tiên để hiển thị toast
+          const firstKey = Object.keys(errorsToMap)[0];
+          toast.error(errorsToMap[firstKey]);
+          return;
+        }
 
-  // CASE 2: lỗi từ RuntimeException BE
-  if (resData.message) {
-    toast.error(resData.message);
-    return;
-  }
+        // 🎯 CASE 2: Lỗi logic từ RuntimeException Backend (Trùng SĐT, Trùng Email)
+        if (resData.message) {
+          const errorMsg = resData.message.toLowerCase();
+          
+          // Bắt chính xác lỗi trùng Số điện thoại và bắn xuống UI
+          if (errorMsg.includes("số điện thoại")) {
+            setFormErrors(prev => ({ ...prev, mobileNumber: resData.message }));
+            toast.error(resData.message);
+          } 
+          // Bắt chính xác lỗi trùng Email và bắn xuống UI
+          else if (errorMsg.includes("email")) {
+            setFormErrors(prev => ({ ...prev, email: resData.message }));
+            toast.error(resData.message);
+          } 
+          // Các lỗi chung chung khác
+          else {
+            toast.error(resData.message);
+          }
+          return;
+        }
 
-  // CASE 3: fallback
-  toast.error("Có lỗi xảy ra, vui lòng thử lại!");
-}
+        // CASE 3: fallback
+        toast.error("Có lỗi xảy ra, vui lòng thử lại!");
+      }
     } catch (error: any) {
       console.error("Lỗi kết nối:", error);
       toast.error(error.message || "Không thể kết nối tới máy chủ!");
@@ -273,8 +309,8 @@ export default function AuthPage() {
             <div className="animate-in fade-in slide-in-from-left-6 duration-700">
               {/* Tabs */}
               <div className="flex gap-8 mb-10 border-b border-white/5 relative">
-                <button type="button" onClick={() => handleSwitchView('login')} className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all ${view === 'login' ? "text-red-500" : "text-zinc-600 hover:text-zinc-400"}`}>Đăng Nhập</button>
-                <button type="button" onClick={() => handleSwitchView('register')} className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all ${view === 'register' ? "text-red-500" : "text-zinc-600 hover:text-zinc-400"}`}>Đăng Ký</button>
+                <button type="button" onClick={() => handleManualSwitchView('login')} className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all ${view === 'login' ? "text-red-500" : "text-zinc-600 hover:text-zinc-400"}`}>Đăng Nhập</button>
+                <button type="button" onClick={() => handleManualSwitchView('register')} className={`pb-4 text-xs font-black uppercase tracking-[0.2em] transition-all ${view === 'register' ? "text-red-500" : "text-zinc-600 hover:text-zinc-400"}`}>Đăng Ký</button>
                 <div className={`absolute bottom-0 h-0.5 bg-red-600 transition-all duration-500 shadow-[0_0_10px_rgba(220,38,38,0.5)] ${view === 'login' ? "left-0 w-[90px]" : "left-[120px] w-[80px]"}`} />
               </div>
 
@@ -326,7 +362,7 @@ export default function AuthPage() {
                 <div className="space-y-1.5 text-left">
                   <div className="flex justify-between px-1">
                     <label className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500">Mật khẩu</label>
-                    {view === 'login' && <button type="button" onClick={() => handleSwitchView('forgot')} className="text-[10px] text-red-500 font-black uppercase hover:text-red-400 transition-colors">Quên mật khẩu?</button>}
+                    {view === 'login' && <button type="button" onClick={() => handleManualSwitchView('forgot')} className="text-[10px] text-red-500 font-black uppercase hover:text-red-400 transition-colors">Quên mật khẩu?</button>}
                   </div>
                   <div className="relative group">
                     <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" />
@@ -370,7 +406,7 @@ export default function AuthPage() {
               </form>
             </div>
           ) : (
-            <ForgotPasswordView onBack={() => handleSwitchView('login')} />
+            <ForgotPasswordView onBack={() => handleManualSwitchView('login')} />
           )}
         </div>
       </div>
