@@ -60,14 +60,15 @@ export default function LiveSearchBar() {
   const handleSelectMovie = (movieId: number) => {
     setIsOpen(false);
     setSearchTerm("");
-    // 🎯 ĐÃ FIX ĐƯỜNG DẪN: Chuyển từ /movie/ sang /movies/ cho khớp với thẻ MovieCard
     router.push(`/movies/${movieId}`); 
   };
 
   return (
-    <div className="relative w-full z-[120]" ref={dropdownRef}>
-      {/* 🚀 TĂNG ĐỘ DÀI & ANIMATION CO GIÃN */}
-      <div className="relative group/search w-[240px] focus-within:w-[340px] xl:w-[280px] xl:focus-within:w-[380px] transition-all duration-500 ease-out">
+    // Khung giữ chỗ mặc định
+    <div className="relative z-[120] w-[200px] xl:w-[240px] h-10" ref={dropdownRef}>
+      
+      {/* 🚀 ĐỘ GIÃN BÊN TRÁI ĐƯỢC THU NGẮN LẠI 1 XÍU: (280px trên màn thường, 320px trên màn to) */}
+      <div className="absolute right-0 top-0 group/search w-[200px] focus-within:w-[280px] xl:w-[240px] xl:focus-within:w-[320px] transition-all duration-500 ease-out z-10">
         <div className="relative flex items-center w-full h-10 rounded-full bg-gradient-to-b from-zinc-900 to-black border border-white/10 shadow-[inset_0_2px_10px_rgba(0,0,0,0.8),_0_2px_10px_rgba(0,0,0,0.4)] focus-within:border-red-600/50 focus-within:shadow-[0_0_20px_rgba(220,38,38,0.2),_inset_0_2px_10px_rgba(0,0,0,0.8)] transition-all duration-500 px-4">
           
           <Search size={16} className="text-zinc-500 group-focus-within/search:text-red-500 transition-colors duration-300" />
@@ -91,9 +92,9 @@ export default function LiveSearchBar() {
         </div>
       </div>
 
-      {/* 🎬 KHUNG DROPDOWN KẾT QUẢ CỰC MƯỢT */}
+      {/* 🎬 KHUNG DROPDOWN KẾT QUẢ - ĐÃ ĐƯỢC CHỈNH BẰNG ĐÚNG KÍCH THƯỚC TRÊN */}
       {isOpen && results.length > 0 && (
-        <div className="absolute top-[calc(100%+12px)] right-0 w-[340px] bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden z-50 py-2 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-[calc(100%+12px)] right-0 w-[280px] xl:w-[320px] bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden z-50 py-2 animate-in fade-in slide-in-from-top-4 duration-300">
           {results.map((movie) => {
             const releaseYear = movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : "2026";
             
@@ -134,7 +135,7 @@ export default function LiveSearchBar() {
                     <span className="px-1.5 py-0.5 bg-[#d4a373]/20 text-[#d4a373] border border-[#d4a373]/20 rounded text-[8px] font-black uppercase">
                       {movie.ageRating || "P"}
                     </span>
-                    <span className="truncate max-w-[150px] text-zinc-400">{displayGenres}</span>
+                    <span className="truncate max-w-[130px] text-zinc-400">{displayGenres}</span>
                   </div>
                 </div>
               </div>
@@ -145,7 +146,7 @@ export default function LiveSearchBar() {
 
       {/* Khi không tìm thấy */}
       {isOpen && results.length === 0 && searchTerm && !isLoading && (
-        <div className="absolute top-[calc(100%+12px)] right-0 w-[340px] bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-50 p-6 text-center animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-[calc(100%+12px)] right-0 w-[280px] xl:w-[320px] bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-50 p-6 text-center animate-in fade-in slide-in-from-top-4 duration-300">
           <p className="text-xs text-zinc-500 font-medium">Không tìm thấy "{searchTerm}"</p>
         </div>
       )}
