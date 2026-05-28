@@ -33,7 +33,8 @@ export default function MovieCard({
   return (
     <Link 
       href={`/movies/${id}`} 
-      className="block group relative w-full max-w-[155px] mx-auto overflow-hidden rounded-[1rem] bg-[#111217] border border-white/[0.03] transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/50 select-none"
+      // Xóa max-w-[155px], thêm h-full flex flex-col để card luôn đều nhau
+      className="block group relative w-full h-full overflow-hidden rounded-[1rem] bg-[#111217] border border-white/[0.03] transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/50 select-none flex flex-col"
     >
       <div className="relative w-full aspect-[2/3] overflow-hidden bg-[#16171d]">
         <img
@@ -49,39 +50,44 @@ export default function MovieCard({
         <div className="absolute inset-0 bg-gradient-to-t from-[#0e0f12] via-[#0e0f12]/20 to-transparent opacity-90" />
 
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-90 group-hover:scale-100 z-20">
-          <div className="p-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-xl">
-            <Play size={12} fill="currentColor" className="ml-0.5" />
+          {/* Phóng to nút Play */}
+          <div className="p-3 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-xl">
+            <Play size={18} fill="currentColor" className="ml-0.5" />
           </div>
         </div>
 
-        {/* 🎯 Nhãn độ tuổi góc trên bên PHẢI */}
-        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md border border-white/10 px-1.5 py-0.5 rounded uppercase z-10">
-          <span className="text-white text-[8px] font-black tracking-widest">
+        {/* 🎯 Nhãn độ tuổi: Phóng to chữ và padding */}
+        <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded uppercase z-10">
+          <span className="text-white text-[10px] font-black tracking-widest">
             {ageRating}
           </span>
         </div>
       </div>
 
-      <div className="p-2.5 space-y-1.5 bg-[#111217]">
-        <h3 className="font-bold text-white text-[11px] md:text-[12px] line-clamp-1 tracking-tight group-hover:text-blue-400 transition-colors duration-200">
-          {title}
-        </h3>
-        
-        {/* 🎯 RATING & LƯỢT ĐÁNH GIÁ */}
-        <div className="flex items-center gap-1">
-          <Star size={10} className="fill-orange-500 text-orange-500" />
-          <span className="text-white text-[10px] font-bold">
-            {displayRating}<span className="text-zinc-500 font-normal">/5</span>
-          </span>
-          <span className="text-zinc-500 text-[9px] font-medium ml-0.5">({reviewCount} đánh giá)</span>
+      {/* Nội dung text: Tăng padding, flex-1 để đẩy khối thể loại xuống đáy */}
+      <div className="p-3 md:p-3.5 space-y-2 bg-[#111217] flex-1 flex flex-col justify-between">
+        <div className="space-y-1.5">
+          {/* Tăng cỡ chữ Title lên text-sm */}
+          <h3 className="font-bold text-white text-sm line-clamp-1 tracking-tight group-hover:text-blue-400 transition-colors duration-200">
+            {title}
+          </h3>
+          
+          {/* 🎯 RATING & LƯỢT ĐÁNH GIÁ: Scale font và icon to hơn */}
+          <div className="flex items-center gap-1.5">
+            <Star size={12} className="fill-orange-500 text-orange-500" />
+            <span className="text-white text-xs font-bold">
+              {displayRating}<span className="text-zinc-500 font-normal text-[10px]">/5</span>
+            </span>
+            <span className="text-zinc-500 text-[10px] font-medium ml-0.5">({reviewCount} đánh giá)</span>
+          </div>
         </div>
         
-        {/* 🎯 FIX LỖI SẬP TRANG: Dùng genreNames?.length để chống null */}
-        <div className="flex items-center justify-between gap-1 text-[9px] pt-1">
+        {/* 🎯 THỂ LOẠI & TRẠNG THÁI */}
+        <div className="flex items-center justify-between gap-1 text-[11px] pt-1.5 mt-auto border-t border-white/[0.03]">
           <span className="line-clamp-1 text-zinc-400 max-w-[70%]">
             {genreNames?.length > 0 ? genreNames.join(" • ") : "Đang cập nhật"}
           </span>
-          <span className={`text-[7px] font-bold px-1 rounded font-mono tracking-wide ${
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono tracking-wide ${
             isShowing ? "text-orange-400 bg-orange-400/5" : "text-sky-400 bg-sky-400/5"
           }`}>
             {isShowing ? "LIVE" : "SẮP"}

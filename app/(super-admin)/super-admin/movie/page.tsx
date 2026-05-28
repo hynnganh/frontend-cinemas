@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Edit3, Trash2, Loader2, Search, Clock, ChevronLeft, ChevronRight, Hash, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit3, Trash2, Loader2, Search, Clock, ChevronLeft, ChevronRight, FileSpreadsheet, MessageSquare, Star } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { apiSuperAdminRequest, getImageUrl } from '@/app/lib/api';
 import ImportMovieModal from './ImportMovieModal'; 
+import ReviewManagementModal from './ReviewManagementModal'; // 🎯 GỌI COMPONENT VÀO
 
 export default function MoviesPage() {
   const [movies, setMovies] = useState([]);
@@ -13,6 +14,7 @@ export default function MoviesPage() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [reviewModalData, setReviewModalData] = useState({ isOpen: false, movieId: null, movieTitle: "" });
 
   const fetchMovies = async (search = "", pageNum = 0) => {
     setLoading(true);
@@ -49,28 +51,28 @@ export default function MoviesPage() {
   const handleDelete = async (id: number) => {
     toast((t) => (
       <div className="text-white p-1">
-        <p className="text-[10px] font-bold uppercase mb-3 tracking-widest text-zinc-300">Xác nhận hủy phim này khỏi core?</p>
+        <p className="text-[10px] font-bold uppercase mb-3 tracking-widest text-zinc-300">Xác nhận hủy phim này khỏi hệ thống?</p>
         <div className="flex gap-2">
           <button 
             onClick={async () => {
               toast.dismiss(t.id);
               const res = await apiSuperAdminRequest(`/api/v1/movies/${id}`, { method: 'DELETE' });
               if (res.ok) { 
-                toast.success("Đã gỡ bỏ phim thành công!"); 
+                toast.success("Đã xóa phim thành công!"); 
                 fetchMovies(searchTerm, page); 
               } else {
-                toast.error("Yêu cầu gỡ bỏ bị từ chối!");
+                toast.error("Không thể xóa phim này!");
               }
             }} 
             className="bg-red-600 px-4 py-2 rounded-lg text-[9px] font-black uppercase hover:bg-red-700 transition-all shadow-md shadow-red-900/20"
           >
-            Xóa
+            Xóa Vĩnh Viễn
           </button>
           <button 
             onClick={() => toast.dismiss(t.id)} 
             className="bg-zinc-800 px-4 py-2 rounded-lg text-[9px] font-bold uppercase hover:bg-zinc-700 transition-all text-zinc-300"
           >
-            Hủy
+            Hủy Bỏ
           </button>
         </div>
       </div>
@@ -79,9 +81,7 @@ export default function MoviesPage() {
 
   return (
     <div className="p-3 md:p-5 space-y-2 max-w-[1600px] mx-auto animate-in fade-in duration-300 min-h-screen bg-[#020202] text-zinc-400 select-none">
-      <Toaster 
-        position="top-right" 
-      />
+      <Toaster position="top-right" />
 
       {/* HEADER SECTION */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-[#060608] p-6 rounded-xl border border-zinc-900 shadow-sm">
@@ -96,7 +96,6 @@ export default function MoviesPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full xl:w-auto">
-          {/* Thanh tìm kiếm */}
           <div className="relative group flex-1 sm:w-72">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-600 transition-colors" size={14} />
             <input 
@@ -108,7 +107,6 @@ export default function MoviesPage() {
             />
           </div>
           
-          {/* Nút Import Excel tinh chỉnh */}
           <button 
             onClick={() => setIsImportOpen(true)}
             className="bg-zinc-950 hover:bg-zinc-900 text-zinc-300 border border-zinc-800 hover:border-zinc-700 px-4 h-[42px] rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shrink-0 active:scale-98"
@@ -116,7 +114,6 @@ export default function MoviesPage() {
             <FileSpreadsheet size={14} className="text-emerald-500 drop-shadow-[0_0_6px_rgba(16,185,129,0.2)]" /> Import Excel
           </button>
 
-          {/* Nút Thêm Phim */}
           <Link href="/super-admin/movie/create" className="bg-red-600 hover:bg-red-700 text-white px-5 h-[42px] rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-lg shadow-red-950/20 active:scale-98">
             <Plus size={15} /> Thêm Phim
           </Link>
@@ -128,10 +125,10 @@ export default function MoviesPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-zinc-950/60 text-[9px] font-black uppercase text-zinc-500 tracking-wider border-b border-zinc-900">
-              <th className="px-8 py-4.5">Phim</th>
-              <th className="px-8 py-4.5">Thông tin danh mục</th>
-              <th className="px-8 py-4.5">Trạng thái vận hành</th>
-              <th className="px-8 py-4.5 text-right">Thao tác</th>
+              <th className="px-8 py-4.5">Thông Tin Phim</th>
+              <th className="px-8 py-4.5">Phân Loại / Thời Lượng</th>
+              <th className="px-8 py-4.5">Trạng Thái</th>
+              <th className="px-8 py-4.5 text-right">Thao Tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-900/30">
@@ -144,7 +141,7 @@ export default function MoviesPage() {
             ) : movies.length === 0 ? (
               <tr>
                 <td colSpan={4} className="py-40 text-center text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
-                  Không tìm thấy dữ liệu phim tương thích hệ thống
+                  Không tìm thấy dữ liệu phim
                 </td>
               </tr>
             ) : (
@@ -163,42 +160,55 @@ export default function MoviesPage() {
                         />
                       </div>
                       <div className="min-w-0 space-y-1">
-                        <p className="text-zinc-200 font-black uppercase tracking-tight text-sm truncate group-hover:text-white transition-colors">
-                          {movie.title}
-                        </p>
-                        <p className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-wider flex items-center gap-1 leading-none">
-                          ID: <span className="text-zinc-500">{movie.id}</span>
-                        </p>
+                       <Link
+                        href={`/super-admin/movie/${movie.id}`}
+                        className="text-zinc-200 font-black uppercase tracking-tight text-sm truncate group-hover:text-red-500 transition-colors"
+                      >
+                        {movie.title}
+                      </Link>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-wider leading-none">
+                            ID: {movie.id}
+                          </p>
+                          <span className="text-zinc-700 text-[8px]">•</span>
+                          {movie.rating && movie.rating > 0 ? (
+                            <p className="text-[10px] font-black text-amber-500 flex items-center gap-1">
+                              <Star size={10} className="fill-amber-500" />
+                              {Number(movie.rating).toFixed(1)}
+                            </p>
+                          ) : (
+                            <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">
+                              Chưa có đánh giá
+                            </p>
+                          )}
+                        </div>
+
                       </div>
                     </div>
                   </td>
-                 <td className="px-8 py-4">
-  <div className="space-y-2">
-    {/* Khớp chính xác với trường "genreNames" từ JSON API thực tế của bạn */}
-    <div className="flex flex-wrap gap-1.5 max-w-[280px]">
-      {movie.genreNames && Array.isArray(movie.genreNames) && movie.genreNames.length > 0 ? (
-        movie.genreNames.map((genreName: string, index: number) => (
-          <span 
-            key={index} 
-            className="text-[8px] font-black text-red-400 bg-red-950/20 border border-red-900/40 px-2 py-0.5 rounded uppercase tracking-wider transition-all hover:bg-red-950/40"
-          >
-            {genreName}
-          </span>
-        ))
-      ) : (
-        // Hiển thị trạng thái nếu mảng genreNames trả về giá trị null hoặc rỗng
-        <span className="text-[8px] font-black text-zinc-600 bg-zinc-950 border border-zinc-900 px-1.5 py-0.5 rounded uppercase tracking-wider">
-          CHƯA PHÂN LOẠI
-        </span>
-      )}
-    </div>
-
-    {/* Thời lượng phim hiển thị ngay bên dưới */}
-    <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-wide">
-      <Clock size={11} className="text-zinc-600" /> {movie.duration} PHÚT
-    </div>
-  </div>
-</td>
+                  <td className="px-8 py-4">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5 max-w-[280px]">
+                        {movie.genreNames && Array.isArray(movie.genreNames) && movie.genreNames.length > 0 ? (
+                          movie.genreNames.map((genreName: string, index: number) => (
+                            <span 
+                              key={index} 
+                              className="text-[8px] font-black text-red-400 bg-red-950/20 border border-red-900/40 px-2 py-0.5 rounded uppercase tracking-wider transition-all hover:bg-red-950/40"
+                            >
+                              {genreName}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[8px] font-black text-zinc-600 bg-zinc-950 border border-zinc-900 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            CHƯA PHÂN LOẠI
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-wide">
+                        <Clock size={11} className="text-zinc-600" /> {movie.duration} PHÚT
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-8 py-4">
                     <div className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${movie.status === 'SHOWING' ? 'text-emerald-500' : 'text-orange-500'}`}>
                       <div className={`w-1.5 h-1.5 rounded-full ${movie.status === 'SHOWING' ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]' : 'bg-orange-500'}`} />
@@ -206,17 +216,26 @@ export default function MoviesPage() {
                     </div>
                   </td>
                   <td className="px-8 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-1 group-hover:translate-x-0">
+                    <div className="flex justify-end gap-2 transition-all">
+                      <button 
+                        onClick={() => setReviewModalData({ isOpen: true, movieId: movie.id, movieTitle: movie.title })}
+                        className="w-8 h-8 bg-zinc-950 border border-zinc-800 hover:border-zinc-500 rounded-lg text-zinc-500 hover:text-white transition-all flex items-center justify-center shadow-sm"
+                        title="Quản lý đánh giá"
+                      >
+                        <MessageSquare size={13} />
+                      </button>
+
                       <Link 
                         href={`/super-admin/movie/edit/${movie.id}`} 
-                        className="w-8 h-8 bg-zinc-950 border border-zinc-900 hover:border-zinc-700 rounded-lg text-zinc-500 hover:text-white transition-all flex items-center justify-center"
+                        className="w-8 h-8 bg-zinc-950 border border-zinc-800 hover:border-zinc-500 rounded-lg text-zinc-500 hover:text-white transition-all flex items-center justify-center shadow-sm"
                         title="Chỉnh sửa phim"
                       >
                         <Edit3 size={13} />
                       </Link>
+
                       <button 
                         onClick={() => handleDelete(movie.id)} 
-                        className="w-8 h-8 bg-zinc-950 border border-zinc-900 hover:border-red-900/40 rounded-lg text-zinc-600 hover:text-red-500 transition-all flex items-center justify-center"
+                        className="w-8 h-8 bg-zinc-950 border border-zinc-800 hover:border-red-900 hover:bg-red-950/20 rounded-lg text-zinc-500 hover:text-red-500 transition-all flex items-center justify-center shadow-sm"
                         title="Xóa phim"
                       >
                         <Trash2 size={13} />
@@ -257,6 +276,14 @@ export default function MoviesPage() {
         isOpen={isImportOpen} 
         onClose={() => setIsImportOpen(false)} 
         onRefreshData={() => fetchMovies(searchTerm, page)} 
+      />
+
+      {/* RENDER MODAL */}
+      <ReviewManagementModal
+        isOpen={reviewModalData.isOpen}
+        movieId={reviewModalData.movieId}
+        movieTitle={reviewModalData.movieTitle}
+        onClose={() => setReviewModalData({ isOpen: false, movieId: null, movieTitle: "" })}
       />
     </div>
   );

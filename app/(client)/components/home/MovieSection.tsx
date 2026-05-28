@@ -12,7 +12,8 @@ export default function MovieSection() {
   useEffect(() => {
     const fetchUpcomingMovies = async () => {
       try {
-        const response = await apiRequest("/api/v1/movies?status=COMING_SOON&page=0&size=6&sort=id,desc", { 
+        // 🎯 Đổi size=6 thành size=5 để lấy đúng 5 phim
+        const response = await apiRequest("/api/v1/movies?status=COMING_SOON&page=0&size=5&sort=id,desc", { 
           method: "GET" 
         });
         
@@ -37,9 +38,11 @@ export default function MovieSection() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 px-6 md:px-12 py-12 bg-[#050505]">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="aspect-[2/3] max-w-[155px] mx-auto w-full bg-zinc-900/40 border border-zinc-800/20 animate-pulse rounded-[1rem]" />
+      // 🎯 Đổi lg:grid-cols-6 thành lg:grid-cols-5
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6 px-6 md:px-12 py-12 bg-[#050505]">
+        {/* 🎯 Đổi Array(6) thành Array(5) */}
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="aspect-[2/3] w-full bg-zinc-900/40 border border-zinc-800/20 animate-pulse rounded-[1rem]" />
         ))}
       </div>
     );
@@ -73,19 +76,17 @@ export default function MovieSection() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-6 max-w-[1400px] mx-auto">
+      {/* 🎯 Đổi lg:grid-cols-6 thành lg:grid-cols-5 ở đây nữa */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-x-6 md:gap-y-8 max-w-[1400px] mx-auto">
         {movies.map((movie: any) => (
-          <div key={movie.id} className="transition-transform duration-300 hover:-translate-y-1">
+          <div key={movie.id} className="transition-transform duration-300 hover:-translate-y-1 h-full">
             <MovieCard
               id={movie.id}
               title={movie.title}
               image={movie.posterUrl} 
               status={movie.status}
               rating={movie.rating} 
-              
-              // 🎯 FIX TRIỆT ĐỂ: Hứng cả 2 trường hợp (genreNames của API Danh sách hoặc genres của API Chi tiết)
               genreNames={movie.genreNames || movie.genres?.map((g: any) => g.name) || []} 
-              
               ageRating={movie.ageRating} 
               reviewCount={movie.reviewCount || 0} 
             />

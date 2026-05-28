@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, use } from 'react';
-import { Play, Star, Award, Calendar, Globe, Film, Ticket, Loader2, X, ArrowLeft, Shield } from 'lucide-react';
+import { Play, Star, Award, Calendar, Globe, Film, Ticket, Loader2, X, ArrowLeft, Shield, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiRequest, getImageUrl } from "@/app/lib/api"; 
@@ -36,8 +36,6 @@ function MovieHorizontalList({ title, subTitle, movies, loading }: { title: stri
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {movies.map((m) => {
           const hasListRating = m.rating !== undefined && m.rating !== null && Number(m.rating) > 0;
-          
-          // 🎯 FIX THỂ LOẠI (Hứng mọi loại API)
           const displayGenres = m.genreNames || m.genres?.map((g: any) => g.name) || [];
 
           return (
@@ -51,7 +49,6 @@ function MovieHorizontalList({ title, subTitle, movies, loading }: { title: stri
               <div className="px-1">
                 <h4 className="text-[11px] font-black text-white uppercase truncate group-hover:text-red-500 transition-colors">{m.title}</h4>
                 <div className="flex items-center justify-between mt-1">
-                   {/* 🎯 HIỂN THỊ CHUỖI THỂ LOẠI */}
                    <p className="text-[9px] font-bold text-zinc-600 uppercase line-clamp-1 max-w-[60%]">
                      {displayGenres.length > 0 ? displayGenres.join(" • ") : "Phim"}
                    </p>
@@ -138,9 +135,19 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
 
   const hasRating = movie.rating !== undefined && movie.rating !== null && Number(movie.rating) > 0;
   
-  // 🎯 XỬ LÝ CHUỖI NHIỀU THỂ LOẠI CHO PHIM HIỆN TẠI
   const movieGenresList = movie.genreNames || movie.genres?.map((g: any) => g.name) || [];
   const movieGenresString = movieGenresList.length > 0 ? movieGenresList.join(" • ") : "Đang cập nhật";
+
+  // 🎯 FIX: Hiển thị TOÀN BỘ diễn viên và bắt buộc thêm đuôi ",..."
+  const formatCast = (castStr: string) => {
+    if (!castStr) return "Đang cập nhật...";
+    
+    // Tách chuỗi bằng dấu phẩy, xóa khoảng trắng thừa ở 2 đầu mỗi tên
+    const castList = castStr.split(',').map(a => a.trim());
+    
+    // Ghép tất cả lại bằng dấu ", " cho đẹp, sau đó nối thêm ",..." ở cuối
+    return `${castList.join(", ")},...`; 
+  };
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-300 font-sans pb-20">
@@ -199,20 +206,16 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
               <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter uppercase text-white leading-[0.9] drop-shadow-2xl">{movie.title}</h1>
               
               <div className="flex items-center justify-center md:justify-start gap-6">
-                 {/* 🎯 ĐIỂM SỐ VÀ LƯỢT ĐÁNH GIÁ ĐÃ ĐƯỢC ÉP HIỂN THỊ */}
                  <div className="flex items-end gap-2">
                     <Star size={20} fill={hasRating ? "#f59e0b" : "none"} className={`mb-1 ${hasRating ? "text-amber-500 animate-pulse" : "text-zinc-600"}`} />
                     <span className={hasRating ? "text-2xl font-black italic text-white leading-none" : "text-[10px] font-black uppercase tracking-wider bg-white/5 px-2.5 py-1 rounded-lg border border-white/5 text-zinc-500"}>
                       {hasRating ? Number(movie.rating).toFixed(1) : "CHƯA CÓ ĐÁNH GIÁ"}
                     </span>
-                    
-                    {/* Luôn hiện số lượt đánh giá nếu phim đã có điểm */}
                     {hasRating && (
                       <span className="text-[12px] font-bold text-zinc-400 mb-[2px]">({formatReviewCount(movie.reviewCount || 0)} đánh giá)</span>
                     )}
                  </div>
                  
-                 {/* 🎯 HIỂN THỊ CHUỖI NHIỀU THỂ LOẠI Ở ĐÂY */}
                  <p className="text-[11px] font-bold uppercase text-zinc-400 tracking-[0.2em] border-l border-white/20 pl-6 line-clamp-1 max-w-sm">
                    {movieGenresString}
                  </p>
@@ -241,13 +244,28 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
               <p className="text-zinc-400 text-base md:text-lg leading-relaxed italic font-medium bg-gradient-to-r from-zinc-900/40 to-transparent p-8 rounded-3xl border-l-2 border-red-600/30">{movie.description}</p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 p-8 bg-zinc-900/20 rounded-3xl border border-white/5 text-center backdrop-blur-sm">
-              <InfoBox icon={<Film size={18}/>} label="ĐẠO DIỄN" value={movie.director} />
-              <InfoBox icon={<Award size={18}/>} label="QUỐC GIA" value={movie.country} />
-              <InfoBox icon={<Globe size={18}/>} label="NĂM" value={movie.releaseDate ? new Date(movie.releaseDate).getFullYear().toString() : "2026"} />
+            {/* 🎯 KHỐI THÔNG TIN CHÍNH + DIỄN VIÊN */}
+            <div className="p-8 bg-zinc-900/20 rounded-3xl border border-white/5 backdrop-blur-sm space-y-8">
+              {/* Đạo diễn không truncate, các trường khác truncate */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                <InfoBox icon={<Film size={18}/>} label="ĐẠO DIỄN" value={movie.director} truncate={false} />
+                <InfoBox icon={<Award size={18}/>} label="QUỐC GIA" value={movie.country} truncate={true} />
+                <InfoBox icon={<Globe size={18}/>} label="NĂM" value={movie.releaseDate ? new Date(movie.releaseDate).getFullYear().toString() : "2026"} truncate={true} />
+                <InfoBox icon={<Shield size={18}/>} label="ĐỘ TUỔI" value={movie.ageRating || "P"} truncate={true} />
+              </div>
               
-              {/* 🎯 ĐỔI TỪ THỂ LOẠI SANG ĐỘ TUỔI */}
-              <InfoBox icon={<Shield size={18}/>} label="ĐỘ TUỔI" value={movie.ageRating || "P"} />
+              {/* Gọi movie.cast thay vì movie.actor */}
+              <div className="pt-6 border-t border-white/5">
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Users size={16} className="text-red-600" />
+                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">DIỄN VIÊN:</span>
+                  </div>
+                  <span className="text-sm font-bold text-white italic line-clamp-2 leading-relaxed">
+                    {formatCast(movie.cast)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -273,12 +291,14 @@ export default function MovieDetailPage({ params }: { params: Promise<{ id: stri
   );
 }
 
-function InfoBox({ icon, label, value }: { icon: any, label: string, value: string }) {
+function InfoBox({ icon, label, value, truncate }: { icon: any, label: string, value: string, truncate: boolean }) {
   return (
     <div className="space-y-2">
       <div className="text-red-600 flex justify-center mb-2">{icon}</div>
       <p className="text-[8px] font-black uppercase text-zinc-500 tracking-widest">{label}</p>
-      <p className="text-sm font-black text-white uppercase truncate italic">{value || "Đang cập nhật"}</p>
+      <p className={`text-sm font-black text-white uppercase italic ${truncate ? 'truncate' : 'line-clamp-2 leading-tight'}`}>
+        {value || "Đang cập nhật"}
+      </p>
     </div>
   );
 }
