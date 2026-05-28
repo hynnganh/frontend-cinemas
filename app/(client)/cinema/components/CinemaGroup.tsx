@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown, MapPin } from 'lucide-react';
-import CinemaCard from './CinemaCard'; // Import thẻ rạp con của ông vào đây
+import CinemaCard from './CinemaCard';
 
 export default function CinemaGroup({ parentName, childrenCinemas, activeChildId, onChildSelect, isExpanded, onToggle }: any) {
   return (
@@ -29,10 +29,11 @@ export default function CinemaGroup({ parentName, childrenCinemas, activeChildId
       {/* DANH SÁCH RẠP CON (SẼ BUNG RA KHI BẤM) */}
       <div 
         className={`transition-all duration-500 overflow-hidden ${
-          isExpanded ? 'max-h-[800px] opacity-100 mt-1 mb-2' : 'max-h-0 opacity-0 mt-0 mb-0'
+          isExpanded ? 'max-h-[800px] opacity-100 mt-2 mb-3' : 'max-h-0 opacity-0 mt-0 mb-0'
         }`}
       >
-        <div className="pl-2 border-l border-white/5 ml-2 mt-1">
+        {/* 🎯 ĐÃ FIX: Thêm "flex flex-col gap-2" để tạo khoảng cách giữa các rạp con */}
+        <div className="pl-3 border-l border-zinc-800 ml-3 mt-1 flex flex-col gap-2">
           {childrenCinemas.map((cinema: any) => (
             <CinemaCard 
               key={cinema.id}
