@@ -17,7 +17,7 @@ export default function ComboPage({ params }: { params: Promise<{ showtimeId: st
 
   const fetchCombos = useCallback(async (id: number) => {
     try {
-      const res = await apiRequest(`/api/v1/admin/cinema-combos/${id}/combos`);
+      const res = await apiRequest(`/api/v1/cinema-combos/${id}/combos`);
       if (res.ok) {
         const result = await res.json();
         setCombos(result.data || []);
