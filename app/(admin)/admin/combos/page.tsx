@@ -37,7 +37,7 @@ export default function AdminComboPage() {
     try {
       const token = getAdminToken();
 
-      const res = await apiRequest("/api/v1/admin/cinema-combos", {
+      const res = await apiRequest("/api/v1/cinema-combos", {
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
@@ -81,7 +81,7 @@ export default function AdminComboPage() {
     try {
       const token = getAdminToken();
 
-      const res = await apiRequest(`/api/v1/admin/cinema-combos/${comboId}/toggle`, {
+      const res = await apiRequest(`/api/v1/cinema-combos/${comboId}/toggle`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -125,7 +125,7 @@ export default function AdminComboPage() {
       const token = getAdminToken();
 
       const res = await apiRequest(
-        `/api/v1/admin/cinema-combos/${comboId}/stock`,
+        `/api/v1/cinema-combos/${comboId}/stock`,
         {
           method: "PUT",
           headers: {
