@@ -10,7 +10,10 @@ export default function SeatDesignerPage() {
   const router = useRouter();
   const roomId = params.id;
 
+  // ===== STATES =====
   const [danhSachGhe, setDanhSachGhe] = useState<any[]>([]);
+  const [deletedSeatIds, setDeletedSeatIds] = useState<number[]>([]); // 🎯 Hàng đợi lưu các ID ghế thật đã bị xóa ảo
+  
   const [roomInfo, setRoomInfo] = useState<any>(null);
   const [dangTai, setDangTai] = useState(true);
   const [dangLuu, setDangLuu] = useState(false);
@@ -25,63 +28,36 @@ export default function SeatDesignerPage() {
     onConfirm: () => void;
     type: 'danger' | 'warning' | 'info';
   }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-    type: 'warning'
+    isOpen: false, title: '', message: '', onConfirm: () => {}, type: 'warning'
   });
 
   const whiteToast: any = {
-    style: { 
-      background: '#ffffff', 
-      color: '#000000', 
-      fontSize: '12px', 
-      fontWeight: '900', 
-      borderRadius: '12px', 
-      padding: '16px',
-      border: '1px solid #eee'
-    }
+    style: { background: '#ffffff', color: '#000000', fontSize: '12px', fontWeight: '900', borderRadius: '12px', padding: '16px', border: '1px solid #eee' }
   };
 
+  // ===== TẢI DỮ LIỆU GỐC =====
   const taiDuLieu = useCallback(async () => {
     if (!roomId) return;
-
     try {
       setDangTai(true);
+      setDeletedSeatIds([]); // 🎯 Reset hàng đợi xóa mỗi khi load lại data gốc
 
-      // ===== LOAD SEATS =====
       const resSeats = await apiAdminRequest(`/api/v1/seats/room/${roomId}`);
       const resultSeats = await resSeats.json();
       const seatsData = resultSeats.data || [];
-
       setDanhSachGhe(seatsData);
 
-      // ===== CASE 1: phòng đã có ghế =====
       if (seatsData.length > 0 && seatsData[0]?.room) {
         const roomData = seatsData[0].room;
-
-        setRoomInfo({
-          id: roomData.id,
-          name: roomData.name,
-          totalSeats: roomData.totalSeats || 0
-        });
+        setRoomInfo({ id: roomData.id, name: roomData.name, totalSeats: roomData.totalSeats || 0 });
         return;
       }
 
-      // ===== CASE 2: phòng chưa có ghế =====
       const resRoom = await apiAdminRequest(`/api/v1/rooms/${roomId}`);
-
       if (!resRoom.ok) throw new Error("Không load được room");
-
       const roomResult = await resRoom.json();
       const rawRoom = roomResult.data;
-
-      setRoomInfo({
-        id: rawRoom.id,
-        name: rawRoom.name,
-        totalSeats: rawRoom.totalSeats || 0
-      });
+      setRoomInfo({ id: rawRoom.id, name: rawRoom.name, totalSeats: rawRoom.totalSeats || 0 });
 
     } catch (err) {
       console.error("Load error:", err);
@@ -93,10 +69,10 @@ export default function SeatDesignerPage() {
 
   useEffect(() => { taiDuLieu(); }, [taiDuLieu]);
 
+  // ===== MODAL =====
   const openConfirm = (title: string, message: string, onConfirm: () => void, type: 'danger' | 'warning' | 'info' = 'warning') => {
     setModalConfig({ isOpen: true, title, message, onConfirm, type });
   };
-
   const closeConfirm = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
 
   const checkSeatEligibility = async (seatId: any) => {
@@ -110,119 +86,124 @@ export default function SeatDesignerPage() {
     } catch { return false; }
   };
 
-  // 🔥 UPDATE KỸ THUẬT: Sửa câu chữ thông báo ổ khóa khớp Business Rule phòng dính suất chiếu
+  // ===== XÓA GHẾ LẺ (ẢO) =====
   const handleXoaGhe = async (ghe: any) => {
     const isTemp = String(ghe.id).startsWith('temp-');
     if (isTemp) {
-      setDanhSachGhe(prev => prev.filter(s => s.id !== ghe.id));
+      setDanhSachGhe(prev => prev.filter(s => s.id !== ghe.id)); // Ảo thì bay luôn
       return;
     }
 
-    const loadingCheck = toast.loading("Đang kiểm tra lịch chiếu...", whiteToast);
+    const loadingCheck = toast.loading("Đang kiểm tra dữ liệu...", whiteToast);
     const canDelete = await checkSeatEligibility(ghe.id);
     toast.dismiss(loadingCheck);
 
     if (!canDelete) {
       return openConfirm(
-        "Không thể chỉnh sửa!",
-        `Phòng chiếu này hiện đã được xếp lịch suất chiếu hoạt động. Hệ thống khóa sơ đồ mẫu để bảo đảm an toàn dữ liệu vé rạp.`,
-        closeConfirm,
-        'info'
+        "Không thể thao tác!",
+        `Phòng chiếu này hiện đã có lịch suất chiếu hoạt động hoặc sắp diễn ra. Không thể xóa ghế này.`,
+        closeConfirm, 'info'
       );
     }
 
     openConfirm(
-      "Xác nhận xóa ghế?",
-      `Xóa vĩnh viễn ghế ${ghe.seatRow}${ghe.seatNumber}?`,
-      async () => {
+      "Xác nhận xóa ghế (Ảo)?",
+      `Ghế ${ghe.seatRow}${ghe.seatNumber} sẽ biến mất khỏi sơ đồ. Bấm LƯU DATABASE để xóa thật.`,
+      () => {
         closeConfirm();
-        const loading = toast.loading("Đang xóa...", whiteToast);
-        try {
-          const res = await apiAdminRequest(`/api/v1/seats/${ghe.id}`, { method: 'DELETE' });
-          const result = await res.json();
-          if (res.ok) {
-            setDanhSachGhe(prev => prev.filter(s => s.id !== ghe.id));
-            toast.success("Đã xóa!", { id: loading, ...whiteToast });
-          } else {
-            toast.error(result.message || "Lỗi xóa ghế!", { id: loading, ...whiteToast });
-          }
-        } catch { toast.error("Lỗi kết nối máy chủ!", { id: loading, ...whiteToast }); }
+        setDeletedSeatIds(prev => [...prev, ghe.id]); // Đưa vào hàng đợi xóa
+        setDanhSachGhe(prev => prev.filter(s => s.id !== ghe.id)); // Ẩn khỏi màn hình
+        toast.success(`Đã xóa ảo ghế ${ghe.seatRow}${ghe.seatNumber}!`, whiteToast);
       },
       'danger'
     );
   };
 
-  // 🔥 UPDATE KỸ THUẬT: Chặn reset sạch từ sớm và bóc lỗi động từ BE
+  // ===== XÓA SẠCH SẼ (ẢO) =====
   const handleResetSạchSẽ = () => {
     if (danhSachGhe.length === 0) return toast.error("Phòng đang trống!", whiteToast);
     
     openConfirm(
-      "Dọn sạch sơ đồ?",
-      `CẢNH BÁO: Hành động này sẽ xóa toàn bộ danh sách cấu hình ghế mẫu của phòng hiện tại.`,
+      "Dọn sạch sơ đồ (Ảo)?",
+      `Toàn bộ ghế sẽ bị gỡ khỏi màn hình. Cần bấm LƯU DATABASE để cập nhật vào máy chủ.`,
       async () => {
         closeConfirm();
-        const loading = toast.loading("Đang xử lý dọn dẹp...", whiteToast);
-        try {
-          const realSeats = danhSachGhe.filter(g => !String(g.id).startsWith('temp-'));
-          
-          if (realSeats.length > 0) {
-            // Kiểm tra nhanh ghế đầu tiên xem phòng có bị dính lịch chiếu hoạt động chặn không
-            const isEligible = await checkSeatEligibility(realSeats[0].id);
-            if (!isEligible) {
-              toast.dismiss(loading);
-              return openConfirm(
-                "Không thể dọn sạch!",
-                "Phòng chiếu này hiện đã có lịch suất chiếu hoạt động. Không thể thực hiện dọn sạch sơ đồ mẫu!",
-                closeConfirm,
-                'info'
-              );
-            }
+        const realSeats = danhSachGhe.filter(g => !String(g.id).startsWith('temp-'));
+        
+        if (realSeats.length > 0) {
+          const loadingCheck = toast.loading("Đang kiểm tra điều kiện...", whiteToast);
+          const isEligible = await checkSeatEligibility(realSeats[0].id);
+          toast.dismiss(loadingCheck);
+          if (!isEligible) {
+            return openConfirm(
+              "Không thể dọn sạch!",
+              "Phòng chiếu này hiện đã có lịch suất chiếu hoạt động. Không thể thực hiện dọn sạch sơ đồ mẫu!",
+              closeConfirm, 'info'
+            );
           }
+        }
 
-          const res = await apiAdminRequest(`/api/v1/seats/room/${roomId}`, { method: 'DELETE' });
-          const result = await res.json();
-          
-          if (res.ok) {
-            taiDuLieu();
-            toast.success(`Đã dọn dẹp sơ đồ phòng sạch sẽ!`, { id: loading, ...whiteToast });
-          } else {
-            toast.error(result.message || "Lỗi reset sơ đồ!", { id: loading, ...whiteToast });
-          }
-        } catch { toast.error("Mất kết nối máy chủ!", { id: loading, ...whiteToast }); }
+        // Nếu hợp lệ -> Đưa toàn bộ ID thật vào hàng đợi xóa, rồi dọn sạch màn hình
+        setDeletedSeatIds(prev => [...prev, ...realSeats.map(g => g.id)]);
+        setDanhSachGhe([]);
+        toast.success(`Đã dọn sạch ảo! Hãy bấm LƯU DATABASE để xác nhận.`, whiteToast);
       },
       'danger'
     );
   };
 
-  // 🔥 UPDATE KỸ THUẬT: Bóc tách lỗi động hiển thị RuntimeException từ Backend ném ra
+  // ===== TẠO SƠ ĐỒ HÀNG LOẠT (ẢO) =====
   const handleGenerateMultiple = () => {
     const totalToGenerate = config.rows * config.cols;
     const maxCapacity = roomInfo?.totalSeats || 0;
     if (totalToGenerate > maxCapacity) return toast.error(`Vượt sức chứa cấu hình rạp (${maxCapacity})!`, whiteToast);
 
     openConfirm(
-      "Tạo sơ đồ hàng loạt?",
-      `Khởi tạo ma trận gồm ${config.rows} hàng x ${config.cols} cột.`,
+      "Tạo sơ đồ hàng loạt (Ảo)?",
+      `Tạo ma trận ${config.rows}x${config.cols}. Thao tác này sẽ gỡ bỏ các ghế cũ trên màn hình. Cần bấm LƯU DATABASE để áp dụng.`,
       async () => {
         closeConfirm();
-        const loading = toast.loading("Đang tạo ma trận ghế...", whiteToast);
-        try {
-          const query = `?roomId=${roomId}&rows=${config.rows}&seatsPerRow=${config.cols}`;
-          const res = await apiAdminRequest(`/api/v1/seats/generate${query}`, { method: 'POST' });
-          const result = await res.json();
-          
-          if (res.ok) {
-            toast.success("Khởi tạo sơ đồ hàng loạt thành công!", { id: loading, ...whiteToast });
-            taiDuLieu();
-          } else {
-            // Đẩy trực tiếp câu: "Phòng đã có suất chiếu, không thể chỉnh sửa..." từ Spring Boot ra màn hình
-            toast.error(result.message || "Không thể khởi tạo sơ đồ mẫu!", { id: loading, ...whiteToast });
+        const realSeats = danhSachGhe.filter(g => !String(g.id).startsWith('temp-'));
+        
+        if (realSeats.length > 0) {
+          const loadingCheck = toast.loading("Đang kiểm tra dữ liệu...", whiteToast);
+          const isEligible = await checkSeatEligibility(realSeats[0].id);
+          toast.dismiss(loadingCheck);
+          if (!isEligible) {
+            return openConfirm(
+              "Không thể tạo hàng loạt!",
+              "Phòng chiếu này đã có suất chiếu. Vui lòng đợi các suất chiếu kết thúc để cấu hình lại sơ đồ.",
+              closeConfirm, 'info'
+            );
           }
-        } catch { toast.error("Lỗi liên lạc máy chủ!", { id: loading, ...whiteToast }); }
+        }
+
+        // Tạo danh sách ghế ảo mới
+        const newSeats = [];
+        let currentRow = 65; // 'A'
+        for (let r = 0; r < config.rows; r++) {
+          const rowChar = String.fromCharCode(currentRow + r);
+          for (let c = 1; c <= config.cols; c++) {
+            newSeats.push({
+              id: `temp-gen-${Date.now()}-${r}-${c}`, // Tạo ID tạm
+              seatRow: rowChar,
+              seatNumber: c,
+              seatType: 'NORMAL',
+              price: 80000,
+              roomId: Number(roomId)
+            });
+          }
+        }
+
+        // Đưa các ghế thật hiện tại vào hàng đợi xóa
+        setDeletedSeatIds(prev => [...prev, ...realSeats.map(g => g.id)]);
+        setDanhSachGhe(newSeats);
+        toast.success("Đã khởi tạo ma trận ảo! Hãy bấm LƯU DATABASE để hoàn tất.", whiteToast);
       }
     );
   };
 
+  // ===== THÊM 1 GHẾ (ẢO) =====
   const handleAddSingleSeat = () => {
     const row = manualSeat.row.trim().toUpperCase();
     const num = parseInt(manualSeat.num);
@@ -231,54 +212,57 @@ export default function SeatDesignerPage() {
     if (danhSachGhe.length >= maxCapacity) return toast.error("Phòng đầy!", whiteToast);
     if (danhSachGhe.some(g => g.seatRow === row && Number(g.seatNumber) === num)) return toast.error("Trùng vị trí ghế!", whiteToast);
 
-    const newSeat = { id: `temp-${Date.now()}`, seatRow: row, seatNumber: num, seatType: 'NORMAL', price: 60000, roomId: Number(roomId) };
+    const newSeat = { id: `temp-add-${Date.now()}`, seatRow: row, seatNumber: num, seatType: 'NORMAL', price: 60000, roomId: Number(roomId) };
     setDanhSachGhe(prev => [...prev, newSeat]);
     setManualSeat(prev => ({ ...prev, num: (num + 1).toString() }));
   };
 
-  // 🔥 UPDATE KỸ THUẬT: Đồng bộ luồng kiểm tra phản hồi lỗi của đống Promise.all
-  const handleSaveAll = async () => {
-    setDangLuu(true);
-    const loading = toast.loading("Đang đồng bộ dữ liệu...", whiteToast);
-    try {
-      const promises = danhSachGhe.map(ghe => {
-        const isNew = String(ghe.id).startsWith('temp-');
-        const body = { seatRow: ghe.seatRow, seatNumber: ghe.seatNumber, seatType: ghe.seatType, price: ghe.price, roomId: Number(roomId) };
-        return apiAdminRequest(isNew ? `/api/v1/seats` : `/api/v1/seats/${ghe.id}`, { 
-          method: isNew ? 'POST' : 'PUT', 
-          body: JSON.stringify(body) 
-        });
-      });
-      
-      const responses = await Promise.all(promises);
-      let backendErrorMsg = null;
-
-      for (const res of responses) {
-        if (!res.ok) {
-          const result = await res.json();
-          backendErrorMsg = result.message;
-          break;
-        }
-      }
-
-      if (backendErrorMsg) {
-        toast.error(backendErrorMsg, { id: loading, ...whiteToast });
-      } else {
-        toast.success("Đã đồng bộ sơ đồ thiết kế xuống database thành công!", { id: loading, ...whiteToast });
-        taiDuLieu();
-      }
-    } catch { 
-      toast.error("Lỗi đồng bộ dữ liệu hệ thống!", whiteToast); 
-    } finally { 
-      setDangLuu(false); 
-    }
-  };
-
+  // ===== ĐỔI LOẠI GHẾ (ẢO) =====
   const toggleSeatType = (ghe: any) => {
     const types = ['NORMAL', 'VIP', 'SWEETBOX'];
     const prices: any = { 'NORMAL': 80000, 'VIP': 120000, 'SWEETBOX': 250000 };
     const nextType = types[(types.indexOf(ghe.seatType) + 1) % types.length];
     setDanhSachGhe(danhSachGhe.map(s => s.id === ghe.id ? { ...s, seatType: nextType, price: prices[nextType] } : s));
+  };
+
+  // 🎯 LƯU VÀO DATABASE (CHẠY TUẦN TỰ ĐỂ AN TOÀN TUYỆT ĐỐI)
+  const handleSaveAll = async () => {
+    setDangLuu(true);
+    const loading = toast.loading("Đang đồng bộ dữ liệu... Vui lòng không đóng trang!", whiteToast);
+
+    try {
+      // BƯỚC 1: Xóa thật những ghế nằm trong hàng đợi (deletedSeatIds)
+      for (const id of deletedSeatIds) {
+        const res = await apiAdminRequest(`/api/v1/seats/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const result = await res.json().catch(()=>({}));
+          throw new Error(result.message || "Lỗi khi xóa ghế cũ!");
+        }
+      }
+
+      // BƯỚC 2: Thêm mới (POST) và Cập nhật (PUT) các ghế trên màn hình
+      for (const ghe of danhSachGhe) {
+        const isNew = String(ghe.id).startsWith('temp-');
+        const body = { seatRow: ghe.seatRow, seatNumber: ghe.seatNumber, seatType: ghe.seatType, price: ghe.price, roomId: Number(roomId) };
+        
+        const res = await apiAdminRequest(isNew ? `/api/v1/seats` : `/api/v1/seats/${ghe.id}`, { 
+          method: isNew ? 'POST' : 'PUT', 
+          body: JSON.stringify(body) 
+        });
+
+        if (!res.ok) {
+          const result = await res.json().catch(()=>({}));
+          throw new Error(result.message || `Lỗi khi lưu ghế ${ghe.seatRow}${ghe.seatNumber}!`);
+        }
+      }
+
+      toast.success("Đã đồng bộ sơ đồ thiết kế xuống máy chủ thành công!", { id: loading, ...whiteToast });
+      taiDuLieu(); // Load lại data từ DB để dọn dẹp hàng đợi và lấy ID thật cho các ghế mới
+    } catch (err: any) { 
+      toast.error(err.message || "Lỗi đồng bộ dữ liệu hệ thống!", { id: loading, ...whiteToast }); 
+    } finally { 
+      setDangLuu(false); 
+    }
   };
 
   const groupedSeats: any = useMemo(() => {
