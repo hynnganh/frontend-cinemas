@@ -9,6 +9,14 @@ import { getTokenByRole } from '@/app/lib/auth';
 import CinemaGroup from './components/CinemaGroup';
 import MovieCard from './components/MovieCard';
 
+// 🔥 Hàm sửa lỗi lệch múi giờ: Luôn lấy YYYY-MM-DD theo đúng giờ Local (VN)
+const getLocalISODate = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function Cinema() {
   const router = useRouter();
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -17,7 +25,7 @@ export default function Cinema() {
   const [cinemas, setCinemas] = useState<any[]>([]);
   const [movies, setMovies] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [expandedParent, setExpandedParent] = useState<string | null>(null); // State mở Rạp Cha
+  const [expandedParent, setExpandedParent] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(""); 
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -25,7 +33,8 @@ export default function Cinema() {
 
   useEffect(() => { 
     setIsMounted(true); 
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    // Dùng getLocalISODate để không bị lùi 1 ngày sang giờ UTC
+    setSelectedDate(getLocalISODate(new Date()));
   }, []);
 
   const handleBooking = (showtimeId: number) => {
@@ -135,7 +144,12 @@ export default function Cinema() {
     const VI_DAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
     return [...Array(7)].map((_, i) => {
       const d = new Date(); d.setDate(d.getDate() + i);
-      return { id: d.toISOString().split('T')[0], dayName: i === 0 ? "Hôm nay" : VI_DAYS[d.getDay()], dateNum: d.getDate() };
+      // 🔥 Thay thế toISOString bằng getLocalISODate
+      return { 
+        id: getLocalISODate(d), 
+        dayName: i === 0 ? "Hôm nay" : VI_DAYS[d.getDay()], 
+        dateNum: d.getDate() 
+      };
     });
   }, []);
 
@@ -204,7 +218,7 @@ export default function Cinema() {
                 type="date" 
                 ref={dateInputRef}
                 value={selectedDate}
-                min={new Date().toISOString().split('T')[0]} 
+                min={getLocalISODate(new Date())} 
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="absolute inset-0 opacity-0 cursor-pointer -z-10" 
               />
