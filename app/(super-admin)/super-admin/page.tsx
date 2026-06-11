@@ -16,7 +16,6 @@ import {
   RefreshCw,
   Calendar,
   ArrowRight,
-  Zap,
 } from "lucide-react";
 
 import {
@@ -45,17 +44,22 @@ interface MovieStat {
   count: number;
 }
 
+interface MovieRevenue {
+  movieName: string;
+  revenue: number;
+}
+
 /* ================= TRANG CHÍNH ================= */
 export default function ReportDashboard() {
   
-  // Hàm tiện ích: Ép đối tượng Date thành chuỗi chuấn 'YYYY-MM-DDTHH:mm' theo múi giờ địa phương
+  // Hàm tiện ích: Ép đối tượng Date thành chuỗi chuẩn 'YYYY-MM-DDTHH:mm' theo múi giờ địa phương
   const toLocalDateTimeString = (date: Date) => {
     const tzOffset = date.getTimezoneOffset() * 60000;
     const localISOTime = new Date(date.getTime() - tzOffset).toISOString();
     return localISOTime.slice(0, 16);
   };
 
-  // ================= BỘ LỌC THỜI GIAN (ĐÃ FIX ĐỒNG BỘ GIỜ HIỆN TẠI) =================
+  // ================= BỘ LỌC THỜI GIAN =================
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     // Mặc định: Đầu tháng hiện tại lúc 00:00
@@ -71,7 +75,8 @@ export default function ReportDashboard() {
   const [loading, setLoading] = useState(true);
   const [ranking, setRanking] = useState<RankingItem[]>([]);
   const [movieStats, setMovieStats] = useState<MovieStat[]>([]);
-
+  const [movieRevenue, setMovieRevenue] = useState<MovieRevenue[]>([]);
+  
   // ================= CÁC NÚT CHỌN NHANH THỜI GIAN =================
   const setQuickFilter = (type: "today" | "7days" | "month") => {
     const now = new Date();
@@ -96,26 +101,27 @@ export default function ReportDashboard() {
     return dateStr.replace("T", " ") + ":00";
   };
 
-  const getQuery = () => {
-    const searchParams = new URLSearchParams({
-      start: formatDateForApi(startDate),
-      end: formatDateForApi(endDate),
-    });
-    return searchParams.toString();
-  };
-
+  // Gom toàn bộ API request chạy đồng thời 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const query = getQuery();
+      
+      const formattedStart = formatDateForApi(startDate);
+      const formattedEnd = formatDateForApi(endDate);
 
-      const [rankRes, movieRes] = await Promise.all([
-        apiSuperAdminRequest(`/api/v1/reports/ranking?${query}`),
+      // Tạo query riêng biệt cho từng endpoint để khớp chính xác với Backend
+      const rankingQuery = new URLSearchParams({ start: formattedStart, end: formattedEnd }).toString();
+      const movieRevenueQuery = new URLSearchParams({ startDate: formattedStart, endDate: formattedEnd }).toString();
+
+      const [rankRes, movieRes, revenueRes] = await Promise.all([
+        apiSuperAdminRequest(`/api/v1/reports/ranking?${rankingQuery}`),
         apiSuperAdminRequest(`/api/v1/reports/stats`),
+        apiSuperAdminRequest(`/api/v1/reports/movie-revenue?${movieRevenueQuery}`),
       ]);
 
       if (rankRes.ok) setRanking((await rankRes.json()) || []);
       if (movieRes.ok) setMovieStats((await movieRes.json()) || []);
+      if (revenueRes.ok) setMovieRevenue((await revenueRes.json()) || []);
     } catch (error) {
       console.error("Lỗi tải dữ liệu hệ thống:", error);
     } finally {
@@ -185,13 +191,12 @@ export default function ReportDashboard() {
           </button>
         </div>
 
-        {/* ================= BỘ LỌC THỜI GIAN NEW DESIGN ================= */}
+        {/* ================= BỘ LỌC THỜI GIAN ================= */}
         <div className="rounded-2xl border border-zinc-800/80 bg-[#0b0b0e] p-5 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-red-500/20 via-transparent to-transparent" />
           
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
             
-            {/* Tiêu đề & Nút chọn nhanh */}
             <div className="flex flex-col md:flex-row md:items-center gap-4 lg:gap-6">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20">
@@ -205,7 +210,6 @@ export default function ReportDashboard() {
                 </div>
               </div>
 
-              {/* Nhóm nút chọn nhanh */}
               <div className="flex items-center gap-2 border border-zinc-800/80 bg-zinc-950 p-1 rounded-xl self-start md:self-auto">
                 <button 
                   onClick={() => setQuickFilter("today")}
@@ -230,9 +234,7 @@ export default function ReportDashboard() {
               </div>
             </div>
 
-            {/* Khung nhập liệu Input datetime */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-zinc-950 p-2 rounded-xl border border-zinc-800/70 w-full xl:w-auto">
-              
               <div className="relative flex-1 sm:w-52">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[9px] uppercase font-black tracking-widest text-zinc-500">
                   Từ
@@ -260,12 +262,11 @@ export default function ReportDashboard() {
                   className="w-full rounded-lg border border-zinc-800/80 bg-[#0d0d12] py-2.5 pl-10 pr-3 text-xs text-zinc-200 font-bold outline-none transition-all duration-200 focus:border-red-500 focus:text-white [color-scheme:dark]"
                 />
               </div>
-
             </div>
           </div>
         </div>
 
-        {/* ================= LOADING OR CONTENT ================= */}
+        {/* ================= DỮ LIỆU ĐỒNG BỘ ================= */}
         {loading ? (
           <div className="flex h-[40vh] flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 rounded-full border-2 border-zinc-800 border-t-red-500 animate-spin" />
@@ -357,7 +358,7 @@ export default function ReportDashboard() {
               </div>
             </div>
 
-            {/* MOVIES TABLE */}
+            {/* MOVIES PERFORMANCE TABLE */}
             <div className="rounded-2xl border border-zinc-900 bg-[#0c0c0e] p-6 shadow-xl relative overflow-hidden group hover:border-zinc-800 transition-all duration-300">
               <div className="mb-5 flex items-center gap-2 border-b border-zinc-900/50 pb-4">
                 <div className="p-1.5 rounded-lg bg-zinc-900 text-yellow-500 border border-zinc-800"><Film size={15} /></div>
@@ -384,6 +385,43 @@ export default function ReportDashboard() {
                 </table>
                 {movieStats.length === 0 && (
                   <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-zinc-600">Hiện tại chưa ghi nhận dữ liệu phim nào</div>
+                )}
+              </div>
+            </div>
+
+            {/* MOVIE REVENUE RANKING TABLE */}
+            <div className="rounded-2xl border border-zinc-800 bg-[#0c0c10]/60 p-6 relative overflow-hidden group hover:border-zinc-700 transition-all duration-300">
+              <h2 className="text-xs font-black uppercase tracking-wider text-white mb-5 border-b border-zinc-900/50 pb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Báo cáo doanh thu chi tiết từng bộ phim
+              </h2>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-900 text-zinc-500 uppercase font-black tracking-wider text-[10px]">
+                      <th className="pb-4 font-bold w-12">#</th>
+                      <th className="pb-4 font-bold">Tên tác phẩm phim</th>
+                      <th className="pb-4 text-right font-bold w-48 text-emerald-500">Tổng doanh thu vé</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-zinc-900/40">
+                    {movieRevenue.map((m, index) => (
+                      <tr key={index} className="transition hover:bg-zinc-900/20 group/row">
+                        <td className="py-3.5 font-medium text-zinc-500">{index + 1}</td>
+                        <td className="py-3.5 font-semibold text-zinc-200 group-hover/row:text-emerald-400 transition-colors">
+                          {m.movieName}
+                        </td>
+                        <td className="py-3.5 text-right text-emerald-400 font-bold text-sm">
+                          {formatMoney(m.revenue)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {movieRevenue.length === 0 && (
+                  <div className="py-12 text-center text-xs font-bold uppercase tracking-widest text-zinc-600">Không tìm thấy dữ liệu thu chi trong thời gian chọn</div>
                 )}
               </div>
             </div>
