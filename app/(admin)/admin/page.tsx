@@ -216,7 +216,7 @@ export default function AdminStatisticsPage() {
             {/* ================= KHỐI THẺ CHỈ SỐ CAO CẤP ================= */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
               <StatCard title="Doanh thu ngày hôm nay" value={formatVND(stats.todayRevenue)} icon={<DollarSign size={18} />} theme="rose" />
-              <StatCard title="Tổng lượng vé đã bán" value={`${(stats.todayTickets || 0).toLocaleString()} vé`} icon={<Ticket size={18} />} theme="blue" />
+              <StatCard title="Tổng lượng vé đã bán hôm nay" value={`${(stats.todayTickets || 0).toLocaleString()} vé`} icon={<Ticket size={18} />} theme="blue" />
               <StatCard title="Suất chiếu đang vận hành" value={`${stats.todayShowtimes} suất`} icon={<Film size={18} />} theme="amber" />
               <StatCard title="Tỷ lệ lấp đầy ghế rạp" value={`${(stats.occupancy || 0).toFixed(0)}%`} icon={<TrendingUp size={18} />} theme="emerald" />
             </div>
