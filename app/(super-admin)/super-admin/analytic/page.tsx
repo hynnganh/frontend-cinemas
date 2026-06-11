@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState,useRef } from "react";
 import { apiSuperAdminRequest } from "../../../lib/api";
 
 import {
@@ -16,7 +16,6 @@ import {
 import {
   Loader2,
   Download,
-  Building2,
   Calendar,
   TrendingUp,
   DollarSign,
@@ -39,21 +38,39 @@ type Cinema = {
 };
 
 export default function FinancePage() {
-  const [month, setMonth] = useState("2026-05");
+  // ================= HÀM ĐỘNG TÍNH TOÁN THỜI GIAN HIỆN TẠI =================
+  const getInitialDates = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const monthStr = String(now.getMonth() + 1).padStart(2, "0"); 
+    
+    // Tìm ngày cuối cùng của tháng hiện tại
+    const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+    const lastDayStr = String(lastDay).padStart(2, "0");
+
+    return {
+      currentMonth: `${year}-${monthStr}`,
+      startDateTime: `${year}-${monthStr}-01T00:00`,
+      endDateTime: `${year}-${monthStr}-${lastDayStr}T23:59`,
+    };
+  };
+
+  const initialDates = getInitialDates();
+
+  // Khởi tạo State tự động ăn theo tháng hiện tại của hệ thống
+  const [month, setMonth] = useState(initialDates.currentMonth);
+  const [startDate, setStartDate] = useState(initialDates.startDateTime);
+  const [endDate, setEndDate] = useState(initialDates.endDateTime);
+  const monthInputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<FinanceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cinemas, setCinemas] = useState<Cinema[]>([]);
   const [selectedCinema, setSelectedCinema] = useState("");
-  
-  // Khoảng ngày linh động phục vụ riêng cho kết xuất file báo cáo
-  const [startDate, setStartDate] = useState("2026-05-01T00:00");
-  const [endDate, setEndDate] = useState("2026-05-31T23:59");
 
-  // Lớp CSS tiện ích để biến icon lịch của trình duyệt thành màu trắng dễ nhìn trên nền đen
   const inputStyleFix = "[&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-calendar-picker-indicator]:cursor-pointer";
 
-  // ================= ĐỊNH DẠNG NGÀY GIỜ =================
+  // ================= ĐỊNH DẠNG NGÀY GIỜ GỬI LÊN BACKEND =================
   const formatDate = (date: string) => {
     return date.replace("T", " ") + ":00";
   };
@@ -140,6 +157,20 @@ export default function FinancePage() {
     }
   };
 
+  // ================= LẮNG NGHE SỰ THAY ĐỔI CỦA THÁNG ĐỂ ĐỒNG BỘ BỘ LỌC NGÀY XUẤT EXCEL =================
+  const handleMonthChange = (newMonth: string) => {
+    setMonth(newMonth);
+    if (!newMonth) return;
+
+    // Tự động update Khoảng ngày Từ - Đến của bộ xuất Excel khi Admin đổi chọn tháng ở cục dưới
+    const [year, m] = newMonth.split("-");
+    const lastDay = new Date(parseInt(year), parseInt(m), 0).getDate();
+    const lastDayStr = String(lastDay).padStart(2, "0");
+
+    setStartDate(`${year}-${m}-01T00:00`);
+    setEndDate(`${year}-${m}-${lastDayStr}T23:59`);
+  };
+
   // ================= HIỆU ỨNG EFFECT =================
   useEffect(() => {
     fetchData();
@@ -178,7 +209,7 @@ export default function FinancePage() {
             Báo cáo Tài chính
           </h1>
           <p className="text-sm text-zinc-400 mt-2 font-medium">
-            Hệ thống quản trị số liệu
+            Hệ thống quản trị số liệu chính xác thực tế
           </p>
         </div>
 
@@ -253,7 +284,6 @@ export default function FinancePage() {
           </div>
         </div>
 
-
         {/* ================= KHỐI 2: TRUNG TÂM PHÂN TÍCH BIỂU ĐỒ DOANH SỐ (CỤC DƯỚI) ================= */}
         <div className="space-y-6 pt-6 border-t border-zinc-900">
           
@@ -271,14 +301,41 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="w-full sm:w-auto flex items-center justify-end gap-3 bg-black border border-zinc-800 p-1.5 px-3 rounded-xl">
-              <span className="text-xs font-bold text-zinc-400">Xem dữ liệu tháng:</span>
-              <input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className={`bg-transparent text-xs text-red-500 font-black outline-none transition cursor-pointer ${inputStyleFix}`}
-              />
+            <div className="w-full sm:w-auto flex items-center justify-end gap-3 bg-black border border-zinc-800 p-1.5 px-3 rounded-xl relative group">
+              <span 
+                className="text-xs font-bold text-zinc-400 cursor-pointer select-none"
+                onClick={() => monthInputRef.current?.showPicker()}
+              >
+                Xem dữ liệu:
+              </span>
+              <div className="relative flex items-center gap-2">
+                <span 
+                  className="text-xs text-red-500 font-black cursor-pointer select-none"
+                  onClick={() => monthInputRef.current?.showPicker()}
+                >
+                  {month ? (() => {
+                    const [year, m] = month.split("-");
+                    return `Tháng ${parseInt(m)} / ${year}`;
+                  })() : "Chọn tháng"}
+                </span>
+
+                {/* SỰ KIỆN CLICK ĐÃ ĐƯỢC GẮN TRỰC TIẾP VÀO ICON LỊCH */}
+                <div 
+                  className="text-zinc-400 group-hover:text-white transition-colors z-10 flex items-center cursor-pointer"
+                  onClick={() => monthInputRef.current?.showPicker()}
+                >
+                  <Calendar size={14} />
+                </div>
+
+                {/* Input thật được ẩn đi hoàn toàn bằng CSS, đóng vai trò lưu giá trị và xử lý ngầm */}
+                <input
+                  ref={monthInputRef}
+                  type="month"
+                  value={month}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  className="absolute pointer-events-none opacity-0 w-0 h-0 [color-scheme:dark]"
+                />
+              </div>
             </div>
           </div>
 
