@@ -121,7 +121,7 @@ export default function StaffScannerPage() {
     setConfirmLoading(true);
     try {
       const token = localStorage.getItem("token_admin");
-      const res = await fetch(`http://localhost:8080/api/v1/orders/${orderData.id}/confirm-checkin`, {
+      const res = await fetch(`http://akcinema.vercel.app/api/v1/orders/${orderData.id}/confirm-checkin`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
