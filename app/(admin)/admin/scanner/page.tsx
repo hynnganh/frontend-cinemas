@@ -117,7 +117,6 @@ export default function StaffScannerPage() {
     }
   };
 
-  // 🔥 ĐÃ CẬP NHẬT: Xóa lệnh in, chỉ ghi nhận Database và Reset
   const handleConfirmCheckIn = async () => {
     if (!orderData) return;
 
@@ -137,10 +136,12 @@ export default function StaffScannerPage() {
 
       if (res.ok && result.status === 200) {
         toast.success("Ghi nhận bàn giao thành công!");
-        // Chờ 1 chút để user đọc thông báo rồi tự reset quay về camera
+        
+        // Chỉ lưu DB, bỏ in ấn, tự động quay lại camera sau 1.5s
         setTimeout(() => {
           handleResetScanner();
         }, 1500);
+
       } else {
         toast.error(result.message || "Không thể xác nhận soát vé!");
       }
