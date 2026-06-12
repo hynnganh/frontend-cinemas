@@ -117,7 +117,7 @@ export default function StaffScannerPage() {
     }
   };
 
-  // 🔥 ĐÃ CẬP NHẬT: Xử lý Xác nhận và Tự động bật hộp thoại In vé
+  // 🔥 ĐÃ CẬP NHẬT: Xóa lệnh in, chỉ ghi nhận Database và Reset
   const handleConfirmCheckIn = async () => {
     if (!orderData) return;
 
@@ -136,15 +136,11 @@ export default function StaffScannerPage() {
       const result = await res.json();
 
       if (res.ok && result.status === 200) {
-        toast.success("Đã ghi nhận! Đang tiến hành in vé cứng...");
-        
-        // Chờ nửa giây để DOM Render xong tờ vé, sau đó gọi lệnh In của hệ điều hành
+        toast.success("Ghi nhận bàn giao thành công!");
+        // Chờ 1 chút để user đọc thông báo rồi tự reset quay về camera
         setTimeout(() => {
-          window.print();
-          // Sau khi in xong, tự động reset màn hình cho khách tiếp theo
           handleResetScanner();
-        }, 800);
-
+        }, 1500);
       } else {
         toast.error(result.message || "Không thể xác nhận soát vé!");
       }
@@ -179,9 +175,7 @@ export default function StaffScannerPage() {
 
   return (
     <>
-      {/* ======================= GIAO DIỆN HIỂN THỊ TRÊN MÀN HÌNH ======================= */}
-      {/* Thêm class print:hidden để toàn bộ giao diện này BIẾN MẤT khi bấm in, tránh bị in rác */}
-      <div className="print:hidden min-h-screen bg-[#040406] text-zinc-100 font-sans p-4 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden select-none w-full">
+      <div className="min-h-screen bg-[#040406] text-zinc-100 font-sans p-4 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden select-none w-full">
         <Toaster />
         
         <div className="absolute top-[-10%] left-[-10%] w-[400px] h-[400px] bg-red-600/10 rounded-full blur-[140px] pointer-events-none" />
@@ -345,6 +339,16 @@ export default function StaffScannerPage() {
                       </span>
                     </div>
                   </div>
+
+                  {orderData.cinemaName && (
+                    <div className="flex items-start gap-2 border-t border-zinc-900 pt-3 text-[10px]">
+                      <MapPin size={12} className="text-zinc-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[9px] text-zinc-500 font-black uppercase tracking-wider">Cụm rạp tiếp nhận</p>
+                        <p className="font-bold text-zinc-300 mt-0.5">{orderData.cinemaName}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -376,6 +380,13 @@ export default function StaffScannerPage() {
                 </div>
               </div>
 
+              <div className="p-4 bg-[#0a0a0f] border border-zinc-900 rounded-2xl flex justify-between items-center">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Tổng doanh thu hóa đơn</span>
+                <span className="text-base font-black text-white italic tracking-tight">
+                  {orderData.totalAmount?.toLocaleString()}đ
+                </span>
+              </div>
+
               <div className="flex gap-2.5 pt-1">
                 <button 
                   onClick={handleResetScanner}
@@ -393,7 +404,7 @@ export default function StaffScannerPage() {
                   ) : (
                     <Ticket size={14} strokeWidth={3} />
                   )}
-                  <span>{confirmLoading ? "Đang ghi nhận..." : "Xác nhận & In vé cứng"}</span>
+                  <span>{confirmLoading ? "Đang ghi nhận..." : "Xác nhận bàn giao"}</span>
                 </button>
               </div>
             </div>
@@ -401,82 +412,6 @@ export default function StaffScannerPage() {
         </div>
       </div>
 
-      {/* ======================= GIAO DIỆN CHỈ DÀNH RIÊNG CHO MÁY IN (ẨN TRÊN WEB) ======================= */}
-      {/* Khối này mô phỏng y hệt tờ vé giấy CGV màu hồng của ông */}
-      {orderData && (
-        <div 
-          className="hidden print:flex flex-col bg-[#ffb5c5] text-black w-[80mm] h-auto font-mono absolute top-0 left-0 p-4" 
-          style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
-        >
-          <div className="w-full text-center mb-4">
-            <h1 className="text-2xl font-black mb-1 tracking-wider">A&K CINEMA</h1>
-            <h2 className="text-[13px] font-bold uppercase tracking-widest">Thẻ Vào Phòng Chiếu Phim</h2>
-          </div>
-
-          <div className="w-full text-[11px] leading-relaxed mb-4">
-            <p className="font-bold">A&K Cinema Center Point</p>
-            <p>Tầng M - 1, Khách sạn Liberty Center Saigon City point, 59 - 61 Pasteur, Quận 1</p>
-            <p className="mt-1">Ngày in: {new Date().toLocaleDateString('en-GB')} {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
-            <p>POS: BOX01</p>
-            <p>Staff: BUI HO KHANH LY</p>
-          </div>
-
-          <div className="w-full border-t border-dashed border-black my-2"></div>
-
-          <div className="w-full mb-3">
-            <h3 className="text-[15px] font-black uppercase leading-tight mb-1">{orderData.movieTitle}</h3>
-            <p className="text-[9px] mb-2 font-bold uppercase">PHIM ĐƯỢC PHỔ BIẾN ĐẾN KHÁN GIẢ TỪ 16 TUỔI TRỞ LÊN</p>
-            
-            <div className="flex justify-between items-center text-[12px] font-bold">
-              <span>{orderData.date}</span>
-              <span>{orderData.time}</span>
-            </div>
-            
-            <div className="flex justify-between items-end mt-1">
-              <span className="text-[14px] font-bold">Cinema {orderData.roomName?.replace('Phòng ', '') || "1"}</span>
-              <span className="text-[18px] font-black tracking-widest">{getSeatStringFromData()}</span>
-            </div>
-          </div>
-
-          <div className="w-full border-t border-dashed border-black my-2"></div>
-
-          <div className="w-full text-[11px] mb-2 space-y-1">
-            <div className="flex justify-between font-bold">
-              <span>Adult VIP Ticket</span>
-              <span></span>
-            </div>
-            
-            {/* Lọc danh sách bắp nước */}
-            {orderData.orderDetails?.filter((item: any) => item.itemType === 'COMBO').length > 0 ? (
-              <div className="w-full mt-2">
-                <p className="font-bold mb-1">Dịch vụ bắp nước:</p>
-                {orderData.orderDetails?.filter((item: any) => item.itemType === 'COMBO').map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between">
-                    <span>- {item.itemName} (x{item.quantity})</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            
-            <div className="flex justify-between font-black text-[13px] mt-3">
-              <span>Tổng thanh toán:</span>
-              <span>{orderData.totalAmount?.toLocaleString()} VND</span>
-            </div>
-            <div className="flex justify-between text-[9px] mt-1">
-              <span>(Đã bao gồm 5% và 8% VAT theo luật)</span>
-            </div>
-          </div>
-
-          <div className="w-full border-t border-dashed border-black my-2"></div>
-
-          <div className="w-full text-center mt-3 text-[10px]">
-            <p>Sales No. {new Date().getFullYear()}-{orderData.id.toString().padStart(6, '0')}-0202-2192</p>
-            <p className="mt-6 text-[8px] italic">Xin cảm ơn và chúc quý khách xem phim vui vẻ!</p>
-          </div>
-        </div>
-      )}
-
-      {/* ======================= STYLE CẤU HÌNH TOÀN CỤC ======================= */}
       <style jsx global>{`
         #reader video {
           width: 100% !important;
@@ -487,19 +422,6 @@ export default function StaffScannerPage() {
         #reader { border: none !important; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #222; border-radius: 10px; }
-        
-        /* CẤU HÌNH CHUYÊN BIỆT CHO MÁY IN NHIỆT (80mm) */
-        @media print {
-          @page {
-            margin: 0;
-            size: 80mm auto; /* Cỡ giấy máy in hóa đơn tiêu chuẩn */
-          }
-          body {
-            background-color: #ffb5c5 !important; /* Ép nền màu hồng */
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact;
-          }
-        }
       `}</style>
     </>
   );
