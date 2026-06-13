@@ -40,8 +40,8 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
       try {
         // 1. Fetch thông tin root account
-        const adminRes = await fetch('https://akcinema.vercel.app/api/v1/users/me', {
-          // const adminRes = await fetch('http://localhost:3000/api/v1/users/me', {
+        // const adminRes = await fetch('https://akcinema.vercel.app/api/v1/users/me', {
+          const adminRes = await fetch('http://localhost:3000/api/v1/users/me', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         

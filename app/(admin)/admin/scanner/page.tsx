@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast'; 
 
-const BACKEND_URL = "https://akcinema-api.onrender.com";
-
+// const BACKEND_URL = "https://akcinema-api.onrender.com";
+const BACKEND_URL = "http://localhost:8080";
 export default function StaffScannerPage() {
   const [orderData, setOrderData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
