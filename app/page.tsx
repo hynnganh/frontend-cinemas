@@ -6,7 +6,7 @@ import TopBanner from "./(client)/components/TopBanner";
 import TopMenu from "./(client)/components/TopMenu";
 import Navbar from "./(client)/components/Navbar";
 import Footer from "./(client)/components/Footer";
-
+import ChatBubble from "./(client)/components/home/ChatBubble";
 export default function Home() {
   return (
     <>
@@ -17,6 +17,7 @@ export default function Home() {
       <ComboSection />
       <PostSection />
       <MovieSection />
+      <ChatBubble />
       <Footer />
     </>
   );
