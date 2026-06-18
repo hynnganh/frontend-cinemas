@@ -1,12 +1,20 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, Search, ChevronDown, ShieldCheck, LogOut } from 'lucide-react';
 import Cookies from 'js-cookie';
-import { apiAdminRequest } from "@/app/lib/api"; // Đảm bảo đường dẫn import đúng
+import { apiAdminRequest } from "@/app/lib/api"; 
+import { useRouter, usePathname } from 'next/navigation';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
 
 export default function AdminHeader() {
   const [thongTinAdmin, setThongTinAdmin] = useState<any>(null);
   const [hienMenuCaNhan, setHienMenuCaNhan] = useState(false);
+  const [soTinNhanChuaDoc, setSoTinNhanChuaDoc] = useState(0);
+  
+  const router = useRouter();
+  const pathname = usePathname();
+  const stompClientRef = useRef<Client | null>(null);
 
   const xuLyDangXuat = useCallback(() => {
     const keyToken = 'token_admin';
@@ -17,9 +25,15 @@ export default function AdminHeader() {
     window.location.href = '/login';
   }, []);
 
+  // Nếu đang ở trang Chat thì reset số thông báo về 0
+  useEffect(() => {
+    if (pathname === '/admin/chat') {
+      setSoTinNhanChuaDoc(0);
+    }
+  }, [pathname]);
+
   useEffect(() => {
     const taiThongTin = async () => {
-      // Sử dụng apiAdminRequest thay vì fetch thủ công
       try {
         const res = await apiAdminRequest('/api/v1/users/me');
 
@@ -45,6 +59,39 @@ export default function AdminHeader() {
     taiThongTin();
   }, [xuLyDangXuat]);
 
+  // 🔥 LẮNG NGHE WEBSOCKET CHO CÁI CHUÔNG
+  useEffect(() => {
+    const cinemaId = thongTinAdmin?.managedCinemaItemId;
+    if (!cinemaId || stompClientRef.current?.active) return;
+
+    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+    const client = new Client({
+      webSocketFactory: () => new SockJS(`${BACKEND_URL}/ws`),
+      reconnectDelay: 5000,
+    });
+
+    client.onConnect = () => {
+      client.subscribe(`/topic/admin.notifications.cinema.${cinemaId}`, (msg) => {
+        // Nếu không ở trang chat thì mới tăng số thông báo
+        if (window.location.pathname !== '/admin/chat') {
+          setSoTinNhanChuaDoc(prev => prev + 1);
+          // Phát âm thanh nhẹ khi có thông báo (Tùy chọn)
+          try {
+            const audio = new Audio('/notification.mp3');
+            audio.play().catch(() => {});
+          } catch(e) {}
+        }
+      });
+    };
+
+    client.activate();
+    stompClientRef.current = client;
+
+    return () => {
+      if (client.active) client.deactivate();
+    };
+  }, [thongTinAdmin]);
+
   return (
     <header className="h-20 border-b border-zinc-900 bg-[#060608] px-6 md:px-10 flex items-center justify-between sticky top-0 z-50 shrink-0 select-none">
       
@@ -64,10 +111,18 @@ export default function AdminHeader() {
       {/* PHẦN TIỆN ÍCH BÊN PHẢI */}
       <div className="flex items-center gap-4 md:gap-6">
         
-        {/* THÔNG BÁO */}
-        <button className="relative p-2.5 bg-zinc-950 border border-zinc-900 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all group">
-          <Bell size={16} className="group-hover:rotate-12 transition-transform" />
-          <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-red-600 rounded-full border border-[#060608] animate-pulse"></span>
+        {/* 🔥 NÚT CHUÔNG THÔNG BÁO TỚI PHÒNG CHAT */}
+        <button 
+          onClick={() => router.push('/admin/chat')}
+          className="relative p-2.5 bg-zinc-950 border border-zinc-900 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all group"
+        >
+          <Bell size={16} className={`${soTinNhanChuaDoc > 0 ? 'animate-swing text-white' : 'group-hover:rotate-12 transition-transform'}`} />
+          
+          {soTinNhanChuaDoc > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 rounded-full border-2 border-[#060608] text-[9px] font-black text-white flex items-center justify-center animate-in zoom-in shadow-[0_0_10px_rgba(220,38,38,0.5)]">
+              {soTinNhanChuaDoc > 9 ? '9+' : soTinNhanChuaDoc}
+            </span>
+          )}
         </button>
         
         <div className="h-6 w-[1px] bg-zinc-900 hidden sm:block"></div>
@@ -108,7 +163,7 @@ export default function AdminHeader() {
             <ChevronDown size={12} className={`text-zinc-600 transition-transform duration-300 ${hienMenuCaNhan ? 'rotate-180' : ''}`} />
           </button>
 
-          {/* MENU CHI TIẾT KHI BẤM VÀO TÀI KHOẢN */}
+          {/* MENU CHI TIẾT */}
           {hienMenuCaNhan && (
             <>
               <div className="fixed inset-0 z-[-1]" onClick={() => setHienMenuCaNhan(false)} />
@@ -131,6 +186,19 @@ export default function AdminHeader() {
           )}
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes swing {
+          20% { transform: rotate(15deg); }
+          40% { transform: rotate(-10deg); }
+          60% { transform: rotate(5deg); }
+          80% { transform: rotate(-5deg); }
+          100% { transform: rotate(0deg); }
+        }
+        .animate-swing {
+          animation: swing 1s ease-in-out infinite;
+        }
+      `}</style>
     </header>
   );
 }

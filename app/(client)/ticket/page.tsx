@@ -4,16 +4,32 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, X, Ticket as TicketIcon, Check, AlertTriangle, Calendar, Clock, MapPin, Film } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api'; 
 import { QRCodeSVG } from 'qrcode.react';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import OrderTicketItem from './OrderTicketItem';
 
+// 🔥 VÁ LỖI: Kiểm tra vé hết hạn chuẩn xác
 const checkIsExpired = (dateStr: string, timeStr: string) => {
-  if (!dateStr || !timeStr) return false;
-  const [day, month, year] = dateStr.split('/').map(Number);
-  const startTime = timeStr.split('-')[0].trim(); 
-  const [hours, minutes] = startTime.split(':').map(Number);
-  const movieTime = new Date(year, month - 1, day, hours, minutes);
-  return movieTime < new Date();
+  if (!dateStr || !timeStr || dateStr === "N/A") return false;
+  try {
+    let year, month, day;
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('T')[0].split('-');
+      year = Number(parts[0]); month = Number(parts[1]); day = Number(parts[2]);
+    } else if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      day = Number(parts[0]); month = Number(parts[1]); year = Number(parts[2]);
+    } else {
+      return false;
+    }
+
+    const startTime = timeStr.split('-')[0].trim(); 
+    const [hours, minutes] = startTime.split(':').map(Number);
+    
+    const movieTime = new Date(year, month - 1, day, hours, minutes);
+    return movieTime < new Date();
+  } catch (error) {
+    return false;
+  }
 };
 
 export default function TicketsTab() {
@@ -25,11 +41,78 @@ export default function TicketsTab() {
   useEffect(() => {
     const fetchOrderHistory = async () => {
       try {
-        const res = await apiRequest('/api/v1/orders/my-history');
+        // 🔥 VÁ LỖI MẠNH: Thêm tham số Timestamp để chặn Cache của Next.js, ép lấy data mới nhất!
+        const res = await apiRequest(`/api/v1/orders/my-history?t=${new Date().getTime()}`);
         if (res.ok) {
           const result = await res.json();
-          const validOrders = (result.data || []).filter((o: any) => o.status === 'PAID' || o.status === 'USED');
+          
+          let rawData: any[] = [];
+          if (Array.isArray(result)) rawData = result;
+          else if (result.data && Array.isArray(result.data)) rawData = result.data;
+          else if (result.content && Array.isArray(result.content)) rawData = result.content;
+
+          const groupedTickets: Record<string, any> = {};
+          const normalizedOrders: any[] = [];
+
+          rawData.forEach((item: any) => {
+            if (item.orderDetails) {
+              normalizedOrders.push({
+                ...item,
+                date: item.date || "N/A",
+                time: item.time || "N/A",
+                movieTitle: item.movieTitle || "Vé Xem Phim"
+              });
+              return;
+            }
+
+            const code = item.bookingCode || `AK${item.id}`;
+            if (!groupedTickets[code]) {
+              let dateStr = "N/A";
+              let timeStr = "N/A";
+
+              // 🔥 VÁ LỖI MÚI GIỜ: Bóc tách chuỗi trực tiếp thay vì dùng new Date()
+              if (item.showtime && item.showtime.startTime) {
+                const [datePart, timePart] = item.showtime.startTime.split('T');
+                if (datePart && timePart) {
+                  const [y, m, d] = datePart.split('-');
+                  const [hrs, mins] = timePart.split(':');
+                  dateStr = `${d}/${m}/${y}`;
+                  timeStr = `${hrs}:${mins}`;
+                }
+              }
+
+              groupedTickets[code] = {
+                id: item.id,
+                bookingCode: code,
+                status: item.status,
+                date: dateStr,
+                time: timeStr,
+                movieTitle: item.showtime?.movie?.title || "Vé Xem Phim",
+                cinemaName: "A&K Cinema",
+                roomName: "PHÒNG CHIẾU",
+                createdAt: item.createdAt,
+                orderDetails: []
+              };
+            }
+
+            if (item.seatName || item.seat?.name) {
+              const sName = item.seatName || item.seat?.name;
+              groupedTickets[code].orderDetails.push({
+                itemType: 'TICKET',
+                itemName: `Ghế ${sName}`
+              });
+            }
+          });
+
+          const finalOrders = [...normalizedOrders, ...Object.values(groupedTickets)];
+          
+          // Lọc vé PAID/USED và sắp xếp vé mới mua nhất lên trên cùng
+          const validOrders = finalOrders.filter((o: any) => o.status === 'PAID' || o.status === 'USED');
+          validOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          
           setOrders(validOrders);
+        } else {
+          toast.error("Không thể tải lịch sử vé!");
         }
       } catch (err) { 
         console.error("Lỗi lấy lịch sử vé: ", err); 
@@ -42,31 +125,23 @@ export default function TicketsTab() {
 
   const filteredOrders = orders.filter(o => {
     const isExpired = o.status === 'PAID' && checkIsExpired(o.date, o.time);
-    if (activeFilter === 'upcoming') {
-      return o.status === 'PAID' && !isExpired;
-    }
-    if (activeFilter === 'done') {
-      return o.status === 'USED' || isExpired;
-    }
+    if (activeFilter === 'upcoming') return o.status === 'PAID' && !isExpired;
+    if (activeFilter === 'done') return o.status === 'USED' || isExpired;
     return true;
   });
 
   const getModalBookingCode = () => {
     if (!selectedOrder) return "A&K-CINEMA";
-    if (selectedOrder.bookingCode) return selectedOrder.bookingCode.toUpperCase();
-    const ticketDetail = selectedOrder.orderDetails?.find((d: any) => d.itemType === 'TICKET');
-    if (ticketDetail && ticketDetail.itemName) {
-      return `AK${selectedOrder.id}X${selectedOrder.createdAt?.substring(14,16) || "9K"}`;
-    }
-    return `AK-COMBO${selectedOrder.id}`;
+    return selectedOrder.bookingCode;
   };
 
   const cleanSeatsDisplay = () => {
     if (!selectedOrder) return "N/A";
     const tickets = selectedOrder.orderDetails?.filter((d: any) => d.itemType === 'TICKET') || [];
+    if (tickets.length === 0) return "N/A";
     return tickets.map((t: any) => {
       const match = t.itemName.match(/Ghế\s+([A-Z0-9]+)/i);
-      return match ? match[1] : "...";
+      return match ? match[1] : t.itemName.replace('Ghế ', '');
     }).sort().join(", ");
   };
 
@@ -75,9 +150,9 @@ export default function TicketsTab() {
 
   return (
     <div className="min-h-screen bg-[#040406] text-white px-4 sm:px-6 lg:px-64 py-12 relative overflow-hidden">
-      <Toaster />
+      <Toaster position="top-center" />
       
-      {/* Hiệu ứng mờ góc nền Điện ảnh */}
+      {/* Hiệu ứng nền */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[130px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[130px] pointer-events-none" />
 
@@ -88,7 +163,7 @@ export default function TicketsTab() {
            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] mt-1.5">Hệ thống quản lý vé thông minh</p>
         </div>
 
-        {/* Nút chuyển đổi bộ lọc */}
+        {/* Nút lọc */}
         <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-900 gap-1 shadow-inner self-start sm:self-auto">
           {[
             { id: 'upcoming', label: 'Vé sắp xem' },
@@ -129,16 +204,13 @@ export default function TicketsTab() {
         </div>
       )}
 
-{/* MODAL CHI TIẾT VÉ - BỐ CỤC NGANG ĐIỆN ẢNH */}
+      {/* MODAL CHI TIẾT VÉ */}
       {selectedOrder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 select-none">
-          {/* Lớp nền mờ */}
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300" onClick={() => setSelectedOrder(null)} />
           
-          {/* Container chính dạng Ngang (Chống tràn 100%) */}
           <div className="relative bg-zinc-950 border border-zinc-850 rounded-[2rem] w-full max-w-2xl max-h-[85vh] shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col md:flex-row animate-in zoom-in-95 duration-200 z-10">
             
-            {/* Nút đóng góc trên phải */}
             <button 
               onClick={() => setSelectedOrder(null)} 
               className="absolute top-4 right-4 z-30 p-2 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white transition-all shadow-md hover:scale-105 active:scale-95"
@@ -146,16 +218,14 @@ export default function TicketsTab() {
               <X size={14} strokeWidth={2.5}/>
             </button>
 
-            {/* VẾ KHÁCH HÀNG (BÊN TRÁI): THÔNG TIN PHIM */}
+            {/* BÊN TRÁI: THÔNG TIN PHIM */}
             <div className="flex-1 p-6 md:p-8 flex flex-col justify-between overflow-y-auto no-scrollbar">
               <div className="space-y-5">
-                {/* Header nhỏ */}
                 <div className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.25em] text-zinc-500 uppercase">
                   <Film size={12} className="text-red-500" />
                   A&K Cinema Pass
                 </div>
 
-                {/* Tên phim */}
                 <div>
                   <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Tác phẩm điện ảnh</span>
                   <h3 className="text-xl font-black text-white uppercase tracking-tight leading-tight">
@@ -163,7 +233,6 @@ export default function TicketsTab() {
                   </h3>
                 </div>
 
-                {/* Chi tiết suất chiếu & Ghế */}
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-zinc-900">
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
@@ -187,7 +256,7 @@ export default function TicketsTab() {
                       Phòng chiếu
                     </div>
                     <span className="text-sm font-black text-red-500 mt-1 uppercase tracking-wide">
-                      {selectedOrder.roomName || "PHÒNG 01"}
+                      {selectedOrder.roomName || "PHÒNG CHIẾU"}
                     </span>
                   </div>
 
@@ -201,24 +270,8 @@ export default function TicketsTab() {
                     </span>
                   </div>
                 </div>
-
-                {/* Hiển thị Combo nếu có */}
-                {selectedOrder.orderDetails?.some((d: any) => d.itemType === 'COMBO') && (
-                  <div className="border-t border-zinc-900 pt-4">
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block mb-2">Combo đi kèm</span>
-                    <div className="space-y-1.5 max-h-[60px] overflow-y-auto pr-0.5 no-scrollbar">
-                      {selectedOrder.orderDetails.filter((d: any) => d.itemType === 'COMBO').map((combo: any) => (
-                        <div key={combo.id} className="flex justify-between items-center text-xs font-semibold text-zinc-400">
-                          <span className="truncate max-w-[200px]">{combo.itemName}</span>
-                          <span className="text-pink-500 font-bold bg-pink-950/20 px-2 py-0.5 rounded border border-pink-900/30 text-[10px]">x{combo.quantity}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Status Bar phía dưới bên trái */}
               <div className={`mt-6 py-2 px-4 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border text-center md:text-left w-fit ${
                 (isSelectedUsed || isSelectedExpired) 
                   ? 'bg-zinc-900/40 text-zinc-500 border-zinc-900' 
@@ -232,17 +285,15 @@ export default function TicketsTab() {
               </div>
             </div>
 
-            {/* ĐƯỜNG CHIA ĐỨT ĐOẠN / RĂNG CƯA GIỮA VÉ VÀ CUỐNG VÉ */}
             <div className="hidden md:flex flex-col justify-between py-6 relative w-[1px] border-r border-dashed border-zinc-800">
               <div className="absolute -top-3 -left-2.5 w-5 h-5 rounded-full bg-[#040406] border-b border-zinc-850" />
               <div className="absolute -bottom-3 -left-2.5 w-5 h-5 rounded-full bg-[#040406] border-t border-zinc-850" />
             </div>
 
-            {/* CUỐNG VÉ KIỂM SOÁT (BÊN PHẢI): QR CODE */}
+            {/* BÊN PHẢI: QR CODE */}
             <div className={`w-full md:w-64 p-6 md:p-8 flex flex-col items-center justify-center border-t md:border-t-0 border-zinc-900 shrink-0 ${
               (isSelectedUsed || isSelectedExpired) ? 'bg-zinc-950' : 'bg-gradient-to-b md:bg-gradient-to-l from-red-950/[0.05] to-transparent'
             }`}>
-              {/* Vùng chứa QR */}
               <div className="relative p-3 rounded-2xl bg-zinc-900 border border-zinc-800/60 shadow-inner">
                 <div className={`bg-white p-3 rounded-xl shadow-md transition-all duration-300 ${
                   (isSelectedUsed || isSelectedExpired) ? 'opacity-25 grayscale blur-[0.5px]' : ''
@@ -250,7 +301,6 @@ export default function TicketsTab() {
                   <QRCodeSVG value={getModalBookingCode()} size={130} level="H" includeMargin={false} />
                 </div>
                 
-                {/* Stamp đè lên khi hết hạn/đã dùng */}
                 {(isSelectedUsed || isSelectedExpired) && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4 rotate-[-12deg]">
                     <div className={`border-2 backdrop-blur-sm px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-2xl ${
@@ -265,7 +315,6 @@ export default function TicketsTab() {
                 )}
               </div>
 
-              {/* Mã chữ số dưới QR */}
               <div className="mt-4 flex flex-col items-center w-full">
                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Mã đặt vé</span>
                 <div className={`px-4 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800/50 font-mono text-xs font-black tracking-[0.2em] shadow-sm bg-gradient-to-b from-zinc-900 to-zinc-950 text-center w-full max-w-[180px] ${
@@ -275,7 +324,6 @@ export default function TicketsTab() {
                 </div>
               </div>
 
-              {/* Dòng nhắc nhở soát vé cho nhân viên */}
               <p className={`mt-5 text-[9px] font-bold text-center tracking-wide ${
                 (isSelectedUsed || isSelectedExpired) ? 'text-zinc-600' : 'text-zinc-400'
               }`}>

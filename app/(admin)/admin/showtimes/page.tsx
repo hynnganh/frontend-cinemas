@@ -28,7 +28,7 @@ export default function AdminShowtimePage() {
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
-  // Kiểm tra ngày hiển thị (cả ngày là quá khứ)
+  // Kiểm tra ngày hiển thị (cả ngày là quá khứ) để chặn nút Tạo suất chiếu
   const isPastDate = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -37,7 +37,7 @@ export default function AdminShowtimePage() {
     return target < today;
   }, [selectedDate]);
 
-  // Kiểm tra thời gian chi tiết của suất chiếu
+  // Kiểm tra thời gian chi tiết của từng suất chiếu
   const isPastShowtime = (startTime: string) => {
     return new Date(startTime) < new Date();
   };
@@ -84,7 +84,10 @@ export default function AdminShowtimePage() {
       const [cinema, show, room, movie] = await Promise.all([c.json(), s.json(), r.json(), m.json()]);
 
       setCinemaName(cinema.data?.name);
+      
+      // 🔥 ĐÃ SỬA: Lấy toàn bộ lịch sử suất chiếu (không lọc bỏ quá khứ nữa)
       setShowtimes(show.data || []);
+      
       setRooms(room.data || []);
       setMovies(movie.data?.content || movie.data || []);
     } catch (e) {
@@ -97,37 +100,35 @@ export default function AdminShowtimePage() {
     loadData();
   }, [loadData]);
 
-const handleSave = async (data: any) => {
-  const tid = toast.loading("Đang xử lý...");
-  try {
-    const res = await apiAdminRequest(
-      data.id ? `/api/v1/showtimes/${data.id}` : "/api/v1/showtimes",
-      {
-        method: data.id ? "PUT" : "POST",
-        body: JSON.stringify({ ...data, cinemaItemId: cinemaId, price: 75000 }),
+  const handleSave = async (data: any) => {
+    const tid = toast.loading("Đang xử lý...");
+    try {
+      const res = await apiAdminRequest(
+        data.id ? `/api/v1/showtimes/${data.id}` : "/api/v1/showtimes",
+        {
+          method: data.id ? "PUT" : "POST",
+          body: JSON.stringify({ ...data, cinemaItemId: cinemaId, price: 75000 }),
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        const errorMessage = result.message || result.error || "Lỗi không xác định";
+        throw new Error(errorMessage);
       }
-    );
 
-    // Chuyển kết quả sang dạng JSON để đọc message lỗi
-    const result = await res.json();
-
-    if (!res.ok) {
-      // Nếu Backend có trả về message thì lấy, không thì lấy mặc định
-      const errorMessage = result.message || result.error || "Lỗi không xác định";
-      throw new Error(errorMessage);
+      toast.success("Thành công!", { id: tid });
+      setIsModalOpen(false);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message || "Lỗi xử lý lịch chiếu!", { id: tid });
     }
-
-    toast.success("Thành công!", { id: tid });
-    setIsModalOpen(false);
-    loadData();
-  } catch (error: any) {
-    // Bây giờ toast sẽ hiện nội dung thật sự từ Backend (ví dụ: "Trùng giờ chiếu")
-    toast.error(error.message || "Lỗi xử lý lịch chiếu!", { id: tid });
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-[#000000] text-zinc-300 p-6 font-sans antialiased select-none tracking-tight">
+      <Toaster position="top-right" />
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-900 pb-5">
           <div className="flex items-center gap-3.5">
@@ -146,6 +147,7 @@ const handleSave = async (data: any) => {
             >
               <Upload size={16} /> Import Excel
             </button>
+            {/* Chặn nút tạo mới nếu đang xem ngày trong quá khứ */}
             {!isPastDate && (
               <button
                 onClick={() => { setSelectedItem(null); setIsModalOpen(true); }}
@@ -157,7 +159,14 @@ const handleSave = async (data: any) => {
           </div>
         </div>
 
-        <input type="date" ref={dateInputRef} value={selectedDate} onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }} className="absolute opacity-0 pointer-events-none w-0 h-0" />
+        {/* Input ẩn để gọi bộ chọn lịch */}
+        <input 
+          type="date" 
+          ref={dateInputRef} 
+          value={selectedDate} 
+          onChange={(e) => { if (e.target.value) setSelectedDate(e.target.value); }} 
+          className="absolute opacity-0 pointer-events-none w-0 h-0" 
+        />
 
         <div className="flex items-center justify-between bg-zinc-950 border border-zinc-900 p-2 rounded-xl gap-3">
           <div className="flex items-center gap-2">
@@ -168,9 +177,17 @@ const handleSave = async (data: any) => {
             {weekTabs.map((d) => {
               const active = selectedDate === d.full;
               return (
-                <button key={d.full} onClick={() => setSelectedDate(d.full)} className={`flex flex-col items-center justify-center py-2 rounded-lg transition-all border ${active ? "bg-red-600 border-red-600 text-white font-black shadow-md shadow-red-900/10" : "bg-zinc-900/30 border-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300"}`}>
-                  <span className={`text-[9px] font-black uppercase tracking-wider ${active ? "text-red-100" : "text-zinc-600"}`}>{d.label}</span>
-                  <span className="text-sm font-black mt-1">{d.dayNum}</span>
+                <button 
+                  key={d.full} 
+                  onClick={() => setSelectedDate(d.full)} 
+                  className={`flex flex-col items-center justify-center py-2 rounded-lg transition-all border ${
+                    active 
+                      ? "bg-red-600 border-red-600 text-white font-black shadow-md shadow-red-900/10" 
+                      : "bg-zinc-900/30 border-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  <span className={`text-[9px] font-black uppercase tracking-wider ${active ? "text-red-100" : d.isOld ? "text-zinc-600" : "text-zinc-500"}`}>{d.label}</span>
+                  <span className={`text-sm font-black mt-1 ${d.isOld && !active ? 'text-zinc-600' : ''}`}>{d.dayNum}</span>
                 </button>
               );
             })}
@@ -187,17 +204,34 @@ const handleSave = async (data: any) => {
           ) : rooms.map((room) => {
             const currentShowtimes = showtimes.filter((s) => s.startTime?.startsWith(selectedDate) && s.room?.id === room.id);
             return (
-              <div key={room.id} className={`p-5 flex flex-col md:flex-row items-start md:items-center gap-5 ${isPastDate ? "opacity-50 grayscale" : ""}`}>
+              <div key={room.id} className="p-5 flex flex-col md:flex-row items-start md:items-center gap-5">
                 <div className="w-full md:w-36 shrink-0">
-                  <span className="inline-block px-4 py-1.5 bg-zinc-900 border border-zinc-800 text-xs font-black uppercase text-white rounded-lg tracking-wide">{room.name}</span>
+                  <span className={`inline-block px-4 py-1.5 border text-xs font-black uppercase rounded-lg tracking-wide ${isPastDate ? 'bg-zinc-950 border-zinc-900 text-zinc-600' : 'bg-zinc-900 border-zinc-800 text-white'}`}>
+                    {room.name}
+                  </span>
                 </div>
                 <div className="flex-1 flex flex-wrap items-center gap-2.5 w-full">
                   {currentShowtimes.map((s) => {
                     const isPast = isPastShowtime(s.startTime);
                     return (
-                      <div key={s.id} onClick={() => !isPast && router.push(`/admin/showtimes/${s.id}`)} className={`group relative inline-flex items-center gap-3 bg-zinc-900 border border-zinc-800 px-3.5 py-2 rounded-lg ${isPast ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-red-600/40 hover:bg-zinc-900/60"} transition-all text-white`}>
-                        <span className="text-xs font-black tracking-tight text-white group-hover:text-red-500 transition-colors">{s.startTime.split("T")[1].substring(0, 5)}</span>
-                        {s.movie && <span className="text-[11px] font-bold text-zinc-400 max-w-[120px] truncate">{s.movie.title || s.movie.name}</span>}
+                      <div 
+                        key={s.id} 
+                        onClick={() => router.push(`/admin/showtimes/${s.id}`)} 
+                        className={`group relative inline-flex items-center gap-3 border px-3.5 py-2 rounded-lg cursor-pointer transition-all ${
+                          isPast 
+                            ? "bg-zinc-950/50 border-zinc-900 text-zinc-500 opacity-70 hover:bg-zinc-900 hover:opacity-100" 
+                            : "bg-zinc-900 border-zinc-800 text-white hover:border-red-600/40 hover:bg-zinc-900/60"
+                        }`}
+                        title={isPast ? "Nhấp để xem lịch sử vé" : "Nhấp để xem chi tiết"}
+                      >
+                        <span className={`text-xs font-black tracking-tight transition-colors ${isPast ? 'text-zinc-500' : 'text-white group-hover:text-red-500'}`}>
+                          {s.startTime.split("T")[1].substring(0, 5)}
+                        </span>
+                        {s.movie && <span className={`text-[11px] font-bold max-w-[120px] truncate ${isPast ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                          {s.movie.title || s.movie.name}
+                        </span>}
+                        
+                        {/* Chỉ hiện nút sửa khi suất chiếu chưa diễn ra */}
                         {!isPast && (
                           <button onClick={(e) => { e.stopPropagation(); setSelectedItem(s); setIsModalOpen(true); }} className="text-zinc-600 hover:text-white transition-colors pl-1">
                             <Edit3 size={13} />
@@ -206,6 +240,8 @@ const handleSave = async (data: any) => {
                       </div>
                     );
                   })}
+                  
+                  {/* Nút cộng suất chiếu bị ẩn đi nếu ở ngày quá khứ */}
                   {!isPastDate && (
                     <button onClick={() => { setSelectedItem({ roomId: room.id, startTime: selectedDate }); setIsModalOpen(true); }} className="inline-flex items-center justify-center w-9 h-8 border border-dashed border-zinc-800 text-zinc-500 hover:text-red-500 hover:border-red-500/40 rounded-lg transition-all bg-zinc-950">
                       <Plus size={14} />

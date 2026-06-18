@@ -4,12 +4,35 @@ import React from 'react';
 import { Calendar, Check, Clock, Coffee, ChevronRight, MapPin, AlertTriangle } from 'lucide-react';
 
 const checkIsExpired = (dateStr: string, timeStr: string) => {
-  if (!dateStr || !timeStr) return false;
-  const [day, month, year] = dateStr.split('/').map(Number);
-  const startTime = timeStr.split('-')[0].trim(); 
-  const [hours, minutes] = startTime.split(':').map(Number);
-  const movieTime = new Date(year, month - 1, day, hours, minutes);
-  return movieTime < new Date();
+  if (!dateStr || !timeStr || dateStr === "N/A") return false;
+  try {
+    let year, month, day;
+    
+    // Nếu BE trả về '2026-06-17'
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('T')[0].split('-');
+      year = Number(parts[0]);
+      month = Number(parts[1]);
+      day = Number(parts[2]);
+    } 
+    // Nếu BE trả về '17/06/2026'
+    else if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      day = Number(parts[0]);
+      month = Number(parts[1]);
+      year = Number(parts[2]);
+    } else {
+      return false;
+    }
+
+    const startTime = timeStr.split('-')[0].trim(); 
+    const [hours, minutes] = startTime.split(':').map(Number);
+    
+    const movieTime = new Date(year, month - 1, day, hours, minutes);
+    return movieTime < new Date();
+  } catch (error) {
+    return false;
+  }
 };
 
 interface OrderTicketItemProps {
@@ -27,7 +50,7 @@ export default function OrderTicketItem({ order, onOpenDetail }: OrderTicketItem
 
   const seatNames = tickets.map((t: any) => {
     const match = t.itemName.match(/Ghế\s+([A-Z0-9]+)/i);
-    return match ? match[1] : "...";
+    return match ? match[1] : t.itemName;
   }).sort().join(", ");
 
   return (

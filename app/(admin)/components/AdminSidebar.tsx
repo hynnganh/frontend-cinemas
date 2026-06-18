@@ -10,7 +10,8 @@ import {
   ShoppingBag,
   Film,
   ChevronRight,
-  QrCode // 🔥 THÊM MỚI: Import icon QrCode xịn sò ở đây
+  QrCode,
+  MessageSquare // 🔥 THÊM ICON CHAT
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -28,8 +29,9 @@ export default function AdminSidebar() {
     { name: 'Quản lý Đơn hàng', icon: Ticket, href: '/admin/orders' }, 
     { name: 'Quản lý Combo', icon: ShoppingBag, href: '/admin/combos' },
     { name: 'Khách hàng', icon: Users, href: '/admin/users' },
-    // 🔥 THÊM MỚI: Mục quét mã QR dành cho nhân viên tại quầy soát vé
     { name: 'Quét mã QR', icon: QrCode, href: '/admin/scanner' }, 
+    // 🔥 THÊM MỚI MỤC CHAT VÀO ĐÂY
+    { name: 'Hỗ trợ CSKH', icon: MessageSquare, href: '/admin/chat' }, 
   ];
 
   const xuLyDangXuat = () => {
@@ -72,7 +74,7 @@ export default function AdminSidebar() {
         <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider px-3 mb-3">Danh mục quản lý</p>
         
         {danhSachMenu.map((link) => {
-          const dangKichHoat = pathname === link.href;
+          const dangKichHoat = pathname.startsWith(link.href) && (link.href !== '/admin' || pathname === '/admin');
           return (
             <Link
               key={link.href}
@@ -120,13 +122,8 @@ export default function AdminSidebar() {
       </div>
 
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 0px;
-        }
-        .custom-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 0px; }
+        .custom-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
       `}</style>
     </aside>
   );
