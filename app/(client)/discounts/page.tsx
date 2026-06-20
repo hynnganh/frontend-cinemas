@@ -21,6 +21,12 @@ import {
 
 import { apiRequest } from '@/app/lib/api';
 
+// Hàm helper lọc các voucher còn hạn (hoặc không có HSD)
+const isNotExpired = (voucher: any) => {
+  if (!voucher.endDate) return true;
+  return new Date(voucher.endDate).getTime() >= new Date().getTime();
+};
+
 export default function MyVoucherWallet() {
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [marketVouchers, setMarketVouchers] = useState<any[]>([]);
@@ -31,9 +37,7 @@ export default function MyVoucherWallet() {
   });
 
   const [loading, setLoading] = useState(true);
-
   const [activeTab, setActiveTab] = useState<'my' | 'market'>('my');
-
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -105,6 +109,10 @@ export default function MyVoucherWallet() {
     fetchData();
   }, [fetchData]);
 
+  // Lọc sẵn danh sách hiển thị đã loại bỏ voucher hết hạn
+  const validMyVouchers = vouchers.filter(isNotExpired);
+  const validMarketVouchers = marketVouchers.filter(isNotExpired);
+
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-300 p-4 md:p-8">
       <div className="max-w-3xl mx-auto">
@@ -166,13 +174,13 @@ export default function MyVoucherWallet() {
               <Loader2 className="animate-spin text-red-600" />
             </div>
           ) : activeTab === 'my' ? (
-            vouchers.length > 0 ? (
-              vouchers.map((v) => <VoucherCard key={v.id} v={v} />)
+            validMyVouchers.length > 0 ? (
+              validMyVouchers.map((v) => <VoucherCard key={v.id} v={v} />)
             ) : (
               <EmptyState />
             )
-          ) : marketVouchers.length > 0 ? (
-            marketVouchers.map((v) => {
+          ) : validMarketVouchers.length > 0 ? (
+            validMarketVouchers.map((v) => {
               const alreadyOwned = vouchers.some(
                 (myVoucher) =>
                   myVoucher.id === v.id ||
@@ -216,8 +224,6 @@ export default function MyVoucherWallet() {
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
               {pointHistory.length > 0 ? (
                 pointHistory.map((h: any) => {
-                  
-                  // LOGIC NHẬN DIỆN CỘNG/TRỪ ĐIỂM LINH HOẠT HƠN
                   const typeStr = String(h.type || '').toUpperCase();
                   
                   const isAddType = typeStr.includes('ADD') || typeStr.includes('EARN') || typeStr.includes('REWARD') || typeStr.includes('REFUND');
@@ -228,7 +234,6 @@ export default function MyVoucherWallet() {
                   else if (isMinusType) isPositive = false;
                   else isPositive = Number(h.amount) > 0;
 
-                  // Lấy trị tuyệt đối để tránh hiện dấu "--" nếu backend gửi số âm
                   const displayAmount = Math.abs(Number(h.amount));
 
                   return (
@@ -287,18 +292,14 @@ function VoucherCard({ v }: { v: any }) {
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-[#101010] to-[#161616] border border-zinc-800 rounded-3xl p-5 hover:border-zinc-700 transition-all duration-300">
-      {/* BG EFFECT */}
       <div className="absolute top-0 right-0 w-40 h-40 bg-red-500/5 blur-3xl rounded-full" />
 
       <div className="relative z-10 flex items-start gap-4">
-        {/* ICON */}
         <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
           <Ticket size={28} className="text-red-500" />
         </div>
 
-        {/* CONTENT */}
         <div className="flex-1 min-w-0">
-          {/* TOP */}
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-base font-black uppercase tracking-wide text-white">
               {v.title}
@@ -311,14 +312,12 @@ function VoucherCard({ v }: { v: any }) {
             )}
           </div>
 
-          {/* DESCRIPTION */}
           {v.description && (
             <p className="mt-2 text-[12px] leading-relaxed text-zinc-400">
               {v.description}
             </p>
           )}
 
-          {/* INFO */}
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {v.discountValue && (
               <div className="flex items-center gap-1 text-[11px] font-bold text-white">
@@ -345,7 +344,6 @@ function VoucherCard({ v }: { v: any }) {
             )}
           </div>
 
-          {/* CODE */}
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <div className="bg-black/50 border border-zinc-800 px-3 py-2 rounded-xl text-[11px] tracking-[0.25em] font-mono text-zinc-300 uppercase">
               {v.code}
@@ -360,7 +358,6 @@ function VoucherCard({ v }: { v: any }) {
           </div>
         </div>
 
-        {/* COPY */}
         <button
           onClick={handleCopy}
           className="w-11 h-11 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-white hover:border-zinc-700 transition shrink-0"
@@ -413,20 +410,15 @@ function MarketCard({
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-[#101010] to-[#161616] border border-zinc-800 rounded-3xl p-5 hover:border-zinc-700 transition-all duration-300">
-      {/* BG EFFECT */}
       <div className="absolute top-0 right-0 w-40 h-40 bg-red-500/5 blur-3xl rounded-full" />
 
       <div className="relative z-10 flex items-start justify-between gap-4">
-        {/* LEFT */}
         <div className="flex items-start gap-4 flex-1 min-w-0">
-          {/* ICON */}
           <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
             <Ticket size={28} className="text-red-500" />
           </div>
 
-          {/* CONTENT */}
           <div className="min-w-0 flex-1">
-            {/* TOP */}
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="text-base font-black uppercase tracking-wide text-white">
                 {v.title}
@@ -445,14 +437,12 @@ function MarketCard({
               )}
             </div>
 
-            {/* DESCRIPTION */}
             {v.description && (
               <p className="mt-2 text-[12px] leading-relaxed text-zinc-400">
                 {v.description}
               </p>
             )}
 
-            {/* INFO */}
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {v.discountValue && (
                 <div className="flex items-center gap-1 text-[11px] font-bold text-white">
@@ -479,7 +469,6 @@ function MarketCard({
               )}
             </div>
 
-            {/* FOOTER */}
             <div className="mt-4 flex items-center gap-3 flex-wrap">
               <div className="px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[11px] font-black uppercase tracking-widest">
                 {v.costPoints} điểm
@@ -495,7 +484,6 @@ function MarketCard({
           </div>
         </div>
 
-        {/* BUTTON */}
         <button
           disabled={balance < v.costPoints || submitting || alreadyOwned}
           onClick={handleRedeem}

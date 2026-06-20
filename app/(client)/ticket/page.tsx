@@ -89,17 +89,27 @@ export default function TicketsTab() {
                 time: timeStr,
                 movieTitle: item.showtime?.movie?.title || "Vé Xem Phim",
                 cinemaName: "A&K Cinema",
-                roomName: "PHÒNG CHIẾU",
+                roomName: item.showtime?.room?.name || item.roomName || "PHÒNG CHIẾU", // Lấy phòng từ showtime hoặc trường phẳng
                 createdAt: item.createdAt,
                 orderDetails: []
               };
             }
 
-            if (item.seatName || item.seat?.name) {
-              const sName = item.seatName || item.seat?.name;
+            // 💡 GÁN THẲNG: Xác định tên ghế từ các trường phẳng trước, tránh phụ thuộc vào quan hệ object
+            let sName = "";
+            if (item.seatName) {
+              sName = item.seatName;
+            } else if (item.seatRow && item.seatNumber) {
+              sName = `${item.seatRow}${item.seatNumber}`;
+            } else if (item.seat && item.seat.name) {
+              sName = item.seat.name;
+            }
+
+            // Nếu tìm thấy tên ghế thì đẩy thẳng chuỗi tên ghế (Ví dụ: "A1") vào danh sách
+            if (sName) {
               groupedTickets[code].orderDetails.push({
                 itemType: 'TICKET',
-                itemName: `Ghế ${sName}`
+                itemName: sName // Gán thẳng tên ghế ở đây, loại bỏ chữ "Ghế " thừa thãi
               });
             }
           });
@@ -135,13 +145,16 @@ export default function TicketsTab() {
     return selectedOrder.bookingCode;
   };
 
+  // 💡 TỐI ƯU HÀM HIỂN THỊ: Vì itemName giờ đã là "A1", "A2" nên chỉ cần map trực tiếp
   const cleanSeatsDisplay = () => {
     if (!selectedOrder) return "N/A";
     const tickets = selectedOrder.orderDetails?.filter((d: any) => d.itemType === 'TICKET') || [];
     if (tickets.length === 0) return "N/A";
+    
     return tickets.map((t: any) => {
-      const match = t.itemName.match(/Ghế\s+([A-Z0-9]+)/i);
-      return match ? match[1] : t.itemName.replace('Ghế ', '');
+      if (!t.itemName) return "N/A";
+      // Phòng thủ nếu backend cũ vẫn lọt chữ "Ghế A1", còn nếu đã gán phẳng "A1" thì lấy luôn
+      return t.itemName.replace('Ghế ', '').trim();
     }).sort().join(", ");
   };
 

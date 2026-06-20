@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Gift,
   Layers,
+  Percent,
 } from "lucide-react";
 
 import {
@@ -61,6 +62,7 @@ export default function AdminStatisticsPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [cinemaId, setCinemaId] = useState<number | null>(null);
+  const [taxRate, setTaxRate] = useState<number>(10); // 🔥 Thêm state quản lý mức thuế suất (mặc định 10%)
 
   const [stats, setStats] = useState<DashboardStats>({
     todayRevenue: 0,
@@ -116,17 +118,19 @@ export default function AdminStatisticsPage() {
     return { start: format(start), end: format(end) };
   };
 
-  
   /* ================= 3. TRÍCH XUẤT EXCEL HÔM NAY ================= */
   const exportExcel = async () => {
     if (!cinemaId) return;
     try {
       setExporting(true);
       const range = getTodayRange();
+      
+      // 🔥 Gửi kèm param taxRate lên Backend xử lý tính toán động
       const query = new URLSearchParams({
         cinemaId: String(cinemaId),
         start: range.start,
         end: range.end,
+        taxRate: String(taxRate), 
       });
 
       const res = await apiAdminRequest(`/api/v1/reports/download?${query}`);
@@ -159,14 +163,14 @@ export default function AdminStatisticsPage() {
   return (
     <div className="min-h-screen bg-[#060608] p-4 sm:p-8 md:p-10 text-zinc-400 font-sans antialiased relative overflow-hidden selection:bg-rose-500/30 selection:text-rose-300">
       
-      {/* BACKGROUND GLOWS (Hệ thống đèn nền chiếu rạp mờ ngầm) */}
+      {/* BACKGROUND GLOWS */}
       <div className="absolute top-[-10%] left-[-5%] w-[45vw] h-[45vw] bg-rose-950/15 rounded-full blur-[150px] pointer-events-none" />
       <div className="absolute top-[40%] right-[-10%] w-[35vw] h-[35vw] bg-emerald-950/10 rounded-full blur-[130px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 relative z-10">
 
         {/* ================= THANH TIÊU ĐỀ CHÍNH (HEADER) ================= */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-zinc-800/60 pb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-zinc-800/60 pb-6">
           <div>
             <div className="flex items-center gap-2 text-rose-500 text-[11px] font-black uppercase tracking-[0.2em] mb-1.5">
               <Sparkles size={12} className="animate-pulse" /> Live Monitoring Center
@@ -182,20 +186,45 @@ export default function AdminStatisticsPage() {
             </p>
           </div>
 
-          {/* NHÓM TÁC VỤ ĐIỀU KHIỂN */}
-          <div className="flex items-center gap-3 w-full md:w-auto">
+{/* ================= NHÓM TÁC VỤ ĐIỀU KHIỂN & Ô NHẬP THUẾ ĐỘNG ================= */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+            
+            {/* KHUNG NHẬP THUẾ SUẤT - MINI & CLEAN */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-[#0c0c10] px-4 h-[46px] shadow-md group/tax transition-all duration-300 hover:border-zinc-700/80">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <Percent size={13} className="text-zinc-500 group-hover/tax:text-rose-400 transition-colors" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                  Thuế suất
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-0.5 border-b border-zinc-800 focus-within:border-rose-500/50 pb-0.5 transition-all">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={taxRate}
+                  onChange={(e) => setTaxRate(Math.max(0, Math.min(100, Number(e.target.value))))}
+                  className="bg-transparent text-white font-mono font-bold text-sm outline-none w-8 text-center border-none p-0 focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-xs font-bold text-zinc-600 font-mono select-none">%</span>
+              </div>
+            </div>
+
+            {/* NÚT XUẤT EXCEL */}
             <button
               onClick={exportExcel}
               disabled={!cinemaId || exporting}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all duration-300 hover:bg-rose-500 hover:text-white active:scale-95 disabled:opacity-40 shadow-lg"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 h-[46px] rounded-xl border border-rose-500/20 bg-rose-500/10 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all duration-300 hover:bg-rose-500 hover:text-white active:scale-95 disabled:opacity-40 shadow-lg"
             >
               {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
               {exporting ? "Đang trích xuất..." : "Xuất file Excel"}
             </button>
 
+            {/* NÚT LÀM MỚI DỮ LIỆU */}
             <button
               onClick={() => cinemaId && fetchDashboard(cinemaId)}
-              className="group flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-[#0c0c10] px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all duration-300 hover:border-zinc-700 hover:text-white active:scale-95 shadow-md"
+              className="group flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-[#0c0c10] px-5 h-[46px] text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all duration-300 hover:border-zinc-700 hover:text-white active:scale-95 shadow-md"
             >
               <RefreshCw size={14} className={`transition-transform duration-700 ${loading ? "animate-spin text-rose-500" : "group-hover:rotate-180"}`} />
               Làm mới dữ liệu
@@ -275,7 +304,7 @@ export default function AdminStatisticsPage() {
               </div>
             </div>
 
-            {/* ================= ⭐ KHỐI DANH SÁCH COMBO BÁN CHẠY (TABLE ĐƯỢC FIX ĐẸP) ================= */}
+            {/* ================= KHỐI DANH SÁCH COMBO BÁN CHẠY ================= */}
             <div className="rounded-2xl border border-zinc-800/60 bg-[#0c0c10]/60 backdrop-blur-xl p-6 md:p-8 shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
 
@@ -296,14 +325,12 @@ export default function AdminStatisticsPage() {
                 </div>
               </div>
 
-              {/* KHÔNG CÓ DỮ LIỆU EMPTY STATE */}
               {comboReport.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-zinc-600 gap-2">
                   <Gift size={28} className="stroke-[1.5]" />
                   <span className="text-xs font-medium">Hôm nay chưa phát sinh giao dịch quầy Combo</span>
                 </div>
               ) : (
-                /* CONTAINER BẢNG ĐIỀU HƯỚNG TRÁNH TRÀN TRÊN MOBILE */
                 <div className="overflow-x-auto w-full rounded-xl border border-zinc-800/50 bg-[#08080b]">
                   <table className="w-full text-sm border-collapse">
                     <thead>
@@ -348,7 +375,7 @@ export default function AdminStatisticsPage() {
   );
 }
 
-/* ================= COMPONENT CON: THÈ CHỈ SỐ CAO CẤP ================= */
+/* ================= COMPONENT CON: THẺ CHỈ SỐ CAO CẤP ================= */
 interface StatCardProps {
   title: string;
   value: string;

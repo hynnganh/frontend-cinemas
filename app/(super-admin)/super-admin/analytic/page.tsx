@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState,useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { apiSuperAdminRequest } from "../../../lib/api";
 
 import {
@@ -44,7 +44,6 @@ export default function FinancePage() {
     const year = now.getFullYear();
     const monthStr = String(now.getMonth() + 1).padStart(2, "0"); 
     
-    // Tìm ngày cuối cùng của tháng hiện tại
     const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
     const lastDayStr = String(lastDay).padStart(2, "0");
 
@@ -57,10 +56,12 @@ export default function FinancePage() {
 
   const initialDates = getInitialDates();
 
-  // Khởi tạo State tự động ăn theo tháng hiện tại của hệ thống
+  // Khởi tạo State hệ thống
   const [month, setMonth] = useState(initialDates.currentMonth);
   const [startDate, setStartDate] = useState(initialDates.startDateTime);
   const [endDate, setEndDate] = useState(initialDates.endDateTime);
+  const [taxRate, setTaxRate] = useState<number>(10); 
+  
   const monthInputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<FinanceData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,17 +81,19 @@ export default function FinancePage() {
     const searchParams = new URLSearchParams({
       start: formatDate(startDate),
       end: formatDate(endDate),
+      taxRate: String(taxRate), // SỬA LỖI: Đồng bộ mức thuế suất động vào file Excel kết xuất
       ...params,
     });
     return searchParams.toString();
   };
 
-  // ================= TẢI DỮ LIỆU TÀI CHÍNH (THEO THÁNG) =================
+  // ================= TẢI DỮ LIỆU TÀI CHÍNH (THEO THÁNG & THUẾ ĐỘNG) =================
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      let url = `/api/v1/reports/finance?month=${month}`;
+      
+      let url = `/api/v1/reports/finance?month=${month}&taxRate=${taxRate}`;
 
       if (selectedCinema) {
         url += `&cinemaId=${selectedCinema}`;
@@ -137,7 +140,7 @@ export default function FinancePage() {
 
       const res = await apiSuperAdminRequest(`/api/v1/reports/download?${query}`);
       if (!res.ok) {
-        throw new Error("Tải tập tin thất bại");
+        throw new Error("Tải tập tin thất bại hoặc không có dữ liệu phù hợp.");
       }
 
       const blob = await res.blob();
@@ -149,20 +152,19 @@ export default function FinancePage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Hệ thống xuất file Excel thất bại. Vui lòng kiểm tra lại đường truyền.");
+      alert(error.message || "Hệ thống xuất file Excel thất bại. Vui lòng kiểm tra lại đường truyền.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ================= LẮNG NGHE SỰ THAY ĐỔI CỦA THÁNG ĐỂ ĐỒNG BỘ BỘ LỌC NGÀY XUẤT EXCEL =================
+  // ================= XỬ LÝ SỰ THAY ĐỔI CỦA THÁNG ĐỂ ĐỒNG BỘ BỘ LỌC NGÀY XUẤT EXCEL =================
   const handleMonthChange = (newMonth: string) => {
-    setMonth(newMonth);
     if (!newMonth) return;
+    setMonth(newMonth);
 
-    // Tự động update Khoảng ngày Từ - Đến của bộ xuất Excel khi Admin đổi chọn tháng ở cục dưới
     const [year, m] = newMonth.split("-");
     const lastDay = new Date(parseInt(year), parseInt(m), 0).getDate();
     const lastDayStr = String(lastDay).padStart(2, "0");
@@ -171,10 +173,10 @@ export default function FinancePage() {
     setEndDate(`${year}-${m}-${lastDayStr}T23:59`);
   };
 
-  // ================= HIỆU ỨNG EFFECT =================
+  // ================= HIỆU ỨNG EFFECT ĐỒNG BỘ SỐ LIỆU =================
   useEffect(() => {
     fetchData();
-  }, [month, selectedCinema]);
+  }, [month, selectedCinema, taxRate]); 
 
   useEffect(() => {
     fetchCinemas();
@@ -185,15 +187,15 @@ export default function FinancePage() {
     return (v ?? 0).toLocaleString("vi-VN") + " ₫";
   };
 
-  // ================= XỬ LÝ DỮ LIỆU BIỂU ĐỒ =================
+  // ================= XỬ LÝ DỮ LIỆU BIỂU ĐỒ TRỰC QUAN =================
   const getChartTimelineData = () => {
     if (!data) return [];
-    const [year, m] = month.split("-");
-    const lastDay = new Date(parseInt(year), parseInt(m), 0).getDate();
+    const [, m] = month.split("-");
+    const lastDay = new Date(parseInt(month.split("-")[0]), parseInt(m), 0).getDate();
 
     return [
-      { ngay: `01/${m}`, "Lợi nhuận": data.profit * 0.35 },
-      { ngay: `15/${m}`, "Lợi nhuận": data.profit * 0.68 },
+      { ngay: `01/${m}`, "Lợi nhuận": Math.round(data.profit * 0.35) },
+      { ngay: `15/${m}`, "Lợi nhuận": Math.round(data.profit * 0.68) },
       { ngay: `${lastDay}/${m}`, "Lợi nhuận": data.profit },
     ];
   };
@@ -213,7 +215,7 @@ export default function FinancePage() {
           </p>
         </div>
 
-        {/* ================= KHỐI 1: TẢI FILE EXCEL (CỤC TRÊN) ================= */}
+        {/* ================= KHỐI 1: TẢI FILE EXCEL ================= */}
         <div className="rounded-2xl border border-zinc-900 bg-[#0c0c0e] p-6 shadow-2xl relative overflow-hidden group hover:border-zinc-800 transition-all duration-300">
           <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-red-700 via-red-600 to-red-500"></div>
           
@@ -284,10 +286,9 @@ export default function FinancePage() {
           </div>
         </div>
 
-        {/* ================= KHỐI 2: TRUNG TÂM PHÂN TÍCH BIỂU ĐỒ DOANH SỐ (CỤC DƯỚI) ================= */}
+        {/* ================= KHỐI 2: TRUNG TÂM PHÂN TÍCH BIỂU ĐỒ DOANH SỐ ================= */}
         <div className="space-y-6 pt-6 border-t border-zinc-900">
           
-          {/* THANH ĐIỀU HƯỚNG CHỌN THÁNG XEM DỮ LIỆU */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#0c0c0e] border border-zinc-900 p-5 rounded-2xl shadow-lg">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-red-600/10 text-red-500">
@@ -301,45 +302,68 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="w-full sm:w-auto flex items-center justify-end gap-3 bg-black border border-zinc-800 p-1.5 px-3 rounded-xl relative group">
-              <span 
-                className="text-xs font-bold text-zinc-400 cursor-pointer select-none"
-                onClick={() => monthInputRef.current?.showPicker()}
-              >
-                Xem dữ liệu:
-              </span>
-              <div className="relative flex items-center gap-2">
-                <span 
-                  className="text-xs text-red-500 font-black cursor-pointer select-none"
-                  onClick={() => monthInputRef.current?.showPicker()}
-                >
-                  {month ? (() => {
-                    const [year, m] = month.split("-");
-                    return `Tháng ${parseInt(m)} / ${year}`;
-                  })() : "Chọn tháng"}
+            <div className="w-full sm:w-auto flex flex-wrap items-center justify-end gap-4">
+              
+              {/* Ô NHẬP PHẦN TRĂM THUẾ */}
+              <div className="flex items-center gap-2 bg-black border border-zinc-800 p-1.5 px-3 rounded-xl">
+                <span className="text-xs font-bold text-zinc-400 select-none flex items-center gap-1">
+                  Mức thuế:
                 </span>
+                <div className="flex items-center gap-1 max-w-[70px]">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={taxRate}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setTaxRate(isNaN(val) ? 0 : val);
+                    }}
+                    className="w-full bg-transparent text-xs text-red-500 font-black text-right outline-none border-b border-transparent focus:border-red-600"
+                  />
+                  <span className="text-xs text-zinc-500 font-bold">%</span>
+                </div>
+              </div>
 
-                {/* SỰ KIỆN CLICK ĐÃ ĐƯỢC GẮN TRỰC TIẾP VÀO ICON LỊCH */}
-                <div 
-                  className="text-zinc-400 group-hover:text-white transition-colors z-10 flex items-center cursor-pointer"
+              {/* Ô CHỌN THÁNG */}
+              <div className="flex items-center justify-end gap-3 bg-black border border-zinc-800 p-1.5 px-3 rounded-xl relative group">
+                <span 
+                  className="text-xs font-bold text-zinc-400 cursor-pointer select-none"
                   onClick={() => monthInputRef.current?.showPicker()}
                 >
-                  <Calendar size={14} />
-                </div>
+                  Xem dữ liệu:
+                </span>
+                <div className="relative flex items-center gap-2">
+                  <span 
+                    className="text-xs text-red-500 font-black cursor-pointer select-none"
+                    onClick={() => monthInputRef.current?.showPicker()}
+                  >
+                    {month ? (() => {
+                      const [, m] = month.split("-");
+                      return `Tháng ${parseInt(m)} / ${month.split("-")[0]}`;
+                    })() : "Chọn tháng"}
+                  </span>
 
-                {/* Input thật được ẩn đi hoàn toàn bằng CSS, đóng vai trò lưu giá trị và xử lý ngầm */}
-                <input
-                  ref={monthInputRef}
-                  type="month"
-                  value={month}
-                  onChange={(e) => handleMonthChange(e.target.value)}
-                  className="absolute pointer-events-none opacity-0 w-0 h-0 [color-scheme:dark]"
-                />
+                  <div 
+                    className="text-zinc-400 group-hover:text-white transition-colors z-10 flex items-center cursor-pointer"
+                    onClick={() => monthInputRef.current?.showPicker()}
+                  >
+                    <Calendar size={14} />
+                  </div>
+
+                  <input
+                    ref={monthInputRef}
+                    type="month"
+                    value={month}
+                    onChange={(e) => handleMonthChange(e.target.value)}
+                    className="absolute pointer-events-none opacity-0 w-0 h-0 [color-scheme:dark]"
+                  />
+                </div>
               </div>
+
             </div>
           </div>
 
-          {/* HỘP BÁO LỖI HỆ THỐNG */}
           {error && (
             <div className="p-4 bg-red-950/20 border border-red-900/50 rounded-xl text-red-400 text-xs font-semibold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -347,7 +371,6 @@ export default function FinancePage() {
             </div>
           )}
 
-          {/* HIỆU ỨNG SKELETON CHỜ TẢI DỮ LIỆU */}
           {loading && (
             <div className="space-y-6 animate-pulse">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -362,11 +385,9 @@ export default function FinancePage() {
             </div>
           )}
 
-          {/* NỘI DUNG CHÍNH (BIỂU ĐỒ & BẢNG SỐ LIỆU) */}
           {!loading && data && (
             <div className="space-y-6">
               
-              {/* CÁC THẺ CARD TỔNG QUAN */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
                 
                 {/* DOANH THU */}
@@ -388,7 +409,7 @@ export default function FinancePage() {
                 <div className="p-6 rounded-2xl border border-zinc-900 bg-[#0c0c0e] shadow-sm group hover:border-zinc-800 transition-all">
                   <div className="flex justify-between items-center mb-4">
                     <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                      Thuế suất khấu trừ (VAT)
+                      Thuếu khấu trừ ({taxRate}%)
                     </p>
                     <div className="p-2 rounded-lg bg-zinc-900 text-zinc-400">
                       <Percent size={13} />
@@ -415,10 +436,9 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              {/* KHU VỰC CHI TIẾT VÀ BIỂU ĐỒ TRỰC QUAN */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 
-                {/* BẢNG CHI TIẾT CHỈ SỐ */}
+                {/* BẢNG CHI TIẾT */}
                 <div className="lg:col-span-2 p-6 rounded-2xl border border-zinc-900 bg-[#0c0c0e] flex flex-col justify-between shadow-sm">
                   <div>
                     <div className="flex items-center gap-2 mb-4 border-b border-zinc-900 pb-3">
@@ -446,7 +466,7 @@ export default function FinancePage() {
                       </div>
                       
                       <div className="flex justify-between py-3.5 text-xs font-medium">
-                        <span className="text-zinc-400">Khoản trừ nghĩa vụ thuế</span>
+                        <span className="text-zinc-400">Khoản trừ nghĩa vụ thuế ({taxRate}%)</span>
                         <span className="font-semibold text-zinc-400">
                           {formatMoney(data.tax)}
                         </span>
@@ -462,7 +482,7 @@ export default function FinancePage() {
                   </div>
                 </div>
 
-                {/* BIỂU ĐỒ PHÂN TÍCH */}
+                {/* BIỂU ĐỒ RECHARTS */}
                 <div className="lg:col-span-3 p-6 rounded-2xl border border-zinc-900 bg-[#0c0c0e] flex flex-col justify-between shadow-sm">
                   <div className="flex items-center gap-2 mb-4 border-b border-zinc-900 pb-3">
                     <Calendar size={15} className="text-zinc-500" />
