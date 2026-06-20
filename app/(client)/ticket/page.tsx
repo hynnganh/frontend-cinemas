@@ -39,97 +39,130 @@ export default function TicketsTab() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   useEffect(() => {
-    const fetchOrderHistory = async () => {
-      try {
-        // 🔥 VÁ LỖI MẠNH: Thêm tham số Timestamp để chặn Cache của Next.js, ép lấy data mới nhất!
-        const res = await apiRequest(`/api/v1/orders/my-history?t=${new Date().getTime()}`);
-        if (res.ok) {
-          const result = await res.json();
-          
-          let rawData: any[] = [];
-          if (Array.isArray(result)) rawData = result;
-          else if (result.data && Array.isArray(result.data)) rawData = result.data;
-          else if (result.content && Array.isArray(result.content)) rawData = result.content;
+const fetchOrderHistory = async () => {
+  try {
+    const res = await apiRequest(`/api/v1/tickets/my-history?t=${new Date().getTime()}`);
 
-          const groupedTickets: Record<string, any> = {};
-          const normalizedOrders: any[] = [];
+    if (res.ok) {
+      const result = await res.json();
 
-          rawData.forEach((item: any) => {
-            if (item.orderDetails) {
-              normalizedOrders.push({
-                ...item,
-                date: item.date || "N/A",
-                time: item.time || "N/A",
-                movieTitle: item.movieTitle || "Vé Xem Phim"
-              });
-              return;
-            }
+      console.log("===== RESPONSE GỐC =====");
+      console.log(result);
 
-            const code = item.bookingCode || `AK${item.id}`;
-            if (!groupedTickets[code]) {
-              let dateStr = "N/A";
-              let timeStr = "N/A";
+      let rawData: any[] = [];
+      if (Array.isArray(result)) rawData = result;
+      else if (result.data && Array.isArray(result.data)) rawData = result.data;
+      else if (result.content && Array.isArray(result.content)) rawData = result.content;
 
-              // 🔥 VÁ LỖI MÚI GIỜ: Bóc tách chuỗi trực tiếp thay vì dùng new Date()
-              if (item.showtime && item.showtime.startTime) {
-                const [datePart, timePart] = item.showtime.startTime.split('T');
-                if (datePart && timePart) {
-                  const [y, m, d] = datePart.split('-');
-                  const [hrs, mins] = timePart.split(':');
-                  dateStr = `${d}/${m}/${y}`;
-                  timeStr = `${hrs}:${mins}`;
-                }
-              }
+      console.log("===== RAW DATA =====");
+      console.log(rawData);
 
-              groupedTickets[code] = {
-                id: item.id,
-                bookingCode: code,
-                status: item.status,
-                date: dateStr,
-                time: timeStr,
-                movieTitle: item.showtime?.movie?.title || "Vé Xem Phim",
-                cinemaName: "A&K Cinema",
-                roomName: item.showtime?.room?.name || item.roomName || "PHÒNG CHIẾU", // Lấy phòng từ showtime hoặc trường phẳng
-                createdAt: item.createdAt,
-                orderDetails: []
-              };
-            }
+      const groupedTickets: Record<string, any> = {};
+      const normalizedOrders: any[] = [];
 
-            // 💡 GÁN THẲNG: Xác định tên ghế từ các trường phẳng trước, tránh phụ thuộc vào quan hệ object
-            let sName = "";
-            if (item.seatName) {
-              sName = item.seatName;
-            } else if (item.seatRow && item.seatNumber) {
-              sName = `${item.seatRow}${item.seatNumber}`;
-            } else if (item.seat && item.seat.name) {
-              sName = item.seat.name;
-            }
+      rawData.forEach((item: any) => {
 
-            // Nếu tìm thấy tên ghế thì đẩy thẳng chuỗi tên ghế (Ví dụ: "A1") vào danh sách
-            if (sName) {
-              groupedTickets[code].orderDetails.push({
-                itemType: 'TICKET',
-                itemName: sName // Gán thẳng tên ghế ở đây, loại bỏ chữ "Ghế " thừa thãi
-              });
-            }
+        console.log("===== ITEM =====");
+        console.log(item);
+
+        if (item.orderDetails) {
+          normalizedOrders.push({
+            ...item,
+            date: item.date || "N/A",
+            time: item.time || "N/A",
+            movieTitle: item.movieTitle || "Vé Xem Phim"
           });
-
-          const finalOrders = [...normalizedOrders, ...Object.values(groupedTickets)];
-          
-          // Lọc vé PAID/USED và sắp xếp vé mới mua nhất lên trên cùng
-          const validOrders = finalOrders.filter((o: any) => o.status === 'PAID' || o.status === 'USED');
-          validOrders.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          
-          setOrders(validOrders);
-        } else {
-          toast.error("Không thể tải lịch sử vé!");
+          return;
         }
-      } catch (err) { 
-        console.error("Lỗi lấy lịch sử vé: ", err); 
-      } finally { 
-        setLoading(false); 
-      }
-    };
+
+        const code = item.bookingCode || `AK${item.id}`;
+
+        if (!groupedTickets[code]) {
+          let dateStr = "N/A";
+          let timeStr = "N/A";
+
+          if (item.showtime && item.showtime.startTime) {
+            const [datePart, timePart] = item.showtime.startTime.split('T');
+
+            if (datePart && timePart) {
+              const [y, m, d] = datePart.split('-');
+              const [hrs, mins] = timePart.split(':');
+
+              dateStr = `${d}/${m}/${y}`;
+              timeStr = `${hrs}:${mins}`;
+            }
+          }
+
+          groupedTickets[code] = {
+            id: item.id,
+            bookingCode: code,
+            status: item.status,
+            date: dateStr,
+            time: timeStr,
+            movieTitle: item.showtime?.movie?.title || "Vé Xem Phim",
+            cinemaName: "A&K Cinema",
+            roomName: item.showtime?.room?.name || item.roomName || "PHÒNG CHIẾU",
+            createdAt: item.createdAt,
+            orderDetails: []
+          };
+        }
+
+        let sName = "";
+
+        if (item.seatName) {
+          sName = item.seatName;
+        } else if (item.seatRow && item.seatNumber) {
+          sName = `${item.seatRow}${item.seatNumber}`;
+        } else if (item.seat && item.seat.name) {
+          sName = item.seat.name;
+        }
+
+        if (sName) {
+          groupedTickets[code].orderDetails.push({
+            itemType: "TICKET",
+            itemName: sName
+          });
+        }
+      });
+
+      console.log("===== GROUPED TICKETS =====");
+      console.log(groupedTickets);
+
+      const finalOrders = [
+        ...normalizedOrders,
+        ...Object.values(groupedTickets)
+      ];
+
+      console.log("===== FINAL ORDERS =====");
+      console.table(finalOrders);
+
+      const validOrders = finalOrders.filter(
+        (o: any) => o.status === "PAID" || o.status === "USED"
+      );
+
+      console.log("===== VALID ORDERS =====");
+      console.table(validOrders);
+
+      validOrders.sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime()
+      );
+
+      console.log("===== SAU KHI SORT =====");
+      console.table(validOrders);
+
+      setOrders(validOrders);
+
+    } else {
+      toast.error("Không thể tải lịch sử vé!");
+    }
+  } catch (err) {
+    console.error("Lỗi lấy lịch sử vé:", err);
+  } finally {
+    setLoading(false);
+  }
+};
     fetchOrderHistory();
   }, []);
 

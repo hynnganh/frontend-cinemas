@@ -100,7 +100,7 @@ export default function PaymentResultContent() {
                 Trang chủ
               </button>
               <button
-                onClick={() => router.push("/")} // Link về lịch sử vé
+                onClick={() => router.push("/ticket")}
                 className="flex items-center justify-center gap-2 px-5 py-3.5 bg-red-600 hover:bg-red-500 active:scale-95 text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg shadow-red-600/30 transition-all"
               >
                 Xem vé ngay

@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode'; 
 import { 
@@ -19,8 +20,9 @@ import {
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast'; 
 
-const BACKEND_URL = "https://akcinema-api.onrender.com";
-// const BACKEND_URL = "http://localhost:8080";
+// Import hàm apiAdminRequest từ file helper của bạn
+import { apiAdminRequest } from '@/app/lib/api'; // Hãy điều chỉnh lại path import cho đúng cấu trúc thư mục của bạn
+
 export default function StaffScannerPage() {
   const [orderData, setOrderData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -92,14 +94,9 @@ export default function StaffScannerPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token_admin");
-
-      const res = await fetch(`${BACKEND_URL}/api/v1/orders/scan?bookingCode=${encodeURIComponent(bookingCode.toUpperCase())}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": token ? `Bearer ${token}` : ""
-        }
+      // Thay thế fetch thuần bằng apiAdminRequest
+      const res = await apiAdminRequest(`/api/v1/orders/scan?bookingCode=${encodeURIComponent(bookingCode.toUpperCase())}`, {
+        method: "GET"
       });
       
       const result = await res.json();
@@ -122,14 +119,9 @@ export default function StaffScannerPage() {
 
     setConfirmLoading(true);
     try {
-      const token = localStorage.getItem("token_admin");
-      
-      const res = await fetch(`${BACKEND_URL}/api/v1/orders/${orderData.id}/confirm-checkin`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": token ? `Bearer ${token}` : ""
-        }
+      // Thay thế fetch thuần bằng apiAdminRequest
+      const res = await apiAdminRequest(`/api/v1/orders/${orderData.id}/confirm-checkin`, {
+        method: "PUT"
       });
 
       const result = await res.json();
@@ -137,7 +129,6 @@ export default function StaffScannerPage() {
       if (res.ok && result.status === 200) {
         toast.success("Ghi nhận bàn giao thành công!");
         
-        // Chỉ lưu DB, bỏ in ấn, tự động quay lại camera sau 1.5s
         setTimeout(() => {
           handleResetScanner();
         }, 1500);
