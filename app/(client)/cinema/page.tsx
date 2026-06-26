@@ -79,13 +79,24 @@ export default function Cinema() {
         if (result?.data) {
           const now = new Date(); 
 
+          // 1. 🔥 LỌC BỎ HOÀN TOÀN SUẤT CHIẾU ĐÃ HỦY (CANCELLED / PENDING_CANCEL)
           const filtered = result.data.filter((item: any) => {
             const startTime = new Date(item.startTime);
             const isSameDate = item.startTime.startsWith(selectedDate);
             const isFuture = startTime > now;
-            return isSameDate && isFuture;
+            
+            // Khách hàng chỉ thấy suất chiếu hoạt động bình thường (ACTIVE)
+            const isLiveStatus = item.status !== 'CANCELLED' && item.status !== 'PENDING_CANCEL';
+            
+            return isSameDate && isFuture && isLiveStatus;
           });
 
+          // 2. 🔥 SẮP XẾP SUẤT CHIẾU THEO THỜI GIAN TỪ SỚM ĐẾN MUỘN (Tăng dần)
+          filtered.sort((a: any, b: any) => {
+            return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+          });
+
+          // 3. Gom nhóm dữ liệu theo bộ phim và định dạng phòng chiếu
           const grouped = filtered.reduce((acc: any, curr: any) => {
             const m = curr.movie;
             if (!m) return acc;
@@ -105,10 +116,12 @@ export default function Cinema() {
             }
             const type = curr.room?.name?.includes("IMAX") ? "IMAX 3D" : "2D DIGITAL";
             if (!acc[m.id].formats[type]) acc[m.id].formats[type] = [];
+            
             acc[m.id].formats[type].push({ 
                 id: curr.id, 
                 time: new Date(curr.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }), 
-                roomId: curr.room?.id 
+                roomId: curr.room?.id,
+                status: curr.status 
             });
             return acc;
           }, {});
@@ -144,7 +157,6 @@ export default function Cinema() {
     const VI_DAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
     return [...Array(7)].map((_, i) => {
       const d = new Date(); d.setDate(d.getDate() + i);
-      // 🔥 Thay thế toISOString bằng getLocalISODate
       return { 
         id: getLocalISODate(d), 
         dayName: i === 0 ? "Hôm nay" : VI_DAYS[d.getDay()], 
@@ -159,9 +171,7 @@ export default function Cinema() {
     <div className="bg-[#050505] min-h-screen pt-20 pb-10 px-4 text-zinc-400 font-sans">
       <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
         
-        {/* ============================== */}
         {/* SIDEBAR RẠP */}
-        {/* ============================== */}
         <div className="lg:col-span-4 space-y-4">
           <div className="relative group sticky top-20 z-10 bg-[#050505] pb-2">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-red-500 transition-colors" size={14} />
@@ -193,9 +203,7 @@ export default function Cinema() {
           </div>
         </div>
 
-        {/* ============================== */}
         {/* MAIN CONTENT (LỊCH CHIẾU) */}
-        {/* ============================== */}
         <div className="lg:col-span-8 space-y-5">
           <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2 border-b border-white/5">
             {dateTabs.map(d => (

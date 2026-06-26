@@ -85,7 +85,7 @@ export default function AdminShowtimePage() {
 
       setCinemaName(cinema.data?.name);
       
-      // 🔥 ĐÃ SỬA: Lấy toàn bộ lịch sử suất chiếu (không lọc bỏ quá khứ nữa)
+      // Lấy toàn bộ lịch sử suất chiếu (không lọc bỏ quá khứ nữa)
       setShowtimes(show.data || []);
       
       setRooms(room.data || []);
@@ -213,26 +213,49 @@ export default function AdminShowtimePage() {
                 <div className="flex-1 flex flex-wrap items-center gap-2.5 w-full">
                   {currentShowtimes.map((s) => {
                     const isPast = isPastShowtime(s.startTime);
+                    const isCancelled = s.status === 'CANCELLED';
+                    const isPending = s.status === 'PENDING_CANCEL';
+
+                    // Cờ hiệu để ẩn nút sửa: Đã qua giờ chiếu HOẶC đã hủy HOẶC đang xin hủy
+                    const canEditQuickly = !isPast && !isCancelled && !isPending;
+
                     return (
                       <div 
                         key={s.id} 
                         onClick={() => router.push(`/admin/showtimes/${s.id}`)} 
                         className={`group relative inline-flex items-center gap-3 border px-3.5 py-2 rounded-lg cursor-pointer transition-all ${
-                          isPast 
+                          isCancelled
+                            ? "bg-zinc-950/40 border-zinc-900/50 opacity-40 grayscale hover:opacity-70"
+                          : isPending
+                            ? "bg-orange-950/20 border-orange-900/40 text-orange-500"
+                          : isPast 
                             ? "bg-zinc-950/50 border-zinc-900 text-zinc-500 opacity-70 hover:bg-zinc-900 hover:opacity-100" 
-                            : "bg-zinc-900 border-zinc-800 text-white hover:border-red-600/40 hover:bg-zinc-900/60"
+                          : "bg-zinc-900 border-zinc-800 text-white hover:border-red-600/40 hover:bg-zinc-900/60"
                         }`}
-                        title={isPast ? "Nhấp để xem lịch sử vé" : "Nhấp để xem chi tiết"}
+                        title={
+                          isCancelled ? "Suất chiếu đã bị hủy (Nhấp để xem chi tiết)" :
+                          isPending ? "Suất chiếu đang chờ duyệt hủy (Nhấp để xem chi tiết)" :
+                          isPast ? "Nhấp để xem lịch sử vé" : "Nhấp để xem chi tiết"
+                        }
                       >
-                        <span className={`text-xs font-black tracking-tight transition-colors ${isPast ? 'text-zinc-500' : 'text-white group-hover:text-red-500'}`}>
+                        <span className={`text-xs font-black tracking-tight transition-colors ${
+                          isCancelled ? 'text-zinc-500 line-through' :
+                          isPending ? 'text-orange-500' :
+                          isPast ? 'text-zinc-500' : 'text-white group-hover:text-red-500'
+                        }`}>
                           {s.startTime.split("T")[1].substring(0, 5)}
                         </span>
-                        {s.movie && <span className={`text-[11px] font-bold max-w-[120px] truncate ${isPast ? 'text-zinc-600' : 'text-zinc-400'}`}>
+
+                        {s.movie && <span className={`text-[11px] font-bold max-w-[120px] truncate ${
+                          isCancelled ? 'text-zinc-600 line-through' :
+                          isPending ? 'text-orange-400/80' :
+                          isPast ? 'text-zinc-600' : 'text-zinc-400'
+                        }`}>
                           {s.movie.title || s.movie.name}
                         </span>}
                         
-                        {/* Chỉ hiện nút sửa khi suất chiếu chưa diễn ra */}
-                        {!isPast && (
+                        {/* Chỉ hiện nút sửa nhanh khi suất chiếu bình thường và chưa diễn ra */}
+                        {canEditQuickly && (
                           <button onClick={(e) => { e.stopPropagation(); setSelectedItem(s); setIsModalOpen(true); }} className="text-zinc-600 hover:text-white transition-colors pl-1">
                             <Edit3 size={13} />
                           </button>

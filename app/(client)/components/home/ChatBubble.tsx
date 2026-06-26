@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs'; 
-import { MessageCircle, X, Send, Bot, UserSquare, Loader2, Film, ArrowRight, Move, MapPin, RefreshCcw, Trash2 } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Loader2, Film, ArrowRight, Move, MapPin, Trash2, Headset, Sparkles, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 
 import { apiRequest, BASE_URL } from '../../../lib/api'; 
@@ -33,16 +33,28 @@ export default function ChatBubble() {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
-  const [chatMode, setChatMode] = useState<"BOT" | "ADMIN">("BOT"); 
   
-  const [botMessages, setBotMessages] = useState<ChatMessage[]>([]);
-  const [adminMessages, setAdminMessages] = useState<ChatMessage[]>([]);
-  const [isChatClosed, setIsClosed] = useState(false);
+  // 🔥 CHAT MODE: BOT (Mặc định) | SELECT_CINEMA (Đang chọn rạp) | ADMIN (Đã nối máy với quản lý)
+  const [chatMode, setChatMode] = useState<"BOT" | "SELECT_CINEMA" | "ADMIN">(() => {
+    if (typeof window !== 'undefined') return (localStorage.getItem("guest_chat_mode") as any) || "BOT";
+    return "BOT";
+  }); 
+
+  // 🔥 DANH SÁCH TIN NHẮN GỘP CHUNG (UNIFIED THREAD)
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   
   const [cinemas, setCinemas] = useState<Cinema[]>([]);
   const [cinemaItems, setCinemaItems] = useState<CinemaItem[]>([]);
   const [selectedParentCinema, setSelectedParentCinema] = useState<Cinema | null>(null);
-  const [selectedCinemaId, setSelectedCinemaId] = useState<number | null>(null);
+  
+  const [selectedCinemaId, setSelectedCinemaId] = useState<number | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("guest_cinema_id");
+      return saved ? parseInt(saved) : null;
+    }
+    return null;
+  });
+
   const [isLoadingCinemas, setIsLoadingCinemas] = useState(false);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -65,13 +77,22 @@ export default function ChatBubble() {
     return "ROOM_TEMP";
   });
 
+  // Đồng bộ trạng thái vào LocalStorage để khách F5 không bị mất kết nối với Admin
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("guest_chat_mode", chatMode === "SELECT_CINEMA" ? "BOT" : chatMode);
+      if (selectedCinemaId) localStorage.setItem("guest_cinema_id", selectedCinemaId.toString());
+      else localStorage.removeItem("guest_cinema_id");
+    }
+  }, [chatMode, selectedCinemaId]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    if (isOpen) scrollToBottom();
-  }, [botMessages, adminMessages, isOpen, chatMode, selectedCinemaId, isChatClosed]);
+    if (isOpen) setTimeout(scrollToBottom, 150);
+  }, [messages, isOpen, chatMode]);
 
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined' && position.x === 0 && position.y === 0) {
@@ -81,11 +102,11 @@ export default function ChatBubble() {
 
   const resetAutoCloseTimeout = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (chatMode !== "ADMIN" || !selectedCinemaId || isChatClosed) return;
+    if (chatMode !== "ADMIN" || !selectedCinemaId) return;
 
     timeoutRef.current = setTimeout(() => {
       handleCloseChatBySystem();
-    }, 180000);
+    }, 180000); // 3 phút không ai chat sẽ tự đóng Admin
   };
 
   const handleCloseChatBySystem = async () => {
@@ -97,15 +118,14 @@ export default function ChatBubble() {
   };
 
   const handleUserActiveCancel = async () => {
-    if (window.confirm("Bạn có chắc chắn muốn kết thúc hỗ trợ từ quản lý rạp?")) {
+    if (window.confirm("Kết thúc phiên trò chuyện với quản lý rạp và quay lại dùng AI?")) {
       await handleCloseChatBySystem();
+      setChatMode("BOT");
       setSelectedCinemaId(null);
-      setSelectedParentCinema(null);
-      setAdminMessages([]);
-      setIsClosed(false);
     }
   };
 
+  // Tải danh sách rạp
   useEffect(() => {
     if (isOpen && cinemas.length === 0 && cinemaItems.length === 0) {
       setIsLoadingCinemas(true);
@@ -129,6 +149,7 @@ export default function ChatBubble() {
     }
   }, [isOpen]);
 
+  // Kết nối WebSocket
   const connectWebSocket = () => {
     if (stompClientRef.current?.active) return;
     setIsConnecting(true);
@@ -141,31 +162,55 @@ export default function ChatBubble() {
     client.onConnect = function () {
       setIsConnecting(false);
       
+      // Lắng nghe tin nhắn mới
       client.subscribe(`/topic/room/${roomId}`, (msg) => {
         const newMsg: ChatMessage = JSON.parse(msg.body);
         
-        if (newMsg.content === "[SYSTEM_CLOSE]") {
-          setIsClosed(true);
-          return;
+        // Bắt lệnh mở lại phòng chat để tẩy cờ đóng
+        if (newMsg.content === "[SYSTEM_OPEN]") {
+            setMessages((prev) => prev.filter((m) => m.content !== "[SYSTEM_CLOSE]"));
+            return;
         }
 
-        if (newMsg.receiverRole === "BOT" || newMsg.senderRole === "BOT") {
-          setBotMessages((prev) => [...prev, newMsg]);
-        } else {
-          setAdminMessages((prev) => [...prev, newMsg]);
+        // Nhận lệnh đóng từ hệ thống Backend
+        if (newMsg.content === "[SYSTEM_CLOSE]") {
+          setChatMode("BOT");
+          setSelectedCinemaId(null);
+          return; 
+        }
+
+        setMessages((prev) => [...prev, newMsg]);
+
+        if (newMsg.receiverRole === "ADMIN" || newMsg.senderRole === "ADMIN") {
           resetAutoCloseTimeout(); 
         }
       });
 
+      // Tải lịch sử tin nhắn
       apiRequest(`/api/v1/chat/history/${roomId}`)
         .then(res => res.json())
         .then((data: ChatMessage[]) => {
           if (data && data.length > 0) {
-            const hasCloseSignal = data.some(m => m.content === "[SYSTEM_CLOSE]");
-            setIsClosed(hasCloseSignal);
+            // Kiểm tra xem phòng Admin có bị đóng không
+            let isCurrentlyClosed = false;
+            for (let i = data.length - 1; i >= 0; i--) {
+                if (data[i].content === "[SYSTEM_CLOSE]") {
+                    isCurrentlyClosed = true;
+                    break;
+                } else if (data[i].receiverRole === "ADMIN" || data[i].senderRole === "ADMIN") {
+                    isCurrentlyClosed = false;
+                    break;
+                }
+            }
+            
+            if (isCurrentlyClosed && chatMode === "ADMIN") {
+                setChatMode("BOT");
+                setSelectedCinemaId(null);
+            }
 
-            setBotMessages(data.filter(m => m.receiverRole === "BOT" || m.senderRole === "BOT"));
-            setAdminMessages(data.filter(m => (m.receiverRole === "ADMIN" || m.senderRole === "ADMIN") && m.content !== "[SYSTEM_CLOSE]"));
+            // Lọc sạch cả 2 mã hệ thống ra khỏi giao diện
+            const validMessages = data.filter(m => m.content !== "[SYSTEM_CLOSE]" && m.content !== "[SYSTEM_OPEN]");
+            setMessages(validMessages);
           }
         }).catch(err => console.error(err));
     };
@@ -181,14 +226,19 @@ export default function ChatBubble() {
 
   const sendMessage = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputValue.trim() || !stompClientRef.current || !stompClientRef.current.connected || isChatClosed) return;
+    if (!inputValue.trim() || !stompClientRef.current || !stompClientRef.current.connected) return;
+
+    // Lọc bỏ hệ thống rác trước khi gửi lên API
+    if (chatMode === "ADMIN") {
+        setMessages(prev => prev.filter(m => m.content !== "[SYSTEM_CLOSE]" && m.content !== "[SYSTEM_OPEN]"));
+    }
 
     const payload = {
       roomId: roomId,
       sender: "Khách Hàng",
       content: inputValue,
       senderRole: "USER",
-      receiverRole: chatMode,
+      receiverRole: chatMode === "ADMIN" ? "ADMIN" : "BOT",
       cinemaItemId: chatMode === "ADMIN" ? selectedCinemaId : null
     };
 
@@ -198,11 +248,12 @@ export default function ChatBubble() {
     });
     
     setInputValue("");
-    resetAutoCloseTimeout();
+    if (chatMode === "ADMIN") resetAutoCloseTimeout();
   };
 
+  // Logic Kéo thả khung chat (Draggable)
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('.btn-close-chat')) return;
+    if ((e.target as HTMLElement).closest('.btn-no-drag')) return;
     setIsDragging(true);
     dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -214,7 +265,7 @@ export default function ChatBubble() {
     let newY = e.clientY - dragStart.current.y;
     if (typeof window !== 'undefined') {
       newX = Math.max(0, Math.min(newX, window.innerWidth - 380));
-      newY = Math.max(0, Math.min(newY, window.innerHeight - 560));
+      newY = Math.max(0, Math.min(newY, window.innerHeight - 600));
     }
     setPosition({ x: newX, y: newY });
   };
@@ -224,6 +275,7 @@ export default function ChatBubble() {
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   };
 
+  // Trình hiển thị nội dung tin nhắn (Xử lý đậm, thẻ phim)
   const renderMessageContent = (text: string, role: string) => {
     if (role === "USER") return text.split('\n').map((item, i) => <span key={i}>{item}<br/></span>);
     
@@ -233,7 +285,7 @@ export default function ChatBubble() {
       const subParts = rawText.split(/(\*\*[^*]+\*\*)/g);
       return subParts.map((subPart, subIdx) => {
         if (subPart.startsWith('**') && subPart.endsWith('**')) {
-          return <strong key={subIdx} className="font-extrabold text-white mx-0.5 drop-shadow-sm">{subPart.slice(2, -2)}</strong>;
+          return <strong key={subIdx} className="font-extrabold text-white mx-0.5 drop-shadow-md">{subPart.slice(2, -2)}</strong>;
         }
         return subPart.split('\n').map((line, lineIdx) => (
           <React.Fragment key={`${subIdx}-${lineIdx}`}>{line}{lineIdx < subPart.split('\n').length - 1 && <br />}</React.Fragment>
@@ -248,9 +300,9 @@ export default function ChatBubble() {
         const poster = posterUrlParts.join('|'); 
 
         return (
-          <Link href={`/movies/${id}`} key={index} className="block mt-2 mb-2 group">
-            <div className="relative flex items-center bg-zinc-900 border border-zinc-700/50 p-2.5 rounded-xl overflow-hidden transition-all duration-300 transform group-hover:-translate-y-1 group-hover:border-red-500/50 group-hover:shadow-[0_8px_20px_rgba(220,38,38,0.25)]">
-              <img src={poster} alt={title} className="w-14 h-20 object-cover rounded-lg shadow-md bg-zinc-800" />
+          <Link href={`/movies/${id}`} key={index} className="block mt-3 mb-2 group">
+            <div className="relative flex items-center bg-[#0a0a0c] border border-white/10 p-2.5 rounded-2xl overflow-hidden transition-all duration-300 transform group-hover:-translate-y-1 group-hover:border-red-500/50 group-hover:shadow-[0_8px_25px_rgba(220,38,38,0.25)]">
+              <img src={poster} alt={title} className="w-14 h-20 object-cover rounded-xl shadow-md bg-zinc-800" />
               <div className="flex-1 ml-3">
                 <h4 className="text-zinc-100 font-black text-[13px] leading-tight line-clamp-2 mb-1">{title}</h4>
                 <p className="text-[10px] text-zinc-400 font-bold uppercase flex items-center gap-1.5 group-hover:text-red-400 transition-colors">
@@ -263,8 +315,8 @@ export default function ChatBubble() {
       }
       if (part === '$$SEEMORE$$') {
         return (
-          <Link href="/movies" key={index} className="block mt-3 mb-1">
-            <div className="w-full py-2.5 bg-gradient-to-r from-zinc-900 to-zinc-950 border border-zinc-800 hover:border-red-600/50 text-center rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 group">
+          <Link href="/movies" key={index} className="block mt-4 mb-1">
+            <div className="w-full py-3 bg-gradient-to-r from-zinc-900 to-[#121215] border border-zinc-800 hover:border-red-600/50 text-center rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 group">
               <span className="text-[11px] font-black text-red-500 uppercase tracking-widest group-hover:text-red-400">Khám phá kho phim</span>
               <ArrowRight size={14} className="text-red-500 group-hover:translate-x-1 transition-transform" />
             </div>
@@ -275,49 +327,81 @@ export default function ChatBubble() {
     });
   };
 
-  const activeMessages = chatMode === "BOT" ? botMessages : adminMessages;
-
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end select-none">
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end select-none font-sans">
+      
+      {/* ======================================================== */}
+      {/* KHUNG CHAT (WIDGET) */}
+      {/* ======================================================== */}
       <div 
-        className={`fixed bg-[#0a0a0c]/95 backdrop-blur-2xl border border-white/5 rounded-[2rem] shadow-[0_30px_80px_-15px_rgba(0,0,0,1)] flex flex-col overflow-hidden transform transition-all ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0 pointer-events-none"}`}
-        style={{ width: "380px", height: "560px", left: `${position.x}px`, top: `${position.y}px`, transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1), opacity 0.4s, left 0.1s ease-out, top 0.1s ease-out' }}
+        className={`fixed bg-[#0d0d12]/95 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden transform transition-all ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0 pointer-events-none"}`}
+        style={{ width: "380px", height: "600px", left: `${position.x}px`, top: `${position.y}px`, transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1), opacity 0.4s, left 0.1s ease-out, top 0.1s ease-out' }}
       >
-        <div onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} className="bg-gradient-to-r from-red-600 to-rose-700 p-4 flex justify-between items-center relative overflow-hidden shadow-lg cursor-move touch-none shrink-0">
+        
+        {/* HEADER */}
+        <div onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} className={`p-4 flex justify-between items-center relative overflow-hidden shadow-lg cursor-move touch-none shrink-0 transition-colors duration-500 ${chatMode === "ADMIN" ? 'bg-gradient-to-r from-emerald-700 to-teal-900' : 'bg-gradient-to-r from-red-600 to-rose-800'}`}>
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-3xl pointer-events-none"></div>
+          
           <div className="flex items-center gap-3 relative z-10 pointer-events-none">
-            <div className="w-12 h-12 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 p-2 shadow-inner">
-              <img src="https://i.imgur.com/k9B9JqP.png" alt="Logo" className="w-full h-full object-contain" />
+            <div className="w-12 h-12 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 p-2.5 shadow-inner">
+              {chatMode === "ADMIN" ? <Headset size={24} className="text-white drop-shadow-md" /> : <Bot size={24} className="text-white drop-shadow-md" />}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h3 className="font-[1000] text-white text-[15px] tracking-widest uppercase italic drop-shadow-md">A&K Nexus</h3>
+                <h3 className="font-[1000] text-white text-[15px] tracking-widest uppercase italic drop-shadow-md">
+                  {chatMode === "ADMIN" ? "Quản lý rạp" : "Trợ lý AI A&K"}
+                </h3>
                 <Move size={12} className="text-white/40" />
               </div>
-              <p className="text-[10px] text-red-100 font-bold flex items-center gap-1.5 tracking-widest mt-0.5 uppercase">
-                <span className={`w-1.5 h-1.5 rounded-full ${isConnecting ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'}`}></span>
+              <p className="text-[10px] text-white/80 font-bold flex items-center gap-1.5 tracking-widest mt-0.5 uppercase">
+                <span className={`w-1.5 h-1.5 rounded-full ${isConnecting ? 'bg-amber-400 animate-pulse' : 'bg-green-400 shadow-[0_0_8px_#4ade80]'}`}></span>
                 {isConnecting ? "Đang kết nối..." : "Hệ thống Online"}
               </p>
             </div>
           </div>
-          <button onClick={() => setIsOpen(false)} className="btn-close-chat w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-all relative z-10 active:scale-90 border border-transparent hover:border-white/10"><X size={16} strokeWidth={2.5} /></button>
+
+          <div className="flex items-center gap-2 relative z-10">
+            {/* Nút Gọi Quản Lý / Hủy Quản Lý */}
+            {chatMode === "BOT" ? (
+               <button onClick={() => setChatMode("SELECT_CINEMA")} className="btn-no-drag w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center transition-all active:scale-95 shadow-md" title="Gặp Quản Lý">
+                 <Headset size={14} />
+               </button>
+            ) : chatMode === "ADMIN" ? (
+               <button onClick={handleUserActiveCancel} className="btn-no-drag w-8 h-8 rounded-full bg-black/20 hover:bg-red-500/80 border border-transparent hover:border-white/30 text-white flex items-center justify-center transition-all active:scale-95" title="Kết thúc trò chuyện">
+                 <Trash2 size={13} />
+               </button>
+            ) : null}
+
+            {/* Nút Đóng Khung Chat */}
+            <button onClick={() => setIsOpen(false)} className="btn-no-drag w-8 h-8 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-all active:scale-90 border border-transparent hover:border-white/10" title="Thu nhỏ">
+              <X size={16} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex bg-[#121215] p-1.5 mx-5 mt-5 rounded-2xl border border-white/5 shadow-inner shrink-0">
-          <button type="button" onClick={() => setChatMode("BOT")} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${chatMode === "BOT" ? "bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"}`}><Bot size={16} /> AI Assistant</button>
-          <button type="button" onClick={() => setChatMode("ADMIN")} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${chatMode === "ADMIN" ? "bg-emerald-600 text-white shadow-[0_0_20px_rgba(5,150,105,0.4)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"}`}><UserSquare size={16} /> Gặp Quản Lý</button>
-        </div>
+        {/* ======================================================== */}
+        {/* BODY TÙY THUỘC VÀO CHAT MODE */}
+        {/* ======================================================== */}
+        
+        {chatMode === "SELECT_CINEMA" ? (
+          // --- MÀN HÌNH CHỌN RẠP ĐỂ NỐI MÁY ADMIN ---
+          <div className="flex-1 overflow-y-auto bg-[#0d0d12] p-5 flex flex-col items-center custom-scrollbar animate-in slide-in-from-right-4 duration-300">
+            
+            <button onClick={() => setChatMode("BOT")} className="self-start text-[10px] font-black uppercase text-zinc-500 hover:text-white mb-6 flex items-center gap-1 transition-colors">
+               <ChevronLeft size={14} /> Quay lại trò chuyện AI
+            </button>
 
-        {chatMode === "ADMIN" && !selectedCinemaId ? (
-          <div className="flex-1 overflow-y-auto p-5 flex flex-col items-center custom-scrollbar">
-            <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.15)]"><MapPin size={28} className="text-emerald-500 animate-bounce" /></div>
+            <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+               <MapPin size={26} className="text-emerald-500 animate-bounce" />
+            </div>
+
             {!selectedParentCinema ? (
               <>
                 <h4 className="text-white font-black text-[15px] mb-1">Xác định Hệ thống rạp</h4>
-                <p className="text-zinc-500 text-xs font-medium text-center mb-6">Bạn đang gặp sự cố tại cụm rạp nào?</p>
+                <p className="text-zinc-500 text-xs font-medium text-center mb-6 px-4 leading-relaxed">Để kết nối chính xác tới nhân viên hỗ trợ, vui lòng chọn cụm rạp bạn đang quan tâm.</p>
                 <div className="w-full space-y-2.5">
                   {cinemas.map(parent => (
-                    <button key={parent.id} onClick={() => { setAdminMessages([]); setSelectedParentCinema(parent); }} className="w-full bg-[#121215] border border-white/5 p-3.5 rounded-xl text-left text-[13px] font-bold text-zinc-300 hover:bg-emerald-950/30 hover:text-emerald-400 hover:border-emerald-500/30 transition-all flex justify-between items-center group shadow-sm">
+                    <button key={parent.id} onClick={() => setSelectedParentCinema(parent)} className="w-full bg-[#16161a] border border-white/5 p-4 rounded-xl text-left text-[13px] font-bold text-zinc-300 hover:bg-emerald-950/30 hover:text-emerald-400 hover:border-emerald-500/30 transition-all flex justify-between items-center group shadow-sm">
                       <span className="uppercase tracking-wider">{parent.name}</span>
                       <ArrowRight size={16} className="text-zinc-600 group-hover:text-emerald-500 group-hover:translate-x-1 transition-transform" />
                     </button>
@@ -325,13 +409,21 @@ export default function ChatBubble() {
                 </div>
               </>
             ) : (
-              <>
-                <h4 className="text-white font-black text-[15px] mb-1">Chọn Chi nhánh cụ thể</h4>
+              <div className="w-full animate-in slide-in-from-right-4 duration-200">
+                <h4 className="text-white font-black text-[15px] mb-1 text-center">Chọn Chi nhánh cụ thể</h4>
                 <p className="text-zinc-500 text-xs font-medium text-center mb-4">Thuộc hệ thống {selectedParentCinema.name}</p>
-                <button onClick={() => { setSelectedParentCinema(null); setAdminMessages([]); }} className="text-[11px] font-black uppercase text-emerald-500 hover:text-emerald-400 mb-5 px-4 py-1.5 bg-emerald-500/10 rounded-full transition-colors">&larr; Quay lại hệ thống rạp</button>
+                
+                <button onClick={() => setSelectedParentCinema(null)} className="w-full mb-4 text-[10px] font-black uppercase text-emerald-500 hover:text-emerald-400 py-2.5 bg-emerald-500/10 rounded-xl transition-colors border border-emerald-500/20">
+                   Đổi hệ thống rạp khác
+                </button>
+
                 <div className="w-full space-y-2.5">
                   {cinemaItems.filter(i => i.cinema?.id === selectedParentCinema.id || i.cinemaId === selectedParentCinema.id || (i as any).cinema === selectedParentCinema.id).map(item => (
-                    <button key={item.id} onClick={() => { setAdminMessages([]); setSelectedCinemaId(item.id); setIsClosed(false); resetAutoCloseTimeout(); }} className="w-full bg-[#121215] border border-white/5 p-4 rounded-xl text-left text-zinc-300 hover:bg-emerald-950/30 hover:text-emerald-400 hover:border-emerald-500/30 transition-all flex justify-between items-center group shadow-sm">
+                    <button key={item.id} onClick={() => { 
+                      setSelectedCinemaId(item.id); 
+                      setChatMode("ADMIN"); 
+                      resetAutoCloseTimeout(); 
+                    }} className="w-full bg-[#16161a] border border-white/5 p-4 rounded-xl text-left text-zinc-300 hover:bg-emerald-950/30 hover:text-emerald-400 hover:border-emerald-500/30 transition-all flex justify-between items-center group shadow-sm">
                       <div className="flex flex-col">
                         <span className="font-bold text-[13px] uppercase tracking-wider">{item.name}</span>
                         <span className="text-[10px] text-zinc-500 font-medium mt-0.5">{item.city}</span>
@@ -342,69 +434,84 @@ export default function ChatBubble() {
                     </button>
                   ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
         ) : (
+          
+          // --- MÀN HÌNH CHAT CHÍNH (GỘP CHUNG BOT VÀ ADMIN) ---
           <>
-            {chatMode === "ADMIN" && selectedCinemaId && (
-              <div className="mx-5 mt-4 flex items-center justify-between bg-emerald-950/40 border border-emerald-500/20 rounded-xl px-4 py-2 shadow-inner">
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-emerald-500 font-black uppercase tracking-widest">Kênh CSKH</span>
-                  <span className="text-xs text-zinc-200 font-bold line-clamp-1">{cinemaItems.find(c => c.id === selectedCinemaId)?.name}</span>
-                </div>
-                <div className="flex gap-1">
-                  {!isChatClosed && <button onClick={handleUserActiveCancel} className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-all" title="Hủy kết nối"><Trash2 size={14} /></button>}
-                  <button onClick={() => { setSelectedCinemaId(null); setSelectedParentCinema(null); setAdminMessages([]); setIsClosed(false); }} className="p-2 bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700 hover:text-white rounded-lg transition-all" title="Đổi rạp"><RefreshCcw size={14} /></button>
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar bg-[#0d0d12]">
+              
+              {/* Lời chào mở đầu cố định của AI */}
+              <div className="text-center mb-6 mt-2">
+                 <span className="text-[9px] bg-white/5 px-4 py-1.5 rounded-full text-zinc-500 font-black border border-white/5 uppercase tracking-[0.2em]">Mã hóa đầu cuối 256-bit</span>
+              </div>
+              
+              <div className="flex flex-col items-start animate-in fade-in duration-500">
+                <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1.5 pl-1 flex items-center gap-1.5">
+                   <Sparkles size={10} className="text-red-500"/> Trợ lý AI A&K
+                </span>
+                <div className="max-w-[85%] text-[13px] px-5 py-4 rounded-2xl rounded-tl-sm shadow-md leading-relaxed bg-[#16161a] border border-white/5 text-zinc-300">
+                  Xin chào! Tôi là siêu trí tuệ nhân tạo của A&K Cinema. Bạn cần kiểm tra lịch chiếu phim, giá vé hay muốn nhận gợi ý phim hay hôm nay?
                 </div>
               </div>
-            )}
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
-              {isChatClosed && chatMode === "ADMIN" ? (
-                <div className="flex flex-col items-center text-center py-10 bg-[#121215] border border-white/5 rounded-2xl">
-                  <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mb-3 text-red-500"><X size={24} /></div>
-                  <p className="text-[13px] font-black text-red-500 uppercase tracking-wider mb-1">Phiên đã kết thúc</p>
-                  <p className="text-[11px] text-zinc-500 px-6 leading-relaxed">Quản lý rạp đã đóng phiên kết nối hoặc phiên hết hạn tự động do không có tương tác.</p>
-                  <button onClick={() => { setIsClosed(false); setSelectedCinemaId(null); setSelectedParentCinema(null); setAdminMessages([]); }} className="mt-5 text-xs bg-white/5 hover:bg-white/10 text-white px-5 py-2.5 rounded-xl uppercase font-bold border border-white/10 transition-all">Tạo phiên kết nối mới</button>
+              {/* Lời chào khi kết nối Admin */}
+              {chatMode === "ADMIN" && selectedCinemaId && (
+                <div className="flex flex-col items-center my-6 animate-in zoom-in-95 duration-300">
+                   <div className="bg-emerald-950/30 border border-emerald-900/50 px-5 py-3 rounded-2xl text-center max-w-[90%] shadow-inner">
+                      <p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mb-1">Đã kết nối Tổng đài viên</p>
+                      <p className="text-xs text-emerald-100/70 font-medium leading-relaxed">
+                         Hỗ trợ viên tại <b>{cinemaItems.find(c => c.id === selectedCinemaId)?.name}</b> đã tham gia trò chuyện. Vui lòng cung cấp mã vé hoặc vấn đề bạn cần xử lý.
+                      </p>
+                   </div>
                 </div>
-              ) : (
-                <>
-                  <div className="text-center mb-6"><span className="text-[9px] bg-white/5 px-4 py-1.5 rounded-full text-zinc-400 font-black border border-white/5 uppercase tracking-[0.2em]">Mã hóa đầu cuối 256-bit</span></div>
-                  
-                  <div className="flex flex-col items-start animate-in fade-in duration-300">
-                    <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1.5 pl-1">{chatMode === "BOT" ? "Hệ thống AI" : "Tổng đài viên"}</span>
-                    <div className={`max-w-[85%] text-[13px] px-5 py-3.5 rounded-2xl rounded-tl-sm shadow-md leading-relaxed border ${chatMode === "BOT" ? "bg-[#16161a] border-white/5 text-zinc-300" : "bg-emerald-950/40 border-emerald-900/50 text-emerald-100"}`}>
-                      {chatMode === "BOT" ? "Chào bạn! Tôi là siêu trí tuệ AI của A&K Cinema. Bạn cần kiểm tra lịch chiếu phim, giá vé hay muốn nhận gợi ý phim hay hôm nay?" : <span>Hệ thống đã nối máy với Quản lý rạp. Để được hỗ trợ nhanh nhất, vui lòng cung cấp:<br/><br/><b className="text-white">1. Mã đặt vé (hoặc SĐT)</b><br/><b className="text-white">2. Yêu cầu cần xử lý</b><br/><br/><i className="text-emerald-500/80 text-[11px]">Nhân viên sẽ kiểm tra và phản hồi ngay!</i></span>}
+              )}
+
+              {/* Render danh sách tin nhắn gộp chung */}
+              {messages.map((msg, idx) => {
+                const isUser = msg.senderRole === "USER";
+                const isAdmin = msg.senderRole === "ADMIN";
+                
+                return (
+                  <div key={idx} className={`flex flex-col ${isUser ? "items-end" : "items-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                    <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1">
+                      {isUser ? "Bạn" : isAdmin ? <><Headset size={10} className="text-emerald-500"/> CSKH A&K</> : <><Sparkles size={10} className="text-red-500"/> Trợ lý AI</>}
+                    </span>
+                    <div className={`max-w-[88%] text-[13px] px-5 py-3.5 rounded-2xl shadow-lg leading-relaxed border ${
+                      isUser 
+                        ? "bg-gradient-to-br from-red-600 to-rose-600 border-red-500/50 text-white rounded-tr-sm shadow-red-900/20" 
+                        : isAdmin
+                          ? "bg-emerald-950/40 border-emerald-900/50 text-emerald-100 rounded-tl-sm shadow-emerald-900/10"
+                          : "bg-[#16161a] border-white/5 text-zinc-300 rounded-tl-sm"
+                    }`}>
+                      {renderMessageContent(msg.content, msg.senderRole)}
                     </div>
                   </div>
-
-                  {activeMessages.map((msg, idx) => (
-                    <div key={idx} className={`flex flex-col ${msg.senderRole === "USER" ? "items-end" : "items-start"} animate-in fade-in slide-in-from-bottom-2`}>
-                      <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1.5 px-1">{msg.sender}</span>
-                      <div className={`max-w-[88%] text-[13px] px-5 py-3.5 rounded-2xl shadow-lg leading-relaxed border ${msg.senderRole === "USER" ? "bg-gradient-to-br from-red-600 to-rose-600 border-red-500/50 text-white rounded-tr-sm" : "bg-[#16161a] border-white/5 text-zinc-300 rounded-tl-sm"}`}>
-                        {renderMessageContent(msg.content, msg.senderRole)}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={sendMessage} className="p-4 bg-[#0a0a0c]/80 backdrop-blur-md border-t border-white/5 flex gap-2.5 shrink-0">
+            {/* KHUNG NHẬP TIN NHẮN */}
+            <form onSubmit={sendMessage} className="p-4 bg-[#0a0a0c]/90 backdrop-blur-xl border-t border-white/5 flex gap-2.5 shrink-0 relative z-20">
               <input 
                 type="text" 
                 value={inputValue} 
                 onChange={(e) => setInputValue(e.target.value)} 
-                disabled={isConnecting || (isChatClosed && chatMode === "ADMIN")} 
-                placeholder={isChatClosed && chatMode === "ADMIN" ? "Phiên đã đóng..." : "Nhập câu hỏi hoặc yêu cầu..."} 
-                className="flex-1 bg-[#121215] border border-white/10 rounded-xl px-4 py-3.5 text-[13px] font-medium text-white focus:outline-none focus:border-red-500/50 transition-all placeholder:text-zinc-600 disabled:opacity-50 shadow-inner" 
+                disabled={isConnecting} 
+                placeholder={chatMode === "ADMIN" ? "Nhắn với quản lý rạp..." : "Hỏi AI A&K Cinema..."} 
+                className="flex-1 bg-[#16161a] border border-white/10 rounded-xl px-4 py-3.5 text-[13px] font-medium text-white focus:outline-none focus:border-red-500/50 transition-all placeholder:text-zinc-600 disabled:opacity-50 shadow-inner" 
               />
               <button 
                 type="submit" 
-                disabled={!inputValue.trim() || isConnecting || (isChatClosed && chatMode === "ADMIN")} 
-                className={`w-12 h-12 text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 ${chatMode === "BOT" ? "bg-red-600 hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.4)]" : "bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]"}`}
+                disabled={!inputValue.trim() || isConnecting} 
+                className={`w-12 h-12 text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 ${
+                  chatMode === "ADMIN" 
+                    ? "bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]" 
+                    : "bg-red-600 hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)]"
+                }`}
               >
                 {isConnecting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} className="ml-0.5" />}
               </button>
@@ -413,11 +520,17 @@ export default function ChatBubble() {
         )}
       </div>
 
+      {/* NÚT MỞ WIDGET */}
       <button onClick={handleOpenChat} className={`w-16 h-16 bg-gradient-to-br from-red-600 to-rose-600 rounded-full flex items-center justify-center text-white shadow-[0_10px_30px_rgba(220,38,38,0.5)] transition-all duration-500 transform hover:scale-110 hover:-translate-y-2 border-2 border-white/20 hover:border-white/40 ${isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100 animate-[bounce_3s_infinite]"}`}>
         <MessageCircle size={28} strokeWidth={2.5} />
       </button>
 
-      <style jsx global>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #ef4444; }`}</style>
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; } 
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; } 
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
+      `}</style>
     </div>
   );
 }

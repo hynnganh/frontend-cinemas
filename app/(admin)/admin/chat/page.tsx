@@ -113,7 +113,7 @@ export default function AdminChatPage() {
             scrollToBottom();
           });
         } catch (error) {
-          console.error("Lỗi Subscribe STOMP:", error);
+          console.error("Lỗi đăng ký kết nối STOMP:", error);
         }
       }
     }, 300);
@@ -178,7 +178,7 @@ export default function AdminChatPage() {
         </div>
         <div className="flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-full relative z-10 shadow-sm">
           <div className={`w-2.5 h-2.5 rounded-full ${isConnecting ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">{isConnecting ? 'Connecting...' : 'Live Socket Connected'}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">{isConnecting ? 'Đang kết nối...' : 'Đã kết nối trực tuyến'}</span>
         </div>
       </div>
 
@@ -247,7 +247,7 @@ export default function AdminChatPage() {
                   </div>
                 </div>
                 <button onClick={handleCloseRoomActive} className="flex items-center gap-2 px-4 py-2 bg-red-600/10 border border-red-600/30 hover:bg-red-600 hover:text-white hover:border-red-600 rounded-xl text-[11px] font-black text-red-500 uppercase tracking-widest transition-all shadow-sm" title="Kết thúc hỗ trợ">
-                  <Power size={14} /> End Session
+                  <Power size={14} /> Đóng phiên
                 </button>
               </div>
 

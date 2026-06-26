@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, X, Ticket as TicketIcon, Check, AlertTriangle, Calendar, Clock, MapPin, Film } from 'lucide-react';
+import { Loader2, X, Ticket as TicketIcon, Check, AlertTriangle, Calendar, Clock, MapPin, Film, XCircle, Tv } from 'lucide-react';
 import { apiRequest } from '@/app/lib/api'; 
 import { QRCodeSVG } from 'qrcode.react';
 import { Toaster, toast } from 'react-hot-toast';
@@ -39,137 +39,123 @@ export default function TicketsTab() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   useEffect(() => {
-const fetchOrderHistory = async () => {
-  try {
-    const res = await apiRequest(`/api/v1/tickets/my-history?t=${new Date().getTime()}`);
+    const fetchOrderHistory = async () => {
+      try {
+        const res = await apiRequest(`/api/v1/tickets/my-history?t=${new Date().getTime()}`);
 
-    if (res.ok) {
-      const result = await res.json();
+        if (res.ok) {
+          const result = await res.json();
+          let rawData: any[] = [];
+          
+          if (Array.isArray(result)) rawData = result;
+          else if (result.data && Array.isArray(result.data)) rawData = result.data;
+          else if (result.content && Array.isArray(result.content)) rawData = result.content;
 
-      console.log("===== RESPONSE GỐC =====");
-      console.log(result);
+          const groupedTickets: Record<string, any> = {};
+          const normalizedOrders: any[] = [];
 
-      let rawData: any[] = [];
-      if (Array.isArray(result)) rawData = result;
-      else if (result.data && Array.isArray(result.data)) rawData = result.data;
-      else if (result.content && Array.isArray(result.content)) rawData = result.content;
+          rawData.forEach((item: any) => {
+            const showtimeStatus = item.showtime?.status || "ACTIVE";
 
-      console.log("===== RAW DATA =====");
-      console.log(rawData);
-
-      const groupedTickets: Record<string, any> = {};
-      const normalizedOrders: any[] = [];
-
-      rawData.forEach((item: any) => {
-
-        console.log("===== ITEM =====");
-        console.log(item);
-
-        if (item.orderDetails) {
-          normalizedOrders.push({
-            ...item,
-            date: item.date || "N/A",
-            time: item.time || "N/A",
-            movieTitle: item.movieTitle || "Vé Xem Phim"
-          });
-          return;
-        }
-
-        const code = item.bookingCode || `AK${item.id}`;
-
-        if (!groupedTickets[code]) {
-          let dateStr = "N/A";
-          let timeStr = "N/A";
-
-          if (item.showtime && item.showtime.startTime) {
-            const [datePart, timePart] = item.showtime.startTime.split('T');
-
-            if (datePart && timePart) {
-              const [y, m, d] = datePart.split('-');
-              const [hrs, mins] = timePart.split(':');
-
-              dateStr = `${d}/${m}/${y}`;
-              timeStr = `${hrs}:${mins}`;
+            // 🔥 BẮT DỮ LIỆU ĐÚNG TỪ JSON TRẢ VỀ
+            if (item.orderDetails) {
+              normalizedOrders.push({
+                ...item,
+                date: item.date || "N/A",
+                time: item.time || "N/A",
+                movieTitle: item.movieTitle || "Vé Xem Phim",
+                roomName: item.roomName || "PHÒNG CHIẾU", 
+                cinemaName: item.cinemaName || "A&K CINEMA",
+                showtimeStatus: showtimeStatus
+              });
+              return;
             }
-          }
 
-          groupedTickets[code] = {
-            id: item.id,
-            bookingCode: code,
-            status: item.status,
-            date: dateStr,
-            time: timeStr,
-            movieTitle: item.showtime?.movie?.title || "Vé Xem Phim",
-            cinemaName: "A&K Cinema",
-            roomName: item.showtime?.room?.name || item.roomName || "PHÒNG CHIẾU",
-            createdAt: item.createdAt,
-            orderDetails: []
-          };
-        }
+            const code = item.bookingCode || `AK${item.id}`;
 
-        let sName = "";
+            if (!groupedTickets[code]) {
+              let dateStr = "N/A";
+              let timeStr = "N/A";
 
-        if (item.seatName) {
-          sName = item.seatName;
-        } else if (item.seatRow && item.seatNumber) {
-          sName = `${item.seatRow}${item.seatNumber}`;
-        } else if (item.seat && item.seat.name) {
-          sName = item.seat.name;
-        }
+              if (item.showtime && item.showtime.startTime) {
+                const [datePart, timePart] = item.showtime.startTime.split('T');
 
-        if (sName) {
-          groupedTickets[code].orderDetails.push({
-            itemType: "TICKET",
-            itemName: sName
+                if (datePart && timePart) {
+                  const [y, m, d] = datePart.split('-');
+                  const [hrs, mins] = timePart.split(':');
+                  dateStr = `${d}/${m}/${y}`;
+                  timeStr = `${hrs}:${mins}`;
+                }
+              }
+
+              groupedTickets[code] = {
+                id: item.id,
+                bookingCode: code,
+                status: item.status, 
+                showtimeStatus: showtimeStatus, 
+                date: dateStr,
+                time: timeStr,
+                movieTitle: item.showtime?.movie?.title || "Vé Xem Phim",
+                cinemaName: item.cinemaName || "A&K Cinema",
+                roomName: item.showtime?.room?.name || item.roomName || "PHÒNG CHIẾU",
+                createdAt: item.createdAt,
+                orderDetails: []
+              };
+            }
+
+            let sName = "";
+            if (item.seatName) {
+              sName = item.seatName;
+            } else if (item.seatRow && item.seatNumber) {
+              sName = `${item.seatRow}${item.seatNumber}`;
+            } else if (item.seat && item.seat.name) {
+              sName = item.seat.name;
+            }
+
+            if (sName) {
+              groupedTickets[code].orderDetails.push({
+                itemType: "TICKET",
+                itemName: sName
+              });
+            }
           });
+
+          const finalOrders = [
+            ...normalizedOrders,
+            ...Object.values(groupedTickets)
+          ];
+
+          const validOrders = finalOrders.filter(
+            (o: any) => o.status === "PAID" || o.status === "USED" || o.status === "CANCELLED" || o.status === "CANCELED"
+          );
+
+          validOrders.sort(
+            (a: any, b: any) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+
+          setOrders(validOrders);
+        } else {
+          toast.error("Không thể tải lịch sử vé!");
         }
-      });
-
-      console.log("===== GROUPED TICKETS =====");
-      console.log(groupedTickets);
-
-      const finalOrders = [
-        ...normalizedOrders,
-        ...Object.values(groupedTickets)
-      ];
-
-      console.log("===== FINAL ORDERS =====");
-      console.table(finalOrders);
-
-      const validOrders = finalOrders.filter(
-        (o: any) => o.status === "PAID" || o.status === "USED"
-      );
-
-      console.log("===== VALID ORDERS =====");
-      console.table(validOrders);
-
-      validOrders.sort(
-        (a: any, b: any) =>
-          new Date(b.createdAt).getTime() -
-          new Date(a.createdAt).getTime()
-      );
-
-      console.log("===== SAU KHI SORT =====");
-      console.table(validOrders);
-
-      setOrders(validOrders);
-
-    } else {
-      toast.error("Không thể tải lịch sử vé!");
-    }
-  } catch (err) {
-    console.error("Lỗi lấy lịch sử vé:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+      } catch (err) {
+        console.error("Lỗi lấy lịch sử vé:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchOrderHistory();
   }, []);
 
   const filteredOrders = orders.filter(o => {
+    const isCancelled = o.status === 'CANCELLED' || o.status === 'CANCELED';
     const isExpired = o.status === 'PAID' && checkIsExpired(o.date, o.time);
-    if (activeFilter === 'upcoming') return o.status === 'PAID' && !isExpired;
-    if (activeFilter === 'done') return o.status === 'USED' || isExpired;
+    
+    if (activeFilter === 'upcoming') return o.status === 'PAID' && !isExpired && !isCancelled;
+    if (activeFilter === 'done') return (o.status === 'USED' || isExpired) && !isCancelled;
+    if (activeFilter === 'cancelled') return isCancelled; 
+    
     return true;
   });
 
@@ -178,7 +164,6 @@ const fetchOrderHistory = async () => {
     return selectedOrder.bookingCode;
   };
 
-  // 💡 TỐI ƯU HÀM HIỂN THỊ: Vì itemName giờ đã là "A1", "A2" nên chỉ cần map trực tiếp
   const cleanSeatsDisplay = () => {
     if (!selectedOrder) return "N/A";
     const tickets = selectedOrder.orderDetails?.filter((d: any) => d.itemType === 'TICKET') || [];
@@ -186,13 +171,18 @@ const fetchOrderHistory = async () => {
     
     return tickets.map((t: any) => {
       if (!t.itemName) return "N/A";
-      // Phòng thủ nếu backend cũ vẫn lọt chữ "Ghế A1", còn nếu đã gán phẳng "A1" thì lấy luôn
-      return t.itemName.replace('Ghế ', '').trim();
+      return t.itemName.replace(/Ghế\s+/i, '').trim();
     }).sort().join(", ");
   };
 
   const isSelectedExpired = selectedOrder && selectedOrder.status === 'PAID' && checkIsExpired(selectedOrder.date, selectedOrder.time);
   const isSelectedUsed = selectedOrder && selectedOrder.status === 'USED';
+  const isSelectedCancelled = selectedOrder && (selectedOrder.status === 'CANCELLED' || selectedOrder.status === 'CANCELED');
+  
+  const isSystemCancelled = isSelectedCancelled && selectedOrder?.showtimeStatus === 'CANCELLED';
+  const isUserCancelled = isSelectedCancelled && !isSystemCancelled;
+
+  const isInvalid = isSelectedUsed || isSelectedExpired || isSelectedCancelled;
 
   return (
     <div className="min-h-screen bg-[#040406] text-white px-4 sm:px-6 lg:px-64 py-12 relative overflow-hidden">
@@ -209,11 +199,11 @@ const fetchOrderHistory = async () => {
            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em] mt-1.5">Hệ thống quản lý vé thông minh</p>
         </div>
 
-        {/* Nút lọc */}
-        <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-900 gap-1 shadow-inner self-start sm:self-auto">
+        <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-900 gap-1 shadow-inner self-start sm:self-auto overflow-x-auto no-scrollbar">
           {[
             { id: 'upcoming', label: 'Vé sắp xem' },
-            { id: 'done', label: 'Lịch sử xem' }
+            { id: 'done', label: 'Lịch sử xem' },
+            { id: 'cancelled', label: 'Đã hủy' }
           ].map((tab) => (
             <button 
               key={tab.id} 
@@ -221,7 +211,7 @@ const fetchOrderHistory = async () => {
               className={`px-5 py-2 rounded-xl text-[11px] font-black uppercase transition-all duration-300 whitespace-nowrap ${
                 activeFilter === tab.id 
                   ? 'bg-red-600 text-white shadow-lg shadow-red-900/20' 
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'
               }`}
             >
               {tab.label}
@@ -274,42 +264,48 @@ const fetchOrderHistory = async () => {
 
                 <div>
                   <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Tác phẩm điện ảnh</span>
-                  <h3 className="text-xl font-black text-white uppercase tracking-tight leading-tight">
+                  <h3 className={`text-xl font-black uppercase tracking-tight leading-tight ${isSelectedCancelled ? 'text-zinc-500 line-through' : 'text-white'}`}>
                     {selectedOrder.movieTitle}
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-zinc-900">
+                <div className={`grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-zinc-900 ${isSelectedCancelled ? 'opacity-50 grayscale' : ''}`}>
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
-                      <Calendar size={11} className="text-zinc-400" />
-                      Ngày chiếu
+                      <Calendar size={11} className="text-zinc-400" /> Ngày chiếu
                     </div>
                     <span className="text-sm font-extrabold text-zinc-200 mt-1">{selectedOrder.date}</span>
                   </div>
 
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
-                      <Clock size={11} className="text-zinc-400" />
-                      Suất chiếu
+                      <Clock size={11} className="text-zinc-400" /> Suất chiếu
                     </div>
                     <span className="text-sm font-extrabold text-zinc-200 mt-1">{selectedOrder.time}</span>
                   </div>
 
+                  {/* 🔥 ĐÃ CẬP NHẬT HIỂN THỊ CẢ RẠP CHIẾU VÀ PHÒNG CHIẾU */}
                   <div className="flex flex-col">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
-                      <MapPin size={11} className="text-zinc-400" />
-                      Phòng chiếu
+                      <MapPin size={11} className="text-zinc-400" /> Cụm rạp
+                    </div>
+                    <span className="text-sm font-black text-zinc-200 mt-1 uppercase tracking-wide truncate pr-2">
+                      {selectedOrder.cinemaName || "A&K CINEMA"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+                      <Tv size={11} className="text-zinc-400" /> Phòng chiếu
                     </div>
                     <span className="text-sm font-black text-red-500 mt-1 uppercase tracking-wide">
                       {selectedOrder.roomName || "PHÒNG CHIẾU"}
                     </span>
                   </div>
 
-                  <div className="flex flex-col">
+                  <div className="flex flex-col col-span-2">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
-                      <Film size={11} className="text-zinc-400" />
-                      Vị trí ghế
+                      <Film size={11} className="text-zinc-400" /> Vị trí ghế
                     </div>
                     <span className="text-xs font-black text-zinc-100 mt-1 tracking-wide bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-md w-fit min-w-[40px] text-center shadow-inner">
                       {cleanSeatsDisplay()}
@@ -318,17 +314,35 @@ const fetchOrderHistory = async () => {
                 </div>
               </div>
 
-              <div className={`mt-6 py-2 px-4 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border text-center md:text-left w-fit ${
-                (isSelectedUsed || isSelectedExpired) 
-                  ? 'bg-zinc-900/40 text-zinc-500 border-zinc-900' 
-                  : 'bg-red-950/20 text-red-400 border-red-900/30 animate-pulse'
-              }`}>
-                {isSelectedUsed 
-                  ? 'VÉ ĐÃ QUA SOÁT VÉ' 
-                  : isSelectedExpired 
-                    ? 'VÉ HẾT HẠN SUẤT CHIẾU' 
-                    : 'HỆ THỐNG VÉ ĐIỆN TỬ CHÍNH THỨC'}
-              </div>
+              {/* THÔNG BÁO LÝ DO HỦY CHI TIẾT */}
+              {isSelectedCancelled ? (
+                <div className="mt-6 p-4 rounded-2xl border bg-red-950/20 border-red-900/40 shadow-inner">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle size={15} className="text-red-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-red-500">
+                      {isSystemCancelled ? 'THÔNG BÁO TỪ HỆ THỐNG' : 'THÔNG BÁO'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-300 leading-relaxed font-medium">
+                    {isSystemCancelled 
+                      ? 'Cinema A&K xin lỗi khách hàng do suất chiếu có vấn đề nên bị huỷ ạ, bên rạp đã đền bù điểm cho khách hàng để đổi mã giảm giá cho lần đặt vé tiếp theo, mong quý khách thông cảm ạ.'
+                      : 'Bạn đã huỷ thanh toán.'}
+                  </p>
+                </div>
+              ) : (
+                <div className={`mt-6 py-2 px-4 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border text-center md:text-left w-fit ${
+                  (isSelectedUsed || isSelectedExpired) 
+                    ? 'bg-zinc-900/40 text-zinc-500 border-zinc-900' 
+                    : 'bg-red-950/20 text-red-400 border-red-900/30 animate-pulse'
+                }`}>
+                  {isSelectedUsed 
+                    ? 'VÉ ĐÃ QUA SOÁT VÉ' 
+                    : isSelectedExpired 
+                      ? 'VÉ HẾT HẠN SUẤT CHIẾU' 
+                      : 'HỆ THỐNG VÉ ĐIỆN TỬ CHÍNH THỨC'}
+                </div>
+              )}
+
             </div>
 
             <div className="hidden md:flex flex-col justify-between py-6 relative w-[1px] border-r border-dashed border-zinc-800">
@@ -338,23 +352,30 @@ const fetchOrderHistory = async () => {
 
             {/* BÊN PHẢI: QR CODE */}
             <div className={`w-full md:w-64 p-6 md:p-8 flex flex-col items-center justify-center border-t md:border-t-0 border-zinc-900 shrink-0 ${
-              (isSelectedUsed || isSelectedExpired) ? 'bg-zinc-950' : 'bg-gradient-to-b md:bg-gradient-to-l from-red-950/[0.05] to-transparent'
+              isInvalid ? 'bg-zinc-950' : 'bg-gradient-to-b md:bg-gradient-to-l from-red-950/[0.05] to-transparent'
             }`}>
-              <div className="relative p-3 rounded-2xl bg-zinc-900 border border-zinc-800/60 shadow-inner">
+              <div className="relative p-3 rounded-2xl bg-zinc-900 border border-zinc-800/60 shadow-inner overflow-hidden">
                 <div className={`bg-white p-3 rounded-xl shadow-md transition-all duration-300 ${
-                  (isSelectedUsed || isSelectedExpired) ? 'opacity-25 grayscale blur-[0.5px]' : ''
+                  isInvalid ? 'opacity-20 grayscale blur-[1.5px]' : '' 
                 }`}>
                   <QRCodeSVG value={getModalBookingCode()} size={130} level="H" includeMargin={false} />
                 </div>
                 
-                {(isSelectedUsed || isSelectedExpired) && (
+                {/* CON DẤU BÁO HIỆU TRẠNG THÁI */}
+                {isInvalid && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4 rotate-[-12deg]">
-                    <div className={`border-2 backdrop-blur-sm px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-2xl ${
-                      isSelectedExpired ? 'border-amber-500 bg-zinc-950/95 text-amber-500' : 'border-emerald-500 bg-zinc-950/95 text-emerald-400'
+                    <div className={`border-2 backdrop-blur-sm px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xl ${
+                      isSelectedCancelled ? 'border-red-600 bg-zinc-950/95 text-red-500' :
+                      isSelectedExpired ? 'border-amber-500 bg-zinc-950/95 text-amber-500' : 
+                      'border-emerald-500 bg-zinc-950/95 text-emerald-400'
                     }`}>
-                      {isSelectedExpired ? <AlertTriangle size={13} className="stroke-[2.5]" /> : <Check size={13} className="stroke-[2.5]" />}
+                      {isSelectedCancelled ? <XCircle size={14} className="stroke-[2.5]" /> :
+                       isSelectedExpired ? <AlertTriangle size={13} className="stroke-[2.5]" /> : 
+                       <Check size={13} className="stroke-[2.5]" />}
+                      
                       <span className="text-[10px] font-black uppercase tracking-[0.15em]">
-                        {isSelectedExpired ? 'HẾT HẠN' : 'ĐÃ DÙNG'}
+                        {isSelectedCancelled ? 'ĐÃ HỦY VÉ' :
+                         isSelectedExpired ? 'HẾT HẠN' : 'ĐÃ DÙNG'}
                       </span>
                     </div>
                   </div>
@@ -364,16 +385,18 @@ const fetchOrderHistory = async () => {
               <div className="mt-4 flex flex-col items-center w-full">
                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Mã đặt vé</span>
                 <div className={`px-4 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800/50 font-mono text-xs font-black tracking-[0.2em] shadow-sm bg-gradient-to-b from-zinc-900 to-zinc-950 text-center w-full max-w-[180px] ${
-                  (isSelectedUsed || isSelectedExpired) ? 'text-zinc-600 line-through decoration-zinc-700' : 'text-zinc-200'
+                  isInvalid ? 'text-zinc-600 line-through decoration-zinc-700' : 'text-zinc-200'
                 }`}>
-                  {getModalBookingCode()}
+                  {/* ẨN MÃ SỐ VÉ NẾU ĐÃ HỦY */}
+                  {isSelectedCancelled ? '***-***-***' : getModalBookingCode()}
                 </div>
               </div>
 
               <p className={`mt-5 text-[9px] font-bold text-center tracking-wide ${
-                (isSelectedUsed || isSelectedExpired) ? 'text-zinc-600' : 'text-zinc-400'
+                isInvalid ? 'text-zinc-600' : 'text-zinc-400'
               }`}>
-                {isSelectedUsed || isSelectedExpired ? 'Vé không còn giá trị' : 'Đưa mã này cho nhân viên quầy soát vé'}
+                {isSelectedCancelled ? 'Mã vé đã được ẩn vì lý do bảo mật' :
+                 isInvalid ? 'Vé không còn giá trị sử dụng' : 'Đưa mã này cho nhân viên quầy soát vé'}
               </p>
             </div>
 

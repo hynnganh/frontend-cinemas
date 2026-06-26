@@ -39,15 +39,26 @@ export default function MovieCard({ movie, onSelect }: any) {
                 <div className="w-1 h-1 bg-red-500 rounded-full" /> {f.type}
               </span>
               <div className="flex flex-wrap gap-2">
-                {f.times.map((st: any) => (
-                  <button 
-                    key={st.id} 
-                    onClick={() => onSelect(st.id)} 
-                    className="px-3.5 py-1.5 rounded-lg bg-[#0a0a0a] border border-zinc-800 text-[10px] font-black text-zinc-300 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-90 shadow-sm"
-                  >
-                    {st.time}
-                  </button>
-                ))}
+                {f.times.map((st: any) => {
+                  // 🔥 KIỂM TRA TRẠNG THÁI SUẤT CHIẾU
+                  const isCancelled = st.status === 'CANCELLED' || st.status === 'PENDING_CANCEL';
+
+                  return (
+                    <button 
+                      key={st.id} 
+                      disabled={isCancelled} // Khóa nút
+                      onClick={() => !isCancelled && onSelect(st.id)} 
+                      title={isCancelled ? "Suất chiếu này đã bị hủy" : "Chọn suất chiếu này"}
+                      className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black transition-all shadow-sm ${
+                        isCancelled 
+                          ? 'bg-zinc-950 border border-zinc-900 text-zinc-700 line-through cursor-not-allowed opacity-60' // Hiệu ứng đã hủy
+                          : 'bg-[#0a0a0a] border border-zinc-800 text-zinc-300 hover:bg-red-600 hover:text-white hover:border-red-600 active:scale-90' // Hiệu ứng bình thường
+                      }`}
+                    >
+                      {st.time}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}

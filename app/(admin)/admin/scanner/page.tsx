@@ -21,7 +21,7 @@ import {
 import toast, { Toaster } from 'react-hot-toast'; 
 
 // Import hàm apiAdminRequest từ file helper của bạn
-import { apiAdminRequest } from '@/app/lib/api'; // Hãy điều chỉnh lại path import cho đúng cấu trúc thư mục của bạn
+import { apiAdminRequest } from '@/app/lib/api'; 
 
 export default function StaffScannerPage() {
   const [orderData, setOrderData] = useState<any>(null);
@@ -94,7 +94,6 @@ export default function StaffScannerPage() {
     setLoading(true);
     setError(null);
     try {
-      // Thay thế fetch thuần bằng apiAdminRequest
       const res = await apiAdminRequest(`/api/v1/orders/scan?bookingCode=${encodeURIComponent(bookingCode.toUpperCase())}`, {
         method: "GET"
       });
@@ -119,7 +118,6 @@ export default function StaffScannerPage() {
 
     setConfirmLoading(true);
     try {
-      // Thay thế fetch thuần bằng apiAdminRequest
       const res = await apiAdminRequest(`/api/v1/orders/${orderData.id}/confirm-checkin`, {
         method: "PUT"
       });
@@ -150,6 +148,7 @@ export default function StaffScannerPage() {
     setScannerEnabled(true);
   };
 
+  // 🔥 FIX LỖI: Sửa lại logic lấy tên ghế cho chuẩn với cấu trúc Backend mới
   const getSeatStringFromData = () => {
     if (!orderData || !orderData.orderDetails) return "N/A";
 
@@ -157,8 +156,9 @@ export default function StaffScannerPage() {
     if (tickets.length === 0) return "N/A";
     
     const seatNames = tickets.map((t: any) => {
-      const match = t.itemName.match(/Ghế\s+([A-Z0-9]+)/i);
-      return match ? match[1] : "...";
+      if (!t.itemName) return "N/A";
+      // Bỏ chữ "Ghế" nếu có, lấy thẳng tên (VD: "Ghế A1" -> "A1", "A1" -> "A1")
+      return t.itemName.replace(/Ghế\s+/i, '').trim();
     });
     
     seatNames.sort();
@@ -359,7 +359,8 @@ export default function StaffScannerPage() {
                         </div>
                         <div>
                           <p className="text-[11px] font-black text-white uppercase tracking-wide leading-tight">
-                            {item.itemName}
+                            {/* 🔥 Đã clean sẵn lúc render cho gọn chữ "Ghế" (nếu thích) */}
+                            {item.itemType === 'TICKET' ? item.itemName.replace(/Ghế\s+/i, '').trim() : item.itemName}
                           </p>
                           <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider mt-0.5">Loại hình: {item.itemType}</p>
                         </div>

@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-
+import { useRouter } from "next/navigation";
 import {
   Gift,
   Sparkles,
@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 
 import Link from "next/link";
-
 import { apiRequest } from "@/app/lib/api";
 
 type Voucher = {
@@ -46,22 +45,15 @@ type UserProfile = {
 };
 
 export default function MembershipPage() {
-  const [points, setPoints] =
-    useState<number>(0);
+  const router = useRouter();
 
-  const [user, setUser] =
-    useState<UserProfile | null>(null);
-
-  const [vouchers, setVouchers] = useState<
-    Voucher[]
-  >([]);
-
+  const [points, setPoints] = useState<number>(0);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  
   // voucher đã đổi
-  const [myVouchers, setMyVouchers] =
-    useState<any[]>([]);
-
-  const [loading, setLoading] =
-    useState<boolean>(true);
+  const [myVouchers, setMyVouchers] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const [toast, setToast] = useState<{
     show: boolean;
@@ -73,20 +65,24 @@ export default function MembershipPage() {
     message: "",
   });
 
+  // ================= LẤY TOKEN AN TOÀN =================
+  const getToken = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("token_user");
+    }
+    return null;
+  };
+
   // ================= FETCH =================
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem(
-              "token_user"
-            )
-          : null;
+      const token = getToken();
 
+      // Nếu chưa đăng nhập, tự động đẩy về trang Login
       if (!token) {
-        setLoading(false);
+        router.push("/auth");
         return;
       }
 
@@ -99,78 +95,40 @@ export default function MembershipPage() {
         voucherRes,
         myVoucherRes,
       ] = await Promise.all([
-        apiRequest(
-          "/api/v1/users/me",
-          {
-            method: "GET",
-            headers,
-          }
-        ),
-
-        apiRequest(
-          "/api/v1/vouchers/redeemable",
-          {
-            method: "GET",
-            headers,
-          }
-        ),
-
-        apiRequest(
-          "/api/v1/vouchers/my-vouchers",
-          {
-            method: "GET",
-            headers,
-          }
-        ),
+        apiRequest("/api/v1/users/me", { method: "GET", headers }),
+        apiRequest("/api/v1/vouchers/redeemable", { method: "GET", headers }),
+        apiRequest("/api/v1/vouchers/my-vouchers", { method: "GET", headers }),
       ]);
 
-      const [
-        userJson,
-        voucherJson,
-        myVoucherJson,
-      ] = await Promise.all([
+      // Nếu Token hết hạn hoặc không hợp lệ (lỗi 401/403), bắt đi đăng nhập lại
+      if (userRes.status === 401 || userRes.status === 403) {
+        localStorage.removeItem("token_user");
+        router.push("/auth/login");
+        return;
+      }
+
+      const [userJson, voucherJson, myVoucherJson] = await Promise.all([
         userRes.json(),
         voucherRes.json(),
         myVoucherRes.json(),
       ]);
 
-      const userData =
-        userJson?.data || {};
-
-      const voucherData = Array.isArray(
-        voucherJson?.data
-      )
-        ? voucherJson.data
-        : [];
-
-      const ownedVouchers =
-        Array.isArray(
-          myVoucherJson?.data
-        )
-          ? myVoucherJson.data
-          : [];
+      const userData = userJson?.data || {};
+      const voucherData = Array.isArray(voucherJson?.data) ? voucherJson.data : [];
+      const ownedVouchers = Array.isArray(myVoucherJson?.data) ? myVoucherJson.data : [];
 
       setUser(userData);
-
       setPoints(userData?.points || 0);
-
       setMyVouchers(ownedVouchers);
 
-      const redeemVouchers =
-        voucherData.filter(
-          (v: Voucher) =>
-            !v.voucherType ||
-            v.voucherType === "REDEEM"
-        );
+      const redeemVouchers = voucherData.filter(
+        (v: Voucher) => !v.voucherType || v.voucherType === "REDEEM"
+      );
 
       setVouchers(redeemVouchers);
     } catch (error) {
       console.error(error);
-
-      showToastMessage(
-        "error",
-        "Không thể tải dữ liệu thành viên"
-      );
+      showToastMessage("error", "Không thể tải dữ liệu thành viên");
     } finally {
       setLoading(false);
     }
@@ -178,13 +136,10 @@ export default function MembershipPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [router]);
 
   // ================= TOAST =================
-  const showToastMessage = (
-    type: "success" | "error",
-    message: string
-  ) => {
+  const showToastMessage = (type: "success" | "error", message: string) => {
     setToast({
       show: true,
       type,
@@ -200,52 +155,49 @@ export default function MembershipPage() {
   };
 
   // ================= REDEEM =================
-  const redeemVoucher = async (
-    voucher: Voucher
-  ) => {
+  const redeemVoucher = async (voucher: Voucher) => {
     try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem(
-              "token_user"
-            )
-          : null;
+      const token = getToken();
+      
+      // Phòng hờ nếu User mở sẵn tab rồi mới bấm đăng xuất ở tab khác
+      if (!token) {
+        router.push("/auth/login");
+        return;
+      }
 
-      const res = await apiRequest(
-        `/api/v1/vouchers/redeem/${voucher.id}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await apiRequest(`/api/v1/vouchers/redeem/${voucher.id}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem("token_user");
+        router.push("/auth/login");
+        return;
+      }
 
       const json = await res.json();
 
       showToastMessage(
         "success",
-        json?.message ||
-          `Đổi voucher thành công`
+        json?.message || `Đổi voucher thành công`
       );
 
       fetchData();
     } catch (error: any) {
       console.error(error);
-
       showToastMessage(
         "error",
-        error?.message ||
-          "Đổi voucher thất bại"
+        error?.message || "Đổi voucher thất bại"
       );
     }
   };
 
   // ================= NAME =================
   const fullName = useMemo(() => {
-    return `${user?.firstName || ""} ${
-      user?.lastName || ""
-    }`.trim();
+    return `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
   }, [user]);
 
   return (
@@ -253,7 +205,6 @@ export default function MembershipPage() {
       {/* BG */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-[-350px] left-1/2 -translate-x-1/2 w-[1200px] h-[1200px] rounded-full bg-red-600/10 blur-[180px]" />
-
         <div className="absolute bottom-[-300px] right-[-150px] w-[800px] h-[800px] rounded-full bg-red-500/10 blur-[180px]" />
       </div>
 
@@ -349,8 +300,7 @@ export default function MembershipPage() {
                     </p>
 
                     <h2 className="mt-3 text-2xl font-black italic leading-tight">
-                      {fullName ||
-                        "A&K MEMBER"}
+                      {fullName || "A&K MEMBER"}
                     </h2>
 
                     <p className="text-zinc-500 text-xs mt-2">
@@ -523,19 +473,14 @@ export default function MembershipPage() {
         ) : (
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
             {vouchers.map((voucher) => {
-              const canRedeem =
-                points >=
-                voucher.costPoints;
+              const canRedeem = points >= voucher.costPoints;
 
               // check đã đổi
-              const alreadyOwned =
-                myVouchers.some(
-                  (myVoucher) =>
-                    myVoucher.id ===
-                      voucher.id ||
-                    myVoucher.code ===
-                      voucher.code
-                );
+              const alreadyOwned = myVouchers.some(
+                (myVoucher) =>
+                  myVoucher.id === voucher.id ||
+                  myVoucher.code === voucher.code
+              );
 
               return (
                 <div
@@ -556,8 +501,6 @@ export default function MembershipPage() {
 
                     {/* CONTENT */}
                     <div className="mt-6">
-                      {/* KHÔNG HIỆN CODE */}
-
                       <h3 className="text-xl font-black leading-tight line-clamp-2 min-h-[56px]">
                         {voucher.title}
                       </h3>
@@ -574,12 +517,8 @@ export default function MembershipPage() {
                         <span className="text-zinc-500 text-xs">
                           Giảm giá
                         </span>
-
                         <span className="text-red-500 font-black">
-                          {Number(
-                            voucher.discountValue
-                          ).toLocaleString()}
-                          đ
+                          {Number(voucher.discountValue).toLocaleString()}đ
                         </span>
                       </div>
 
@@ -587,10 +526,8 @@ export default function MembershipPage() {
                         <span className="text-zinc-500 text-xs">
                           Đổi điểm
                         </span>
-
                         <span className="font-black text-white text-sm">
-                          {voucher.costPoints}
-                          điểm
+                          {voucher.costPoints} điểm
                         </span>
                       </div>
 
@@ -598,12 +535,8 @@ export default function MembershipPage() {
                         <span className="text-zinc-500 text-xs">
                           Đơn tối thiểu
                         </span>
-
                         <span className="font-bold text-zinc-300 text-xs">
-                          {Number(
-                            voucher.minOrderAmount
-                          ).toLocaleString()}
-                          đ
+                          {Number(voucher.minOrderAmount).toLocaleString()}đ
                         </span>
                       </div>
 
@@ -611,14 +544,9 @@ export default function MembershipPage() {
                         <span className="text-zinc-500 text-xs">
                           HSD
                         </span>
-
                         <span className="font-bold text-zinc-300 text-xs">
                           {voucher.endDate
-                            ? new Date(
-                                voucher.endDate
-                              ).toLocaleDateString(
-                                "vi-VN"
-                              )
+                            ? new Date(voucher.endDate).toLocaleDateString("vi-VN")
                             : "Không giới hạn"}
                         </span>
                       </div>
@@ -626,15 +554,8 @@ export default function MembershipPage() {
 
                     {/* BUTTON */}
                     <button
-                      onClick={() =>
-                        redeemVoucher(
-                          voucher
-                        )
-                      }
-                      disabled={
-                        !canRedeem ||
-                        alreadyOwned
-                      }
+                      onClick={() => redeemVoucher(voucher)}
+                      disabled={!canRedeem || alreadyOwned}
                       className={`mt-6 w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs transition-all duration-300 ${
                         alreadyOwned
                           ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
